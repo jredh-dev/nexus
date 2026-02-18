@@ -1,0 +1,43 @@
+# sms-sender service
+#
+# Joins the existing "agentic-network" Docker network so it can resolve
+# "kafka" by hostname (the broker's service-discovery alias on that network).
+#
+# Usage:
+#   cp .env.example .env          # fill in your Telnyx credentials
+#   docker compose -f docker-compose.sms-sender.yml up -d
+#
+# To publish a test message from the host:
+#   docker exec -i agentic-kafka kafka-console-producer \
+#     --topic sms-outbox \
+#     --bootstrap-server localhost:9092 <<< \
+#     '{"id":"test-1","to":"+1XXXXXXXXXX","body":"hello world from kafka"}'
+
+services:
+  sms-sender:
+    build:
+      context: .
+      dockerfile: docker/sms-sender/Dockerfile
+    image: nascent-nexus/sms-sender:latest
+    restart: unless-stopped
+    environment:
+      # Kafka broker list — "kafka" resolves via agentic-network service discovery.
+      KAFKA_BROKERS: kafka:9092
+      # Telnyx API v2 key.  Get this from console.telnyx.com → API Keys.
+      TELNYX_API_KEY: ${TELNYX_API_KEY}
+      # Your Telnyx-provisioned number in E.164 format.
+      TELNYX_FROM_NUMBER: ${TELNYX_FROM_NUMBER}
+    networks:
+      - agentic-network
+    # No ports exposed — this is a pure consumer with no inbound traffic.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  # Attach to the existing agentic-network (created by the main docker-compose
+  # stack) so Kafka is reachable by hostname without port-forwarding gymnastics.
+  agentic-network:
+    external: true
