@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>nascent-nexus - Your Personal AI Assistant</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .hero {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .feature-icon {
+            font-size: 3rem;
+            color: #667eea;
+            margin-bottom: 1rem;
+        }
+        .logo-image {
+            max-width: 300px;
+            margin: 2rem auto;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <!-- Hero Section -->
+    <section class="hero is-medium is-primary">
+        <div class="hero-body">
+            <div class="container has-text-centered">
+                <img src="/images/logo.svg" alt="nascent-nexus logo" class="logo-image">
+                <h1 class="title is-1 has-text-white">
+                    nascent-nexus
+                </h1>
+                <h2 class="subtitle is-3 has-text-white">
+                    The mind that remembers, reminds, and coordinates everything
+                </h2>
+                <p class="is-size-5 has-text-white mb-5">
+                    Your personal AI assistant, accessible via SMS
+                </p>
+                <a href="#features" class="button is-white is-large">
+                    <span class="icon">
+                        <i class="fas fa-arrow-down"></i>
+                    </span>
+                    <span>Learn More</span>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="section">
+        <div class="container">
+            <h2 class="title is-2 has-text-centered mb-6">Features</h2>
+            
+            <div class="columns is-multiline">
+                <!-- Memory System -->
+                <div class="column is-4">
+                    <div class="box has-text-centered">
+                        <div class="feature-icon">
+                            <i class="fas fa-brain"></i>
+                        </div>
+                        <h3 class="title is-4">Memory System</h3>
+                        <p>Text your thoughts, schedules, and questions. Your AI assistant remembers everything.</p>
+                    </div>
+                </div>
+
+                <!-- Service Integration -->
+                <div class="column is-4">
+                    <div class="box has-text-centered">
+                        <div class="feature-icon">
+                            <i class="fas fa-puzzle-piece"></i>
+                        </div>
+                        <h3 class="title is-4">Service Integration</h3>
+                        <p>Connect all your apps and services. IFTTT-like automation for your digital life.</p>
+                    </div>
+                </div>
+
+                <!-- Community Q&A -->
+                <div class="column is-4">
+                    <div class="box has-text-centered">
+                        <div class="feature-icon">
+                            <i class="fas fa-comments"></i>
+                        </div>
+                        <h3 class="title is-4">Community Questions</h3>
+                        <p>Reddit-style Q&A with your own crowd. Get answers from real people.</p>
+                    </div>
+                </div>
+
+                <!-- Voice Chat -->
+                <div class="column is-4">
+                    <div class="box has-text-centered">
+                        <div class="feature-icon">
+                            <i class="fas fa-microphone"></i>
+                        </div>
+                        <h3 class="title is-4">Voice Chat</h3>
+                        <p>General lobby for conversations. Talk naturally with your AI assistant.</p>
+                    </div>
+                </div>
+
+                <!-- Smart Security -->
+                <div class="column is-4">
+                    <div class="box has-text-centered">
+                        <div class="feature-icon">
+                            <i class="fas fa-shield-halved"></i>
+                        </div>
+                        <h3 class="title is-4">LLM-Based Auth</h3>
+                        <p>Unique security questions generated just for you. Secure and memorable.</p>
+                    </div>
+                </div>
+
+                <!-- Human-in-the-Loop -->
+                <div class="column is-4">
+                    <div class="box has-text-centered">
+                        <div class="feature-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <h3 class="title is-4">Human Advisory</h3>
+                        <p>AI consults real humans for sensitive topics. The best of both worlds.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Status Section -->
+    <section class="section has-background-light">
+        <div class="container">
+            <div class="columns is-vcentered">
+                <div class="column is-6">
+                    <h2 class="title is-2">Current Status</h2>
+                    <div class="content is-size-5">
+                        <p><strong>Phase 1: SMS "hello world"</strong> ✅</p>
+                        <p>Text any message to your nascent-nexus number and get "world" back!</p>
+                        <p class="mt-4">Coming soon:</p>
+                        <ul>
+                            <li>PostgreSQL integration + memory storage</li>
+                            <li>LLM integration for intelligent responses</li>
+                            <li>Service integrations (calendar, email, etc.)</li>
+                            <li>Community features and voice chat</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="column is-6 has-text-centered">
+                    <div class="notification is-info is-light">
+                        <h3 class="title is-4">
+                            <span class="icon">
+                                <i class="fas fa-mobile-alt"></i>
+                            </span>
+                            <span>SMS Interface</span>
+                        </h3>
+                        <p class="is-size-5">
+                            Access your AI assistant from anywhere, no app required. Just text.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tech Stack -->
+    <section class="section">
+        <div class="container">
+            <h2 class="title is-2 has-text-centered mb-6">Built With</h2>
+            <div class="columns is-centered">
+                <div class="column is-8">
+                    <div class="tags are-large is-centered">
+                        <span class="tag is-primary">Go</span>
+                        <span class="tag is-link">PostgreSQL</span>
+                        <span class="tag is-info">Twilio</span>
+                        <span class="tag is-success">ngrok</span>
+                        <span class="tag is-warning">OpenAI</span>
+                        <span class="tag is-danger">Bulma</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="content has-text-centered">
+            <p>
+                <strong>nascent-nexus</strong> by jredh-dev
+            </p>
+            <p>
+                Licensed under <a href="/LICENSE">AGPL-3.0</a>
+            </p>
+            <p class="mt-4">
+                <a href="https://github.com/jredh-dev/nascent-nexus" class="button is-dark">
+                    <span class="icon">
+                        <i class="fab fa-github"></i>
+                    </span>
+                    <span>GitHub</span>
+                </a>
+            </p>
+        </div>
+    </footer>
+</body>
+</html>

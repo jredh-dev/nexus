@@ -22,6 +22,22 @@ import (
 )
 
 func main() {
+	// Serve static files (CSS, JS, images)
+	fs := http.FileServer(http.Dir("./static"))
+	http.Handle("/images/", http.StripPrefix("/images/", http.FileServer(http.Dir("./static/images"))))
+	http.Handle("/css/", http.StripPrefix("/css/", http.FileServer(http.Dir("./static/css"))))
+	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir("./static/js"))))
+
+	// Homepage
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			http.ServeFile(w, r, "./static/index.html")
+			return
+		}
+		// For any other path, try serving from static
+		fs.ServeHTTP(w, r)
+	})
+
 	// Health check endpoint
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -34,6 +50,7 @@ func main() {
 	// Start server
 	port := "8080"
 	fmt.Printf("🚀 nascent-nexus server starting on port %s\n", port)
+	fmt.Printf("🌐 Website available at: http://localhost:%s\n", port)
 	fmt.Printf("📱 SMS webhook available at: http://localhost:%s/sms\n", port)
 	fmt.Printf("💚 Health check at: http://localhost:%s/health\n", port)
 
