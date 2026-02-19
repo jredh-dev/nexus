@@ -66,7 +66,7 @@ module "cloud_run" {
   gcs_bucket = google_storage_bucket.cal_data.name
   mount_path = "/data"
 
-  memory        = "256Mi"
+  memory        = "512Mi"
   cpu           = "1"
   min_instances = 0
   max_instances = 3

@@ -53,7 +53,7 @@ variable "mount_path" {
 
 variable "memory" {
   type    = string
-  default = "256Mi"
+  default = "512Mi"
 }
 
 variable "cpu" {
