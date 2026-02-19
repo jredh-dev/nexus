@@ -1,0 +1,166 @@
+/* === Magic Bar === */
+.magic-bar {
+    position: relative;
+    flex: 1;
+    max-width: 420px;
+    margin: 0 0.75rem;
+}
+
+.magic-bar-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem 0.5rem 2.25rem;
+    border: 1px solid #e3e3e3;
+    border-radius: 500px;
+    font-size: 0.875rem;
+    font-family: "Open Sans", BlinkMacSystemFont, -apple-system, sans-serif;
+    background-color: var(--fresh-light-grey);
+    color: var(--fresh-dark);
+    transition: border-color 0.3s, box-shadow 0.3s, background-color 0.3s;
+}
+
+.magic-bar-input::placeholder {
+    color: var(--fresh-muted);
+}
+
+.magic-bar-input:focus {
+    outline: none;
+    border-color: var(--fresh-primary);
+    background-color: #fff;
+    box-shadow: -1px 3px 15px 0 rgba(0, 0, 0, 0.06);
+}
+
+/* Search icon inside input */
+.magic-bar .magic-bar-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--fresh-muted);
+    font-size: 0.8rem;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.magic-bar-input:focus + .magic-bar-icon,
+.magic-bar .magic-bar-icon:has(+ .magic-bar-input:focus) {
+    color: var(--fresh-primary);
+}
+
+/* Keyboard shortcut hint */
+.magic-bar-hint {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.65rem;
+    font-family: "Montserrat", sans-serif;
+    font-weight: 600;
+    color: var(--fresh-muted);
+    background: #fff;
+    border: 1px solid #e3e3e3;
+    border-radius: 4px;
+    padding: 0.1rem 0.35rem;
+    pointer-events: none;
+    letter-spacing: 0.02em;
+}
+
+/* Results dropdown */
+.magic-bar-results {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    background-color: #fff;
+    border: 1px solid #e3e3e3;
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    max-height: 320px;
+    overflow-y: auto;
+    z-index: 200;
+}
+
+.magic-bar-results.visible {
+    display: block;
+}
+
+/* Result items */
+.magic-bar-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 0.75rem;
+    cursor: pointer;
+    transition: background-color 0.1s;
+}
+
+.magic-bar-item:first-child {
+    border-radius: 6px 6px 0 0;
+}
+
+.magic-bar-item:last-child {
+    border-radius: 0 0 6px 6px;
+}
+
+.magic-bar-item:hover,
+.magic-bar-item.selected {
+    background-color: var(--fresh-light-grey);
+}
+
+.magic-bar-item.selected {
+    background-color: rgba(79, 193, 234, 0.08);
+}
+
+.magic-bar-item-icon {
+    font-size: 0.7rem;
+    color: var(--fresh-primary);
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(79, 193, 234, 0.1);
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.magic-bar-item-title {
+    font-weight: 500;
+    color: var(--fresh-dark);
+    flex-shrink: 0;
+    font-size: 0.9rem;
+}
+
+.magic-bar-item-desc {
+    color: var(--fresh-muted);
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.magic-bar-empty {
+    padding: 1rem;
+    text-align: center;
+    color: var(--fresh-muted);
+    font-size: 0.875rem;
+}
+
+/* Responsive: hide hint on mobile, shrink bar */
+@media screen and (max-width: 768px) {
+    .magic-bar {
+        max-width: none;
+        margin: 0.5rem 0;
+    }
+    .magic-bar-hint {
+        display: none;
+    }
+}
+
+/* Clone navbar: slightly smaller bar */
+#navbar-clone .magic-bar-input {
+    background-color: var(--fresh-light-grey);
+}
+#navbar-clone .magic-bar-input:focus {
+    background-color: #fff;
+}
