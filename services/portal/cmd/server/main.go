@@ -55,7 +55,7 @@ func main() {
 
 	// Seed admin user in development if DB is empty.
 	if cfg.Server.Env == "development" {
-		seedDevUser(authService)
+		seedDevUsers(authService)
 	}
 
 	// Initialize router.
@@ -119,18 +119,29 @@ func main() {
 	log.Println("Server stopped")
 }
 
-// seedDevUser creates a default admin user if the database is empty.
-func seedDevUser(authService *auth.Service) {
-	// Try to log in with the dev user — if it works, user already exists.
-	_, err := authService.Login("admin@hooperdevelopment.com", "admin", "seed", "seed")
-	if err == nil {
-		return // already exists
+// seedDevUsers creates default users if the database is empty.
+func seedDevUsers(authService *auth.Service) {
+	users := []struct {
+		email    string
+		password string
+		name     string
+	}{
+		{"admin@localhost", "admin", "Admin"},
+		{"demo@localhost", "demo", "Demo User"},
 	}
 
-	user, err := authService.CreateUser("admin@hooperdevelopment.com", "admin", "Admin")
-	if err != nil {
-		log.Printf("Dev user seed skipped (may already exist): %v", err)
-		return
+	for _, u := range users {
+		// If login succeeds, user already exists.
+		_, err := authService.Login(u.email, u.password, "seed", "seed")
+		if err == nil {
+			continue
+		}
+
+		created, err := authService.CreateUser(u.email, u.password, u.name)
+		if err != nil {
+			log.Printf("Seed user %s skipped (may already exist): %v", u.email, err)
+			continue
+		}
+		log.Printf("Seeded user: %s (%s)", created.Email, created.ID)
 	}
-	log.Printf("Seeded dev user: %s (%s)", user.Email, user.ID)
 }
