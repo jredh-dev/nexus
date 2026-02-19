@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  portal:
+    build:
+      context: ../..
+      dockerfile: services/portal/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - ENV=development
+      - DB_PATH=/app/data/portal.db
+      - SESSION_SECRET=local-dev-secret-change-me
+      - SESSION_MAX_AGE=604800
+    volumes:
+      - portal-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  portal-data:
