@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, 'workstream_*']
+    branches: [main, 'workstream_**']
   pull_request:
     branches: [main]
 
