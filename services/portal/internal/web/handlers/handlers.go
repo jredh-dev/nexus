@@ -189,11 +189,13 @@ func (h *Handler) GetToken(w http.ResponseWriter, r *http.Request) {
 
 	// Return token as JSON
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"token":      tokenString,
 		"expires_in": 3600, // 1 hour in seconds
 		"token_type": "Bearer",
-	})
+	}); err != nil {
+		log.Printf("Error encoding token response: %v", err)
+	}
 }
 
 // ValidateToken validates a JWT token (used by microservices)
@@ -203,10 +205,12 @@ func (h *Handler) ValidateToken(w http.ResponseWriter, r *http.Request) {
 	if authHeader == "" {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(token.ValidationResponse{
+		if err := json.NewEncoder(w).Encode(token.ValidationResponse{
 			Valid: false,
 			Error: "Missing Authorization header",
-		})
+		}); err != nil {
+			log.Printf("Error encoding validation response: %v", err)
+		}
 		return
 	}
 
@@ -217,10 +221,12 @@ func (h *Handler) ValidateToken(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(token.ValidationResponse{
+		if err := json.NewEncoder(w).Encode(token.ValidationResponse{
 			Valid: false,
 			Error: "Invalid Authorization header format",
-		})
+		}); err != nil {
+			log.Printf("Error encoding validation response: %v", err)
+		}
 		return
 	}
 
@@ -229,21 +235,25 @@ func (h *Handler) ValidateToken(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(token.ValidationResponse{
+		if err := json.NewEncoder(w).Encode(token.ValidationResponse{
 			Valid: false,
 			Error: fmt.Sprintf("Invalid token: %v", err),
-		})
+		}); err != nil {
+			log.Printf("Error encoding validation response: %v", err)
+		}
 		return
 	}
 
 	// Return validation success
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(token.ValidationResponse{
+	if err := json.NewEncoder(w).Encode(token.ValidationResponse{
 		Valid:  true,
 		UserID: claims.UserID,
 		Email:  claims.Email,
 		Roles:  claims.Roles,
-	})
+	}); err != nil {
+		log.Printf("Error encoding validation response: %v", err)
+	}
 }
 
 // GetUserInfo returns user information for the authenticated user
@@ -256,11 +266,13 @@ func (h *Handler) GetUserInfo(w http.ResponseWriter, r *http.Request) {
 
 	// Return user info as JSON
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"user_id": userID,
 		"email":   userEmail,
 		"name":    userName,
-	})
+	}); err != nil {
+		log.Printf("Error encoding user info response: %v", err)
+	}
 }
 
 // Helper methods
