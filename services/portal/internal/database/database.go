@@ -1,121 +1,162 @@
 package database
 
 import (
-	"context"
+	"database/sql"
 	"fmt"
-	"os"
+	"time"
 
-	"cloud.google.com/go/firestore"
-	firebase "firebase.google.com/go/v4"
-	"firebase.google.com/go/v4/auth"
-	"github.com/jredh-dev/nexus/services/portal/config"
-	"google.golang.org/api/option"
+	"github.com/jredh-dev/nexus/services/portal/pkg/models"
+
+	_ "modernc.org/sqlite"
 )
 
-// DB holds database connections
+// DB wraps a SQLite connection.
 type DB struct {
-	Firestore *firestore.Client
-	Auth      *auth.Client
-	ctx       context.Context
+	conn *sql.DB
 }
 
-// New creates a new database connection
-func New(ctx context.Context, cfg *config.Config) (*DB, error) {
-	var opts []option.ClientOption
-
-	// Configure emulator mode if enabled
-	if cfg.Firebase.UseEmulator {
-		// Set environment variables for Firebase emulators
-		if cfg.Firebase.EmulatorAuthHost != "" {
-			setEmulatorEnv("FIREBASE_AUTH_EMULATOR_HOST", cfg.Firebase.EmulatorAuthHost)
-		}
-		if cfg.Firebase.EmulatorFirestoreHost != "" {
-			setEmulatorEnv("FIRESTORE_EMULATOR_HOST", cfg.Firebase.EmulatorFirestoreHost)
-		}
-		// Emulator doesn't require credentials
-		opts = nil
-	} else if cfg.Firebase.CredentialsPath != "" {
-		// If credentials path is provided, use it (production mode)
-		opts = append(opts, option.WithCredentialsFile(cfg.Firebase.CredentialsPath))
-	}
-
-	// Initialize Firebase app
-	firebaseConfig := &firebase.Config{
-		ProjectID: cfg.Firebase.ProjectID,
-	}
-
-	app, err := firebase.NewApp(ctx, firebaseConfig, opts...)
+// New opens (or creates) the SQLite database and runs migrations.
+func New(path string) (*DB, error) {
+	conn, err := sql.Open("sqlite", path+"?_journal_mode=WAL&_busy_timeout=5000")
 	if err != nil {
-		return nil, fmt.Errorf("error initializing firebase app: %w", err)
+		return nil, fmt.Errorf("open database: %w", err)
 	}
 
-	// Initialize Firestore client
-	firestoreClient, err := app.Firestore(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing firestore: %w", err)
+	// Single writer, many readers.
+	conn.SetMaxOpenConns(1)
+
+	if err := migrate(conn); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("migrate: %w", err)
 	}
 
-	// Initialize Auth client
-	authClient, err := app.Auth(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing auth: %w", err)
-	}
-
-	return &DB{
-		Firestore: firestoreClient,
-		Auth:      authClient,
-		ctx:       ctx,
-	}, nil
+	return &DB{conn: conn}, nil
 }
 
-// Close closes all database connections
+// Close closes the database connection.
 func (db *DB) Close() error {
-	if db.Firestore != nil {
-		return db.Firestore.Close()
+	return db.conn.Close()
+}
+
+// migrate creates tables if they do not exist.
+func migrate(conn *sql.DB) error {
+	const ddl = `
+	CREATE TABLE IF NOT EXISTS users (
+		id            TEXT PRIMARY KEY,
+		email         TEXT UNIQUE NOT NULL,
+		name          TEXT NOT NULL DEFAULT '',
+		password_hash TEXT NOT NULL,
+		created_at    DATETIME NOT NULL,
+		updated_at    DATETIME NOT NULL,
+		last_login_at DATETIME NOT NULL
+	);
+
+	CREATE TABLE IF NOT EXISTS sessions (
+		id         TEXT PRIMARY KEY,
+		user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		expires_at DATETIME NOT NULL,
+		created_at DATETIME NOT NULL,
+		ip_address TEXT NOT NULL DEFAULT '',
+		user_agent TEXT NOT NULL DEFAULT ''
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+	CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
+	`
+	_, err := conn.Exec(ddl)
+	return err
+}
+
+// --- User operations ---
+
+// CreateUser inserts a new user.
+func (db *DB) CreateUser(u *models.User) error {
+	const q = `INSERT INTO users (id, email, name, password_hash, created_at, updated_at, last_login_at)
+	           VALUES (?, ?, ?, ?, ?, ?, ?)`
+	_, err := db.conn.Exec(q, u.ID, u.Email, u.Name, u.PasswordHash, u.CreatedAt, u.UpdatedAt, u.LastLoginAt)
+	return err
+}
+
+// GetUserByEmail looks up a user by email.
+func (db *DB) GetUserByEmail(email string) (*models.User, error) {
+	const q = `SELECT id, email, name, password_hash, created_at, updated_at, last_login_at FROM users WHERE email = ?`
+	u := &models.User{}
+	err := db.conn.QueryRow(q, email).Scan(&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.CreatedAt, &u.UpdatedAt, &u.LastLoginAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
 	}
-	return nil
+	return u, err
 }
 
-// Helper methods for common operations
-
-// Collection returns a Firestore collection reference
-func (db *DB) Collection(name string) *firestore.CollectionRef {
-	return db.Firestore.Collection(name)
-}
-
-// Users returns the users collection
-func (db *DB) Users() *firestore.CollectionRef {
-	return db.Collection("users")
-}
-
-// Clients returns the clients collection
-func (db *DB) Clients() *firestore.CollectionRef {
-	return db.Collection("clients")
-}
-
-// Projects returns the projects collection
-func (db *DB) Projects() *firestore.CollectionRef {
-	return db.Collection("projects")
-}
-
-// Issues returns the issues collection
-func (db *DB) Issues() *firestore.CollectionRef {
-	return db.Collection("github_issues")
-}
-
-// IssueComments returns the issue comments collection
-func (db *DB) IssueComments() *firestore.CollectionRef {
-	return db.Collection("issue_comments")
-}
-
-// Invoices returns the invoices collection
-func (db *DB) Invoices() *firestore.CollectionRef {
-	return db.Collection("invoices")
-}
-
-// setEmulatorEnv sets an environment variable for Firebase emulator configuration
-func setEmulatorEnv(key, value string) {
-	if err := os.Setenv(key, value); err != nil {
-		fmt.Printf("Warning: failed to set %s: %v\n", key, err)
+// GetUserByID looks up a user by ID.
+func (db *DB) GetUserByID(id string) (*models.User, error) {
+	const q = `SELECT id, email, name, password_hash, created_at, updated_at, last_login_at FROM users WHERE id = ?`
+	u := &models.User{}
+	err := db.conn.QueryRow(q, id).Scan(&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.CreatedAt, &u.UpdatedAt, &u.LastLoginAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
 	}
+	return u, err
+}
+
+// UpdateLastLogin sets the last_login_at timestamp.
+func (db *DB) UpdateLastLogin(userID string, t time.Time) error {
+	const q = `UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?`
+	_, err := db.conn.Exec(q, t, t, userID)
+	return err
+}
+
+// --- Session operations ---
+
+// CreateSession inserts a new session.
+func (db *DB) CreateSession(s *models.Session) error {
+	const q = `INSERT INTO sessions (id, user_id, expires_at, created_at, ip_address, user_agent)
+	           VALUES (?, ?, ?, ?, ?, ?)`
+	_, err := db.conn.Exec(q, s.ID, s.UserID, s.ExpiresAt, s.CreatedAt, s.IPAddress, s.UserAgent)
+	return err
+}
+
+// GetSession looks up a session by ID and ensures it has not expired.
+func (db *DB) GetSession(id string) (*models.Session, error) {
+	const q = `SELECT id, user_id, expires_at, created_at, ip_address, user_agent
+	           FROM sessions WHERE id = ? AND expires_at > ?`
+	s := &models.Session{}
+	err := db.conn.QueryRow(q, id, time.Now()).Scan(&s.ID, &s.UserID, &s.ExpiresAt, &s.CreatedAt, &s.IPAddress, &s.UserAgent)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return s, err
+}
+
+// DeleteSession removes a session by ID.
+func (db *DB) DeleteSession(id string) error {
+	_, err := db.conn.Exec(`DELETE FROM sessions WHERE id = ?`, id)
+	return err
+}
+
+// DeleteExpiredSessions cleans up sessions that have passed their expiry.
+func (db *DB) DeleteExpiredSessions() error {
+	_, err := db.conn.Exec(`DELETE FROM sessions WHERE expires_at <= ?`, time.Now())
+	return err
+}
+
+// GetSessionsByUserID returns all active sessions for a user.
+func (db *DB) GetSessionsByUserID(userID string) ([]models.Session, error) {
+	const q = `SELECT id, user_id, expires_at, created_at, ip_address, user_agent
+	           FROM sessions WHERE user_id = ? AND expires_at > ? ORDER BY created_at DESC`
+	rows, err := db.conn.Query(q, userID, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sessions []models.Session
+	for rows.Next() {
+		var s models.Session
+		if err := rows.Scan(&s.ID, &s.UserID, &s.ExpiresAt, &s.CreatedAt, &s.IPAddress, &s.UserAgent); err != nil {
+			return nil, err
+		}
+		sessions = append(sessions, s)
+	}
+	return sessions, rows.Err()
 }
