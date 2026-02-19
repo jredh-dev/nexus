@@ -54,7 +54,10 @@ func main() {
 	// Initialize auth service.
 	authService := auth.New(db, cfg)
 
-	// Seed admin user in development if DB is empty.
+	// Seed demo user in all environments so visitors can log in.
+	seedDemoUser(authService)
+
+	// Seed admin user in development only.
 	if cfg.Server.Env == "development" {
 		seedDevUsers(authService)
 	}
@@ -128,29 +131,32 @@ func main() {
 	log.Println("Server stopped")
 }
 
-// seedDevUsers creates default users if the database is empty.
+// seedDemoUser ensures the demo account exists in all environments.
+func seedDemoUser(authService *auth.Service) {
+	_, err := authService.Login("demo@demo.com", "demo", "seed", "seed")
+	if err == nil {
+		return // already exists
+	}
+
+	created, err := authService.CreateUser("demo@demo.com", "demo", "Demo User")
+	if err != nil {
+		log.Printf("Demo user skipped (may already exist): %v", err)
+		return
+	}
+	log.Printf("Seeded demo user: %s (%s)", created.Email, created.ID)
+}
+
+// seedDevUsers creates admin users for development only.
 func seedDevUsers(authService *auth.Service) {
-	users := []struct {
-		email    string
-		password string
-		name     string
-	}{
-		{"admin@admin.com", "admin", "Admin"},
-		{"demo@demo.com", "demo", "Demo User"},
+	_, err := authService.Login("admin@admin.com", "admin", "seed", "seed")
+	if err == nil {
+		return
 	}
 
-	for _, u := range users {
-		// If login succeeds, user already exists.
-		_, err := authService.Login(u.email, u.password, "seed", "seed")
-		if err == nil {
-			continue
-		}
-
-		created, err := authService.CreateUser(u.email, u.password, u.name)
-		if err != nil {
-			log.Printf("Seed user %s skipped (may already exist): %v", u.email, err)
-			continue
-		}
-		log.Printf("Seeded user: %s (%s)", created.Email, created.ID)
+	created, err := authService.CreateUser("admin@admin.com", "admin", "Admin")
+	if err != nil {
+		log.Printf("Admin user skipped (may already exist): %v", err)
+		return
 	}
+	log.Printf("Seeded admin user: %s (%s)", created.Email, created.ID)
 }
