@@ -1,0 +1,65 @@
+{{define "navbar"}}
+<nav class="navbar is-dark" role="navigation" aria-label="main navigation">
+    <div class="container">
+        <div class="navbar-brand">
+            <a class="navbar-item has-text-weight-bold is-size-5" href="/">
+                Hooper Development
+            </a>
+            <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="mainNavbar">
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
+            </a>
+        </div>
+        <div id="mainNavbar" class="navbar-menu">
+            <div class="navbar-start">
+                <a class="navbar-item" href="/">
+                    <span class="icon"><i class="fas fa-home"></i></span>
+                    <span>Home</span>
+                </a>
+                {{if .LoggedIn}}
+                <a class="navbar-item" href="/dashboard">
+                    <span class="icon"><i class="fas fa-tachometer-alt"></i></span>
+                    <span>Dashboard</span>
+                </a>
+                {{end}}
+            </div>
+            <div class="navbar-end">
+                {{if .LoggedIn}}
+                <div class="navbar-item has-dropdown is-hoverable">
+                    <a class="navbar-link">
+                        <span class="icon"><i class="fas fa-user-circle"></i></span>
+                        <span>{{if .User}}{{.User.Name}}{{else}}Account{{end}}</span>
+                    </a>
+                    <div class="navbar-dropdown is-right">
+                        <a class="navbar-item" href="/dashboard">
+                            <span class="icon"><i class="fas fa-user"></i></span>
+                            <span>Profile</span>
+                        </a>
+                        <hr class="navbar-divider">
+                        <a class="navbar-item" href="/logout">
+                            <span class="icon"><i class="fas fa-sign-out-alt"></i></span>
+                            <span>Logout</span>
+                        </a>
+                    </div>
+                </div>
+                {{else}}
+                <div class="navbar-item">
+                    <div class="buttons">
+                        <a class="button is-light" href="/signup">
+                            <span class="icon"><i class="fas fa-user-plus"></i></span>
+                            <span>Sign Up</span>
+                        </a>
+                        <a class="button is-primary" href="/login">
+                            <span class="icon"><i class="fas fa-sign-in-alt"></i></span>
+                            <span>Login</span>
+                        </a>
+                    </div>
+                </div>
+                {{end}}
+            </div>
+        </div>
+    </div>
+</nav>
+{{end}}

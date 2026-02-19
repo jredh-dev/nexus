@@ -3,77 +3,111 @@
 {{define "content"}}
 <section class="section">
     <div class="container">
-        <h1 class="dash-title">Dashboard</h1>
-        <p class="dash-subtitle">Welcome back, {{.User.Name}}</p>
+        <div class="mb-5">
+            <h1 class="title is-3">
+                <span class="icon-text">
+                    <span class="icon"><i class="fas fa-tachometer-alt"></i></span>
+                    <span>Dashboard</span>
+                </span>
+            </h1>
+            <p class="subtitle is-5 has-text-grey">Welcome back, {{.User.Name}}</p>
+        </div>
 
-        <div class="dash-grid">
+        <div class="columns">
             <!-- Profile Card -->
-            <div class="profile-card">
-                <h2>Profile</h2>
-                <table>
-                    <tbody>
-                        {{if .User.Username}}
-                        <tr>
-                            <th>Username</th>
-                            <td>{{.User.Username}}</td>
-                        </tr>
-                        {{end}}
-                        <tr>
-                            <th>Email</th>
-                            <td>{{.User.Email}}</td>
-                        </tr>
-                        {{if .User.PhoneNumber}}
-                        <tr>
-                            <th>Phone</th>
-                            <td>{{.User.PhoneNumber}}</td>
-                        </tr>
-                        {{end}}
-                        <tr>
-                            <th>Name</th>
-                            <td>{{.User.Name}}</td>
-                        </tr>
-                        <tr>
-                            <th>Member since</th>
-                            <td>{{.User.CreatedAt.Format "Jan 2, 2006"}}</td>
-                        </tr>
-                        <tr>
-                            <th>Last login</th>
-                            <td>{{.User.LastLoginAt.Format "Jan 2, 2006 3:04 PM"}}</td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div class="mt-3">
-                    <a class="btn btn-danger" href="/logout">Logout</a>
+            <div class="column is-4">
+                <div class="box">
+                    <h2 class="title is-5">
+                        <span class="icon-text">
+                            <span class="icon"><i class="fas fa-user-circle"></i></span>
+                            <span>Profile</span>
+                        </span>
+                    </h2>
+                    <table class="table is-fullwidth is-narrow">
+                        <tbody>
+                            {{if .User.Username}}
+                            <tr>
+                                <th><span class="icon"><i class="fas fa-at"></i></span> Username</th>
+                                <td>{{.User.Username}}</td>
+                            </tr>
+                            {{end}}
+                            <tr>
+                                <th><span class="icon"><i class="fas fa-envelope"></i></span> Email</th>
+                                <td>{{.User.Email}}</td>
+                            </tr>
+                            {{if .User.PhoneNumber}}
+                            <tr>
+                                <th><span class="icon"><i class="fas fa-phone"></i></span> Phone</th>
+                                <td>{{.User.PhoneNumber}}</td>
+                            </tr>
+                            {{end}}
+                            <tr>
+                                <th><span class="icon"><i class="fas fa-id-card"></i></span> Name</th>
+                                <td>{{.User.Name}}</td>
+                            </tr>
+                            <tr>
+                                <th><span class="icon"><i class="fas fa-calendar"></i></span> Member since</th>
+                                <td>{{.User.CreatedAt.Format "Jan 2, 2006"}}</td>
+                            </tr>
+                            <tr>
+                                <th><span class="icon"><i class="fas fa-clock"></i></span> Last login</th>
+                                <td>{{.User.LastLoginAt.Format "Jan 2, 2006 3:04 PM"}}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="mt-4">
+                        <a class="button is-danger is-outlined is-fullwidth" href="/logout">
+                            <span class="icon"><i class="fas fa-sign-out-alt"></i></span>
+                            <span>Logout</span>
+                        </a>
+                    </div>
                 </div>
             </div>
 
             <!-- Active Sessions -->
-            <div class="profile-card">
-                <h2>Active Sessions</h2>
-                {{if .Sessions}}
-                <table>
-                    <thead>
-                        <tr>
-                            <th>IP Address</th>
-                            <th>User Agent</th>
-                            <th>Created</th>
-                            <th>Expires</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {{range .Sessions}}
-                        <tr>
-                            <td>{{.IPAddress}}</td>
-                            <td><span class="ua-text">{{.UserAgent}}</span></td>
-                            <td>{{.CreatedAt.Format "Jan 2, 2006 3:04 PM"}}</td>
-                            <td>{{.ExpiresAt.Format "Jan 2, 2006 3:04 PM"}}</td>
-                        </tr>
-                        {{end}}
-                    </tbody>
-                </table>
-                {{else}}
-                <p class="text-muted">No active sessions.</p>
-                {{end}}
+            <div class="column is-8">
+                <div class="box">
+                    <h2 class="title is-5">
+                        <span class="icon-text">
+                            <span class="icon"><i class="fas fa-desktop"></i></span>
+                            <span>Active Sessions</span>
+                        </span>
+                    </h2>
+                    {{if .Sessions}}
+                    <div class="table-container">
+                        <table class="table is-fullwidth is-striped is-hoverable">
+                            <thead>
+                                <tr>
+                                    <th>IP Address</th>
+                                    <th>User Agent</th>
+                                    <th>Created</th>
+                                    <th>Expires</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range .Sessions}}
+                                <tr>
+                                    <td>
+                                        <span class="icon-text">
+                                            <span class="icon"><i class="fas fa-network-wired"></i></span>
+                                            <span>{{.IPAddress}}</span>
+                                        </span>
+                                    </td>
+                                    <td><span class="is-size-7 has-text-grey">{{.UserAgent}}</span></td>
+                                    <td>{{.CreatedAt.Format "Jan 2, 2006 3:04 PM"}}</td>
+                                    <td>{{.ExpiresAt.Format "Jan 2, 2006 3:04 PM"}}</td>
+                                </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                    {{else}}
+                    <p class="has-text-grey">
+                        <span class="icon"><i class="fas fa-info-circle"></i></span>
+                        No active sessions.
+                    </p>
+                    {{end}}
+                </div>
             </div>
         </div>
     </div>
