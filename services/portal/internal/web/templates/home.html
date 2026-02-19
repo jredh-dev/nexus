@@ -1,55 +1,97 @@
 {{template "base" .}}
 
 {{define "content"}}
-<section class="hero">
-    <div class="container">
-        <h1>Building with AI, one system at a time.</h1>
-        <p>
-            I'm a developer working at the intersection of software engineering
-            and AI. I build tools, agents, and infrastructure that let humans
-            and machines collaborate effectively.
-        </p>
+<section class="hero is-medium is-dark">
+    <div class="hero-body">
+        <div class="container">
+            <p class="title is-2">Building with AI, one system at a time.</p>
+            <p class="subtitle is-5 has-text-grey-light mt-3" style="max-width: 640px;">
+                I'm a developer working at the intersection of software engineering
+                and AI. I build tools, agents, and infrastructure that let humans
+                and machines collaborate effectively.
+            </p>
+        </div>
     </div>
 </section>
 
 <section class="section">
     <div class="container">
-        <h2 class="section-title">What I Work On</h2>
-        <div class="cards">
-            <div class="card">
-                <h3>AI-Assisted Development</h3>
-                <p>
-                    Multi-agent workflows, agentic coding systems, and tooling
-                    that makes AI a practical collaborator in real engineering work.
-                </p>
+        <h2 class="title is-3 has-text-centered mb-6">What I Work On</h2>
+        <div class="columns">
+            <div class="column">
+                <div class="card">
+                    <div class="card-content">
+                        <div class="media">
+                            <div class="media-left">
+                                <span class="icon is-large has-text-primary">
+                                    <i class="fas fa-robot fa-2x"></i>
+                                </span>
+                            </div>
+                            <div class="media-content">
+                                <p class="title is-5">AI-Assisted Development</p>
+                            </div>
+                        </div>
+                        <div class="content">
+                            Multi-agent workflows, agentic coding systems, and tooling
+                            that makes AI a practical collaborator in real engineering work.
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="card">
-                <h3>Infrastructure</h3>
-                <p>
-                    Cloud architecture, CI/CD pipelines, Docker, and Git worktree
-                    workflows. Systems that are reliable and easy to reason about.
-                </p>
+            <div class="column">
+                <div class="card">
+                    <div class="card-content">
+                        <div class="media">
+                            <div class="media-left">
+                                <span class="icon is-large has-text-info">
+                                    <i class="fas fa-server fa-2x"></i>
+                                </span>
+                            </div>
+                            <div class="media-content">
+                                <p class="title is-5">Infrastructure</p>
+                            </div>
+                        </div>
+                        <div class="content">
+                            Cloud architecture, CI/CD pipelines, Docker, and Git worktree
+                            workflows. Systems that are reliable and easy to reason about.
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="card">
-                <h3>Open Source Tools</h3>
-                <p>
-                    CLI tools, workstream managers, and developer utilities.
-                    Small, focused software that solves real problems.
-                </p>
+            <div class="column">
+                <div class="card">
+                    <div class="card-content">
+                        <div class="media">
+                            <div class="media-left">
+                                <span class="icon is-large has-text-success">
+                                    <i class="fas fa-code-branch fa-2x"></i>
+                                </span>
+                            </div>
+                            <div class="media-content">
+                                <p class="title is-5">Open Source Tools</p>
+                            </div>
+                        </div>
+                        <div class="content">
+                            CLI tools, workstream managers, and developer utilities.
+                            Small, focused software that solves real problems.
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </section>
 
-<section class="section section-alt">
-    <div class="container cta">
-        <h2>Want to get in touch?</h2>
-        <p>
+<section class="section has-background-light">
+    <div class="container has-text-centered">
+        <h2 class="title is-3">Want to get in touch?</h2>
+        <p class="subtitle is-5 has-text-grey">
             I'm always interested in hearing about interesting problems
             and collaboration opportunities.
         </p>
-        <a class="btn btn-dark" href="mailto:jason@hooperdevelopment.com">
-            Contact Me
+        <a class="button is-dark is-medium" href="mailto:jason@hooperdevelopment.com">
+            <span class="icon"><i class="fas fa-envelope"></i></span>
+            <span>Contact Me</span>
         </a>
     </div>
 </section>

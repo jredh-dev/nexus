@@ -4,15 +4,16 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"log"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/jredh-dev/nexus/services/portal/config"
 	"github.com/jredh-dev/nexus/services/portal/internal/auth"
 	"github.com/jredh-dev/nexus/services/portal/internal/database"
+	"github.com/jredh-dev/nexus/services/portal/internal/web/templates"
 )
 
 // Handler holds dependencies for HTTP handlers.
@@ -25,13 +26,23 @@ type Handler struct {
 
 // New creates a new handler with parsed templates.
 func New(db *database.DB, cfg *config.Config, authService *auth.Service) *Handler {
-	templates := make(map[string]*template.Template)
-	basePath := filepath.Join("services", "portal", "internal", "web", "templates", "base.html")
+	tmplMap := make(map[string]*template.Template)
+
+	// Collect shared templates: base.html + all partials.
+	shared := []string{"base.html"}
+	partials, err := fs.Glob(templates.FS, "partials/*.html")
+	if err != nil {
+		log.Fatalf("Error globbing partials: %v", err)
+	}
+	shared = append(shared, partials...)
 
 	for _, page := range []string{"home.html", "login.html", "signup.html", "dashboard.html"} {
-		pagePath := filepath.Join("services", "portal", "internal", "web", "templates", page)
-		templates[page] = template.Must(
-			template.New(page).ParseFiles(basePath, pagePath),
+		files := make([]string, 0, len(shared)+1)
+		files = append(files, shared...)
+		files = append(files, page)
+
+		tmplMap[page] = template.Must(
+			template.New(page).ParseFS(templates.FS, files...),
 		)
 	}
 
@@ -39,7 +50,7 @@ func New(db *database.DB, cfg *config.Config, authService *auth.Service) *Handle
 		db:        db,
 		cfg:       cfg,
 		auth:      authService,
-		templates: templates,
+		templates: tmplMap,
 	}
 }
 

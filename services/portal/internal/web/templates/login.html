@@ -3,31 +3,49 @@
 {{define "content"}}
 <section class="section">
     <div class="container">
-        <div class="box">
-            <h1>Login</h1>
-            {{if .Error}}
-            <div class="alert alert-error">{{.Error}}</div>
-            {{end}}
-            <form action="/login" method="POST">
-                <div class="field">
-                    <label for="email">Email</label>
-                    <input type="email" id="email" name="email" placeholder="you@example.com" required>
+        <div class="columns is-centered">
+            <div class="column is-4">
+                <div class="box">
+                    <h1 class="title is-4 has-text-centered">
+                        <span class="icon-text">
+                            <span class="icon"><i class="fas fa-sign-in-alt"></i></span>
+                            <span>Login</span>
+                        </span>
+                    </h1>
+                    {{if .Error}}
+                    <div class="notification is-danger is-light">
+                        <span class="icon"><i class="fas fa-exclamation-circle"></i></span>
+                        {{.Error}}
+                    </div>
+                    {{end}}
+                    <form action="/login" method="POST">
+                        <div class="field">
+                            <label class="label" for="email">Email</label>
+                            <div class="control has-icons-left">
+                                <input class="input" type="email" id="email" name="email" placeholder="you@example.com" required>
+                                <span class="icon is-small is-left"><i class="fas fa-envelope"></i></span>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="label" for="password">Password</label>
+                            <div class="control has-icons-left">
+                                <input class="input" type="password" id="password" name="password" required>
+                                <span class="icon is-small is-left"><i class="fas fa-lock"></i></span>
+                            </div>
+                        </div>
+                        <div class="field mt-5">
+                            <button class="button is-primary is-fullwidth" type="submit">
+                                <span class="icon"><i class="fas fa-sign-in-alt"></i></span>
+                                <span>Login</span>
+                            </button>
+                        </div>
+                    </form>
                 </div>
-                <div class="field">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="password" required>
-                </div>
-                <div class="field mt-2">
-                    <button class="btn" type="submit">Login</button>
-                </div>
-            </form>
+                <p class="has-text-centered has-text-grey mt-4">
+                    Don't have an account? <a href="/signup">Sign up</a>
+                </p>
+            </div>
         </div>
-        <p class="text-center text-muted mt-2">
-            Don't have an account? <a href="/signup">Sign up</a>
-        </p>
-        <p class="text-center text-muted mt-1">
-            <a href="/">Back to home</a>
-        </p>
     </div>
 </section>
 {{end}}
