@@ -1,17 +1,16 @@
 {{template "base" .}}
 
 {{define "content"}}
-<section class="section">
+<section class="section section-light-grey" style="min-height: 80vh; display: flex; align-items: center;">
     <div class="container">
         <div class="columns is-centered">
             <div class="column is-5">
-                <div class="box">
-                    <h1 class="title is-4 has-text-centered">
-                        <span class="icon-text">
-                            <span class="icon"><i class="fas fa-user-plus"></i></span>
-                            <span>Sign Up</span>
-                        </span>
-                    </h1>
+                <div class="has-text-centered mb-5">
+                    <h1 class="title is-3" style="font-family: 'Montserrat', sans-serif;">Create Account</h1>
+                    <div class="divider is-centered mt-3 mb-3"></div>
+                    <p class="subtitle is-6 is-muted">Join Hooper Development</p>
+                </div>
+                <div class="box auth-card">
                     {{if .Error}}
                     <div class="notification is-danger is-light">
                         <span class="icon"><i class="fas fa-exclamation-circle"></i></span>
@@ -20,50 +19,49 @@
                     {{end}}
                     <form action="/signup" method="POST">
                         <div class="field">
-                            <label class="label" for="username">Username</label>
+                            <label class="label" for="username" style="font-size: 0.9rem; color: var(--fresh-dark);">Username</label>
                             <div class="control has-icons-left">
                                 <input class="input" type="text" id="username" name="username" placeholder="jsmith" value="{{.Username}}" required>
-                                <span class="icon is-small is-left"><i class="fas fa-at"></i></span>
+                                <span class="icon is-small is-left" style="color: var(--fresh-muted);"><i class="fas fa-at"></i></span>
                             </div>
                         </div>
                         <div class="field">
-                            <label class="label" for="name">Full Name</label>
+                            <label class="label" for="name" style="font-size: 0.9rem; color: var(--fresh-dark);">Full Name</label>
                             <div class="control has-icons-left">
                                 <input class="input" type="text" id="name" name="name" placeholder="John Smith" value="{{.Name}}">
-                                <span class="icon is-small is-left"><i class="fas fa-user"></i></span>
+                                <span class="icon is-small is-left" style="color: var(--fresh-muted);"><i class="fas fa-user"></i></span>
                             </div>
                         </div>
                         <div class="field">
-                            <label class="label" for="email">Email</label>
+                            <label class="label" for="email" style="font-size: 0.9rem; color: var(--fresh-dark);">Email</label>
                             <div class="control has-icons-left">
                                 <input class="input" type="email" id="email" name="email" placeholder="you@example.com" value="{{.Email}}" required>
-                                <span class="icon is-small is-left"><i class="fas fa-envelope"></i></span>
+                                <span class="icon is-small is-left" style="color: var(--fresh-muted);"><i class="fas fa-envelope"></i></span>
                             </div>
                         </div>
                         <div class="field">
-                            <label class="label" for="phone">Phone Number</label>
+                            <label class="label" for="phone" style="font-size: 0.9rem; color: var(--fresh-dark);">Phone Number</label>
                             <div class="control has-icons-left">
                                 <input class="input" type="tel" id="phone" name="phone" placeholder="(555) 123-4567" value="{{.Phone}}" required>
-                                <span class="icon is-small is-left"><i class="fas fa-phone"></i></span>
+                                <span class="icon is-small is-left" style="color: var(--fresh-muted);"><i class="fas fa-phone"></i></span>
                             </div>
                         </div>
                         <div class="field">
-                            <label class="label" for="password">Password</label>
+                            <label class="label" for="password" style="font-size: 0.9rem; color: var(--fresh-dark);">Password</label>
                             <div class="control has-icons-left">
                                 <input class="input" type="password" id="password" name="password" required>
-                                <span class="icon is-small is-left"><i class="fas fa-lock"></i></span>
+                                <span class="icon is-small is-left" style="color: var(--fresh-muted);"><i class="fas fa-lock"></i></span>
                             </div>
                         </div>
                         <div class="field mt-5">
-                            <button class="button is-primary is-fullwidth" type="submit">
-                                <span class="icon"><i class="fas fa-user-plus"></i></span>
-                                <span>Create Account</span>
+                            <button class="button primary-btn is-rounded is-fullwidth cta" type="submit">
+                                Create Account
                             </button>
                         </div>
                     </form>
                 </div>
-                <p class="has-text-centered has-text-grey mt-4">
-                    Already have an account? <a href="/login">Login</a>
+                <p class="has-text-centered has-text-fresh-muted mt-4">
+                    Already have an account? <a href="/login" style="color: var(--fresh-primary);">Login</a>
                 </p>
             </div>
         </div>

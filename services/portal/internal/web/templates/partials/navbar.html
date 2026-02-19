@@ -1,8 +1,9 @@
 {{define "navbar"}}
-<nav class="navbar is-dark" role="navigation" aria-label="main navigation">
+<!-- Primary transparent navbar -->
+<nav class="navbar is-fresh" role="navigation" aria-label="main navigation">
     <div class="container">
         <div class="navbar-brand">
-            <a class="navbar-item has-text-weight-bold is-size-5" href="/">
+            <a class="navbar-item has-text-weight-bold is-size-5" href="/" style="color: var(--fresh-dark); font-family: 'Montserrat', sans-serif;">
                 Hooper Development
             </a>
             <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="mainNavbar">
@@ -14,19 +15,10 @@
         </div>
         <div id="mainNavbar" class="navbar-menu">
             <div class="navbar-start">
-                <a class="navbar-item" href="/">
-                    <span class="icon"><i class="fas fa-home"></i></span>
-                    <span>Home</span>
-                </a>
-                <a class="navbar-item" href="/about">
-                    <span class="icon"><i class="fas fa-user"></i></span>
-                    <span>About</span>
-                </a>
+                <a class="navbar-item" href="/">Home</a>
+                <a class="navbar-item" href="/about">About</a>
                 {{if .LoggedIn}}
-                <a class="navbar-item" href="/dashboard">
-                    <span class="icon"><i class="fas fa-tachometer-alt"></i></span>
-                    <span>Dashboard</span>
-                </a>
+                <a class="navbar-item" href="/dashboard">Dashboard</a>
                 {{end}}
             </div>
             <div class="navbar-end">
@@ -51,13 +43,69 @@
                 {{else}}
                 <div class="navbar-item">
                     <div class="buttons">
-                        <a class="button is-light" href="/signup">
-                            <span class="icon"><i class="fas fa-user-plus"></i></span>
-                            <span>Sign Up</span>
+                        <a class="button primary-btn is-rounded cta" href="/signup">
+                            Sign Up
                         </a>
-                        <a class="button is-primary" href="/login">
-                            <span class="icon"><i class="fas fa-sign-in-alt"></i></span>
-                            <span>Login</span>
+                        <a class="button btn-outlined primary-btn is-rounded cta" href="/login">
+                            Login
+                        </a>
+                    </div>
+                </div>
+                {{end}}
+            </div>
+        </div>
+    </div>
+</nav>
+
+<!-- Fixed navbar clone (appears on scroll) -->
+<nav id="navbar-clone" class="navbar is-fresh" role="navigation" aria-label="main navigation">
+    <div class="container">
+        <div class="navbar-brand">
+            <a class="navbar-item has-text-weight-bold is-size-5" href="/" style="color: var(--fresh-dark); font-family: 'Montserrat', sans-serif;">
+                Hooper Development
+            </a>
+            <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="cloneNavbar">
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
+            </a>
+        </div>
+        <div id="cloneNavbar" class="navbar-menu">
+            <div class="navbar-start">
+                <a class="navbar-item" href="/">Home</a>
+                <a class="navbar-item" href="/about">About</a>
+                {{if .LoggedIn}}
+                <a class="navbar-item" href="/dashboard">Dashboard</a>
+                {{end}}
+            </div>
+            <div class="navbar-end">
+                {{if .LoggedIn}}
+                <div class="navbar-item has-dropdown is-hoverable">
+                    <a class="navbar-link">
+                        <span class="icon"><i class="fas fa-user-circle"></i></span>
+                        <span>{{if .User}}{{.User.Name}}{{else}}Account{{end}}</span>
+                    </a>
+                    <div class="navbar-dropdown is-right">
+                        <a class="navbar-item" href="/dashboard">
+                            <span class="icon"><i class="fas fa-user"></i></span>
+                            <span>Profile</span>
+                        </a>
+                        <hr class="navbar-divider">
+                        <a class="navbar-item" href="/logout">
+                            <span class="icon"><i class="fas fa-sign-out-alt"></i></span>
+                            <span>Logout</span>
+                        </a>
+                    </div>
+                </div>
+                {{else}}
+                <div class="navbar-item">
+                    <div class="buttons">
+                        <a class="button primary-btn is-rounded cta" href="/signup">
+                            Sign Up
+                        </a>
+                        <a class="button btn-outlined primary-btn is-rounded cta" href="/login">
+                            Login
                         </a>
                     </div>
                 </div>

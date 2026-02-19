@@ -3,23 +3,24 @@
 {{define "content"}}
 <section class="section">
     <div class="container">
-        <div class="mb-5">
-            <h1 class="title is-3">
+        <div class="mb-6">
+            <h1 class="title is-3" style="font-family: 'Montserrat', sans-serif;">
                 <span class="icon-text">
-                    <span class="icon"><i class="fas fa-tachometer-alt"></i></span>
+                    <span class="icon" style="color: var(--fresh-primary);"><i class="fas fa-tachometer-alt"></i></span>
                     <span>Dashboard</span>
                 </span>
             </h1>
-            <p class="subtitle is-5 has-text-grey">Welcome back, {{.User.Name}}</p>
+            <p class="subtitle is-5 is-muted">Welcome back, {{.User.Name}}</p>
+            <div class="divider"></div>
         </div>
 
         <div class="columns">
             <!-- Profile Card -->
             <div class="column is-4">
-                <div class="box">
-                    <h2 class="title is-5">
+                <div class="box" style="border-radius: 6px; box-shadow: 0px 5px 25px 0px rgba(0,0,0,0.08); border: none;">
+                    <h2 class="title is-5 mb-4">
                         <span class="icon-text">
-                            <span class="icon"><i class="fas fa-user-circle"></i></span>
+                            <span class="icon" style="color: var(--fresh-primary);"><i class="fas fa-user-circle"></i></span>
                             <span>Profile</span>
                         </span>
                     </h2>
@@ -27,36 +28,36 @@
                         <tbody>
                             {{if .User.Username}}
                             <tr>
-                                <th><span class="icon"><i class="fas fa-at"></i></span> Username</th>
-                                <td>{{.User.Username}}</td>
+                                <th style="color: var(--fresh-dark);"><span class="icon"><i class="fas fa-at"></i></span> Username</th>
+                                <td style="color: var(--fresh-muted);">{{.User.Username}}</td>
                             </tr>
                             {{end}}
                             <tr>
-                                <th><span class="icon"><i class="fas fa-envelope"></i></span> Email</th>
-                                <td>{{.User.Email}}</td>
+                                <th style="color: var(--fresh-dark);"><span class="icon"><i class="fas fa-envelope"></i></span> Email</th>
+                                <td style="color: var(--fresh-muted);">{{.User.Email}}</td>
                             </tr>
                             {{if .User.PhoneNumber}}
                             <tr>
-                                <th><span class="icon"><i class="fas fa-phone"></i></span> Phone</th>
-                                <td>{{.User.PhoneNumber}}</td>
+                                <th style="color: var(--fresh-dark);"><span class="icon"><i class="fas fa-phone"></i></span> Phone</th>
+                                <td style="color: var(--fresh-muted);">{{.User.PhoneNumber}}</td>
                             </tr>
                             {{end}}
                             <tr>
-                                <th><span class="icon"><i class="fas fa-id-card"></i></span> Name</th>
-                                <td>{{.User.Name}}</td>
+                                <th style="color: var(--fresh-dark);"><span class="icon"><i class="fas fa-id-card"></i></span> Name</th>
+                                <td style="color: var(--fresh-muted);">{{.User.Name}}</td>
                             </tr>
                             <tr>
-                                <th><span class="icon"><i class="fas fa-calendar"></i></span> Member since</th>
-                                <td>{{.User.CreatedAt.Format "Jan 2, 2006"}}</td>
+                                <th style="color: var(--fresh-dark);"><span class="icon"><i class="fas fa-calendar"></i></span> Member since</th>
+                                <td style="color: var(--fresh-muted);">{{.User.CreatedAt.Format "Jan 2, 2006"}}</td>
                             </tr>
                             <tr>
-                                <th><span class="icon"><i class="fas fa-clock"></i></span> Last login</th>
-                                <td>{{.User.LastLoginAt.Format "Jan 2, 2006 3:04 PM"}}</td>
+                                <th style="color: var(--fresh-dark);"><span class="icon"><i class="fas fa-clock"></i></span> Last login</th>
+                                <td style="color: var(--fresh-muted);">{{.User.LastLoginAt.Format "Jan 2, 2006 3:04 PM"}}</td>
                             </tr>
                         </tbody>
                     </table>
                     <div class="mt-4">
-                        <a class="button is-danger is-outlined is-fullwidth" href="/logout">
+                        <a class="button secondary-btn btn-outlined is-rounded is-fullwidth" href="/logout">
                             <span class="icon"><i class="fas fa-sign-out-alt"></i></span>
                             <span>Logout</span>
                         </a>
@@ -66,10 +67,10 @@
 
             <!-- Active Sessions -->
             <div class="column is-8">
-                <div class="box">
-                    <h2 class="title is-5">
+                <div class="box" style="border-radius: 6px; box-shadow: 0px 5px 25px 0px rgba(0,0,0,0.08); border: none;">
+                    <h2 class="title is-5 mb-4">
                         <span class="icon-text">
-                            <span class="icon"><i class="fas fa-desktop"></i></span>
+                            <span class="icon" style="color: var(--fresh-primary);"><i class="fas fa-desktop"></i></span>
                             <span>Active Sessions</span>
                         </span>
                     </h2>
@@ -78,10 +79,10 @@
                         <table class="table is-fullwidth is-striped is-hoverable">
                             <thead>
                                 <tr>
-                                    <th>IP Address</th>
-                                    <th>User Agent</th>
-                                    <th>Created</th>
-                                    <th>Expires</th>
+                                    <th style="color: var(--fresh-dark);">IP Address</th>
+                                    <th style="color: var(--fresh-dark);">User Agent</th>
+                                    <th style="color: var(--fresh-dark);">Created</th>
+                                    <th style="color: var(--fresh-dark);">Expires</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -89,20 +90,20 @@
                                 <tr>
                                     <td>
                                         <span class="icon-text">
-                                            <span class="icon"><i class="fas fa-network-wired"></i></span>
+                                            <span class="icon" style="color: var(--fresh-primary);"><i class="fas fa-network-wired"></i></span>
                                             <span>{{.IPAddress}}</span>
                                         </span>
                                     </td>
-                                    <td><span class="is-size-7 has-text-grey">{{.UserAgent}}</span></td>
-                                    <td>{{.CreatedAt.Format "Jan 2, 2006 3:04 PM"}}</td>
-                                    <td>{{.ExpiresAt.Format "Jan 2, 2006 3:04 PM"}}</td>
+                                    <td><span class="is-size-7 has-text-fresh-muted">{{.UserAgent}}</span></td>
+                                    <td style="color: var(--fresh-muted);">{{.CreatedAt.Format "Jan 2, 2006 3:04 PM"}}</td>
+                                    <td style="color: var(--fresh-muted);">{{.ExpiresAt.Format "Jan 2, 2006 3:04 PM"}}</td>
                                 </tr>
                                 {{end}}
                             </tbody>
                         </table>
                     </div>
                     {{else}}
-                    <p class="has-text-grey">
+                    <p class="has-text-fresh-muted">
                         <span class="icon"><i class="fas fa-info-circle"></i></span>
                         No active sessions.
                     </p>

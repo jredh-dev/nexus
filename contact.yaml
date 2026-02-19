@@ -27,6 +27,11 @@ socials:
     url: https://discord.gg/4GaWgtaZ
     icon: fab fa-discord
 
+pets:
+  dog:
+    name: Bigsby
+    nickname: Bigsby
+
 github:
   username: jredh
   org: jredh-dev
