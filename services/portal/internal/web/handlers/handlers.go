@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/jredh-dev/nexus/services/portal/config"
+	"github.com/jredh-dev/nexus/services/portal/internal/actions"
 	"github.com/jredh-dev/nexus/services/portal/internal/auth"
 	"github.com/jredh-dev/nexus/services/portal/internal/database"
 	"github.com/jredh-dev/nexus/services/portal/internal/web/templates"
@@ -23,6 +25,7 @@ type Handler struct {
 	cfg        *config.Config
 	auth       *auth.Service
 	templates  map[string]*template.Template
+	actions    *actions.Registry
 }
 
 // New creates a new handler with parsed templates.
@@ -57,6 +60,7 @@ func New(db *database.DB, giveawayDB *database.GiveawayDB, cfg *config.Config, a
 		cfg:        cfg,
 		auth:       authService,
 		templates:  tmplMap,
+		actions:    actions.New(),
 	}
 }
 
@@ -300,6 +304,29 @@ func (h *Handler) AdminGenerateMagicLink(w http.ResponseWriter, r *http.Request)
 
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprintf(w, `{"link":%q}`, link)
+}
+
+// SearchActions returns actions matching the query parameter "q".
+// Results are filtered by auth state — admin actions only for admins,
+// login/signup hidden when logged in, logout/dashboard hidden when logged out.
+func (h *Handler) SearchActions(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query().Get("q")
+
+	// Determine auth context from session cookie (best-effort, no redirect).
+	ctx := actions.SearchContext{}
+	if cookie, err := r.Cookie("session"); err == nil && cookie.Value != "" {
+		if user, _, err := h.auth.ValidateSession(cookie.Value); err == nil && user != nil {
+			ctx.LoggedIn = true
+			ctx.IsAdmin = user.IsAdmin()
+		}
+	}
+
+	results := h.actions.Search(query, ctx)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(results); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // --- helpers ---

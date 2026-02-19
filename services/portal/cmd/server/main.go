@@ -111,6 +111,7 @@ func main() {
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/items", h.APIListItems)
 		r.Get("/fee", h.APICalculateFee)
+		r.Get("/actions", h.SearchActions)
 		r.Post("/claims", h.APICreateClaim)
 	})
 
