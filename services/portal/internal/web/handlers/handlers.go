@@ -36,7 +36,7 @@ func New(db *database.DB, cfg *config.Config, authService *auth.Service) *Handle
 	}
 	shared = append(shared, partials...)
 
-	for _, page := range []string{"home.html", "login.html", "signup.html", "dashboard.html"} {
+	for _, page := range []string{"home.html", "login.html", "signup.html", "dashboard.html", "about.html"} {
 		files := make([]string, 0, len(shared)+1)
 		files = append(files, shared...)
 		files = append(files, page)
@@ -215,6 +215,15 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		"User":     user,
 		"Sessions": sessions,
 		"LoggedIn": true,
+	})
+}
+
+// About renders the about page.
+func (h *Handler) About(w http.ResponseWriter, r *http.Request) {
+	h.renderTemplate(w, "about.html", map[string]interface{}{
+		"Title":    "About",
+		"Year":     time.Now().Year(),
+		"LoggedIn": h.isLoggedIn(r),
 	})
 }
 

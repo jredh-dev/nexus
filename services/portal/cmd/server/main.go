@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -76,8 +77,14 @@ func main() {
 	// Initialize handlers.
 	h := handlers.New(db, cfg, authService)
 
+	// Static file serving.
+	staticDir := filepath.Join("services", "portal", "static")
+	fileServer := http.FileServer(http.Dir(staticDir))
+	r.Handle("/static/*", http.StripPrefix("/static/", fileServer))
+
 	// Public routes.
 	r.Get("/", h.Home)
+	r.Get("/about", h.About)
 	r.Get("/login", h.LoginPage)
 	r.Post("/login", h.Login)
 	r.Get("/signup", h.SignupPage)
