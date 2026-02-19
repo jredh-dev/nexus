@@ -255,3 +255,124 @@ func TestDeleteFeedAndEvents(t *testing.T) {
 		t.Errorf("expected 0 feeds after delete, got %d", len(feeds))
 	}
 }
+
+func TestCreateFeed_WithSlug(t *testing.T) {
+	h := testHandler(t)
+	r := testRouter(h)
+
+	// Create feed with slug
+	body := `{"name":"My Calendar","slug":"my-calendar"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/feeds", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("create feed with slug: expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var created createFeedResp
+	if err := json.Unmarshal(w.Body.Bytes(), &created); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if created.Token != "my-calendar" {
+		t.Errorf("expected token 'my-calendar', got %q", created.Token)
+	}
+	if created.URL != "/cal/my-calendar.ics" {
+		t.Errorf("expected URL '/cal/my-calendar.ics', got %q", created.URL)
+	}
+
+	// Subscribe using the slug
+	req = httptest.NewRequest(http.MethodGet, "/cal/my-calendar.ics", nil)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("subscribe with slug: expected 200, got %d", w.Code)
+	}
+	if !strings.HasPrefix(w.Header().Get("Content-Type"), "text/calendar") {
+		t.Errorf("expected text/calendar, got %q", w.Header().Get("Content-Type"))
+	}
+}
+
+func TestCreateFeed_SlugCollision(t *testing.T) {
+	h := testHandler(t)
+	r := testRouter(h)
+
+	// Create first feed with slug
+	body := `{"name":"First","slug":"work"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/feeds", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("first feed: expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Try duplicate slug
+	body = `{"name":"Second","slug":"work"}`
+	req = httptest.NewRequest(http.MethodPost, "/api/feeds", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusConflict {
+		t.Errorf("duplicate slug: expected 409, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestCreateFeed_InvalidSlug(t *testing.T) {
+	h := testHandler(t)
+	r := testRouter(h)
+
+	cases := []struct {
+		name string
+		slug string
+	}{
+		{"uppercase", "My-Calendar"},
+		{"spaces", "my calendar"},
+		{"special chars", "my_calendar!"},
+		{"starts with hyphen", "-my-calendar"},
+		{"ends with hyphen", "my-calendar-"},
+		{"single char", "x"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			body, _ := json.Marshal(map[string]string{"name": "Test", "slug": tc.slug})
+			req := httptest.NewRequest(http.MethodPost, "/api/feeds", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			if w.Code != http.StatusBadRequest {
+				t.Errorf("slug %q: expected 400, got %d: %s", tc.slug, w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestCreateFeed_WithoutSlug_GetsUUID(t *testing.T) {
+	h := testHandler(t)
+	r := testRouter(h)
+
+	body := `{"name":"No Slug"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/feeds", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var created createFeedResp
+	if err := json.Unmarshal(w.Body.Bytes(), &created); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	// Token should be a UUID (36 chars with hyphens)
+	if len(created.Token) != 36 {
+		t.Errorf("expected UUID token (36 chars), got %q (%d chars)", created.Token, len(created.Token))
+	}
+}

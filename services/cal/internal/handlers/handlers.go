@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -12,6 +13,10 @@ import (
 	"github.com/jredh-dev/nexus/services/cal/internal/database"
 	"github.com/jredh-dev/nexus/services/cal/internal/ical"
 )
+
+// slugPattern matches valid slugs: lowercase letters, digits, and hyphens,
+// 2-64 characters, must start and end with alphanumeric.
+var slugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$`)
 
 // Handler holds dependencies for HTTP handlers.
 type Handler struct {
@@ -83,6 +88,7 @@ func (h *Handler) Subscribe(w http.ResponseWriter, r *http.Request) {
 
 type createFeedReq struct {
 	Name string `json:"name"`
+	Slug string `json:"slug"` // optional: readable URL slug (e.g. "my-calendar")
 }
 
 type createFeedResp struct {
@@ -105,17 +111,31 @@ func (h *Handler) CreateFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	token := uuid.New().String()
+	if req.Slug != "" {
+		if !slugPattern.MatchString(req.Slug) {
+			jsonError(w, "slug must be 2-64 characters, lowercase alphanumeric and hyphens, must start and end with alphanumeric", http.StatusBadRequest)
+			return
+		}
+		token = req.Slug
+	}
+
 	now := time.Now().UTC()
 	feed := &database.Feed{
 		ID:        uuid.New().String(),
 		Name:      req.Name,
-		Token:     uuid.New().String(),
+		Token:     token,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
 
 	if err := h.db.CreateFeed(feed); err != nil {
 		log.Printf("error creating feed: %v", err)
+		// Check for slug collision (UNIQUE constraint on token)
+		if req.Slug != "" {
+			jsonError(w, "slug already in use", http.StatusConflict)
+			return
+		}
 		jsonError(w, "failed to create feed", http.StatusInternalServerError)
 		return
 	}
