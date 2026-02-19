@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jredh-dev/nexus/services/portal/config"
 	"github.com/jredh-dev/nexus/services/portal/internal/database"
+	"github.com/jredh-dev/nexus/services/portal/pkg/identity"
 	"github.com/jredh-dev/nexus/services/portal/pkg/models"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -36,6 +37,68 @@ func HashPassword(password string) (string, error) {
 // CheckPassword compares a plaintext password against a bcrypt hash.
 func CheckPassword(password, hash string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+}
+
+// Signup registers a new user after checking for identity duplicates.
+// It normalizes and hashes the email and phone number, then checks
+// that no existing user shares the same username, email hash, or phone hash.
+func (s *Service) Signup(username, email, phone, password, name string) (*models.User, error) {
+	// Check username uniqueness.
+	existing, err := s.db.GetUserByUsername(username)
+	if err != nil {
+		return nil, fmt.Errorf("check username: %w", err)
+	}
+	if existing != nil {
+		return nil, ErrUsernameTaken
+	}
+
+	// Compute identity hashes.
+	eHash := identity.EmailHash(email)
+	pHash := identity.PhoneHash(phone)
+
+	// Check email dedup.
+	existing, err = s.db.GetUserByEmailHash(eHash)
+	if err != nil {
+		return nil, fmt.Errorf("check email hash: %w", err)
+	}
+	if existing != nil {
+		return nil, ErrEmailTaken
+	}
+
+	// Check phone dedup.
+	existing, err = s.db.GetUserByPhoneHash(pHash)
+	if err != nil {
+		return nil, fmt.Errorf("check phone hash: %w", err)
+	}
+	if existing != nil {
+		return nil, ErrPhoneTaken
+	}
+
+	// Hash password.
+	pwHash, err := HashPassword(password)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	user := &models.User{
+		ID:           uuid.New().String(),
+		Username:     username,
+		Email:        email,
+		PhoneNumber:  phone,
+		Name:         name,
+		PasswordHash: pwHash,
+		EmailHash:    eHash,
+		PhoneHash:    pHash,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+		LastLoginAt:  now,
+	}
+
+	if err := s.db.CreateUser(user); err != nil {
+		return nil, fmt.Errorf("create user: %w", err)
+	}
+	return user, nil
 }
 
 // Login verifies credentials and creates a new session.
@@ -106,6 +169,8 @@ func (s *Service) Logout(sessionID string) error {
 }
 
 // CreateUser registers a new user with a hashed password.
+// This is the legacy method used by dev seeding. For user-facing signup,
+// use Signup() which includes identity dedup checks.
 func (s *Service) CreateUser(email, password, name string) (*models.User, error) {
 	hash, err := HashPassword(password)
 	if err != nil {
@@ -118,6 +183,7 @@ func (s *Service) CreateUser(email, password, name string) (*models.User, error)
 		Email:        email,
 		Name:         name,
 		PasswordHash: hash,
+		EmailHash:    identity.EmailHash(email),
 		CreatedAt:    now,
 		UpdatedAt:    now,
 		LastLoginAt:  now,

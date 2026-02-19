@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/jredh-dev/nexus/services/portal/config"
@@ -26,7 +28,7 @@ func New(db *database.DB, cfg *config.Config, authService *auth.Service) *Handle
 	templates := make(map[string]*template.Template)
 	basePath := filepath.Join("services", "portal", "internal", "web", "templates", "base.html")
 
-	for _, page := range []string{"home.html", "login.html", "dashboard.html"} {
+	for _, page := range []string{"home.html", "login.html", "signup.html", "dashboard.html"} {
 		pagePath := filepath.Join("services", "portal", "internal", "web", "templates", page)
 		templates[page] = template.Must(
 			template.New(page).ParseFiles(basePath, pagePath),
@@ -117,6 +119,71 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
+// SignupPage renders the signup form.
+func (h *Handler) SignupPage(w http.ResponseWriter, r *http.Request) {
+	h.renderTemplate(w, "signup.html", map[string]interface{}{
+		"Title": "Sign Up",
+		"Year":  time.Now().Year(),
+	})
+}
+
+// Signup handles signup form submission.
+func (h *Handler) Signup(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		log.Printf("Error parsing signup form: %v", err)
+		h.signupError(w, "Invalid form data.", r)
+		return
+	}
+
+	username := strings.TrimSpace(r.FormValue("username"))
+	email := strings.TrimSpace(r.FormValue("email"))
+	phone := strings.TrimSpace(r.FormValue("phone"))
+	password := r.FormValue("password")
+	name := strings.TrimSpace(r.FormValue("name"))
+
+	if username == "" || email == "" || phone == "" || password == "" {
+		h.signupError(w, "Username, email, phone number, and password are required.", r)
+		return
+	}
+
+	_, err := h.auth.Signup(username, email, phone, password, name)
+	if err != nil {
+		log.Printf("Signup failed for %s: %v", email, err)
+
+		switch {
+		case errors.Is(err, auth.ErrUsernameTaken):
+			h.signupError(w, "This username is already taken.", r)
+		case errors.Is(err, auth.ErrEmailTaken):
+			h.signupError(w, "An account with this email already exists.", r)
+		case errors.Is(err, auth.ErrPhoneTaken):
+			h.signupError(w, "An account with this phone number already exists.", r)
+		default:
+			h.signupError(w, "Something went wrong. Please try again.", r)
+		}
+		return
+	}
+
+	// Auto-login after signup.
+	sessionID, err := h.auth.Login(email, password, r.RemoteAddr, r.UserAgent())
+	if err != nil {
+		log.Printf("Auto-login after signup failed for %s: %v", email, err)
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    sessionID,
+		Path:     "/",
+		MaxAge:   h.cfg.Session.MaxAge,
+		HttpOnly: true,
+		Secure:   h.cfg.Server.Env == "production",
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+}
+
 // Dashboard renders the authenticated dashboard page.
 func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	user, ok := GetUserFromContext(r.Context())
@@ -156,6 +223,18 @@ func (h *Handler) loginError(w http.ResponseWriter, msg string) {
 		"Title": "Login",
 		"Year":  time.Now().Year(),
 		"Error": msg,
+	})
+}
+
+func (h *Handler) signupError(w http.ResponseWriter, msg string, r *http.Request) {
+	h.renderTemplate(w, "signup.html", map[string]interface{}{
+		"Title":    "Sign Up",
+		"Year":     time.Now().Year(),
+		"Error":    msg,
+		"Username": r.FormValue("username"),
+		"Email":    r.FormValue("email"),
+		"Phone":    r.FormValue("phone"),
+		"Name":     r.FormValue("name"),
 	})
 }
 

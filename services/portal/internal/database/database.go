@@ -43,13 +43,21 @@ func migrate(conn *sql.DB) error {
 	const ddl = `
 	CREATE TABLE IF NOT EXISTS users (
 		id            TEXT PRIMARY KEY,
+		username      TEXT UNIQUE NOT NULL DEFAULT '',
 		email         TEXT UNIQUE NOT NULL,
+		phone_number  TEXT NOT NULL DEFAULT '',
 		name          TEXT NOT NULL DEFAULT '',
 		password_hash TEXT NOT NULL,
+		email_hash    TEXT NOT NULL DEFAULT '',
+		phone_hash    TEXT NOT NULL DEFAULT '',
 		created_at    DATETIME NOT NULL,
 		updated_at    DATETIME NOT NULL,
 		last_login_at DATETIME NOT NULL
 	);
+
+	CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+	CREATE INDEX IF NOT EXISTS idx_users_email_hash ON users(email_hash);
+	CREATE INDEX IF NOT EXISTS idx_users_phone_hash ON users(phone_hash);
 
 	CREATE TABLE IF NOT EXISTS sessions (
 		id         TEXT PRIMARY KEY,
@@ -67,36 +75,65 @@ func migrate(conn *sql.DB) error {
 	return err
 }
 
+// userColumns is the SELECT column list for user queries.
+const userColumns = `id, username, email, phone_number, name, password_hash, email_hash, phone_hash, created_at, updated_at, last_login_at`
+
+// scanUser scans a row into a User model.
+func scanUser(row interface{ Scan(...interface{}) error }) (*models.User, error) {
+	u := &models.User{}
+	err := row.Scan(
+		&u.ID, &u.Username, &u.Email, &u.PhoneNumber, &u.Name,
+		&u.PasswordHash, &u.EmailHash, &u.PhoneHash,
+		&u.CreatedAt, &u.UpdatedAt, &u.LastLoginAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return u, err
+}
+
 // --- User operations ---
 
 // CreateUser inserts a new user.
 func (db *DB) CreateUser(u *models.User) error {
-	const q = `INSERT INTO users (id, email, name, password_hash, created_at, updated_at, last_login_at)
-	           VALUES (?, ?, ?, ?, ?, ?, ?)`
-	_, err := db.conn.Exec(q, u.ID, u.Email, u.Name, u.PasswordHash, u.CreatedAt, u.UpdatedAt, u.LastLoginAt)
+	const q = `INSERT INTO users (id, username, email, phone_number, name, password_hash, email_hash, phone_hash, created_at, updated_at, last_login_at)
+	           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	_, err := db.conn.Exec(q,
+		u.ID, u.Username, u.Email, u.PhoneNumber, u.Name,
+		u.PasswordHash, u.EmailHash, u.PhoneHash,
+		u.CreatedAt, u.UpdatedAt, u.LastLoginAt,
+	)
 	return err
 }
 
 // GetUserByEmail looks up a user by email.
 func (db *DB) GetUserByEmail(email string) (*models.User, error) {
-	const q = `SELECT id, email, name, password_hash, created_at, updated_at, last_login_at FROM users WHERE email = ?`
-	u := &models.User{}
-	err := db.conn.QueryRow(q, email).Scan(&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.CreatedAt, &u.UpdatedAt, &u.LastLoginAt)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	return u, err
+	q := `SELECT ` + userColumns + ` FROM users WHERE email = ?`
+	return scanUser(db.conn.QueryRow(q, email))
 }
 
 // GetUserByID looks up a user by ID.
 func (db *DB) GetUserByID(id string) (*models.User, error) {
-	const q = `SELECT id, email, name, password_hash, created_at, updated_at, last_login_at FROM users WHERE id = ?`
-	u := &models.User{}
-	err := db.conn.QueryRow(q, id).Scan(&u.ID, &u.Email, &u.Name, &u.PasswordHash, &u.CreatedAt, &u.UpdatedAt, &u.LastLoginAt)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	return u, err
+	q := `SELECT ` + userColumns + ` FROM users WHERE id = ?`
+	return scanUser(db.conn.QueryRow(q, id))
+}
+
+// GetUserByUsername looks up a user by username (case-insensitive).
+func (db *DB) GetUserByUsername(username string) (*models.User, error) {
+	q := `SELECT ` + userColumns + ` FROM users WHERE username = ? COLLATE NOCASE`
+	return scanUser(db.conn.QueryRow(q, username))
+}
+
+// GetUserByEmailHash looks up a user by normalized email hash.
+func (db *DB) GetUserByEmailHash(hash string) (*models.User, error) {
+	q := `SELECT ` + userColumns + ` FROM users WHERE email_hash = ?`
+	return scanUser(db.conn.QueryRow(q, hash))
+}
+
+// GetUserByPhoneHash looks up a user by normalized phone hash.
+func (db *DB) GetUserByPhoneHash(hash string) (*models.User, error) {
+	q := `SELECT ` + userColumns + ` FROM users WHERE phone_hash = ?`
+	return scanUser(db.conn.QueryRow(q, hash))
 }
 
 // UpdateLastLogin sets the last_login_at timestamp.

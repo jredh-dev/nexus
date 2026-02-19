@@ -1,74 +1,56 @@
 {{template "base" .}}
 
 {{define "content"}}
-<section class="hero is-dark is-large">
-    <div class="hero-body">
-        <div class="container">
-            <div class="columns is-vcentered">
-                <div class="column is-8">
-                    <h1 class="title is-1 has-text-white">
-                        Building with AI, one system at a time.
-                    </h1>
-                    <p class="subtitle is-4 has-text-grey-lighter mt-4">
-                        I'm a developer working at the intersection of software engineering
-                        and AI. I build tools, agents, and infrastructure that let humans
-                        and machines collaborate effectively.
-                    </p>
-                </div>
-            </div>
-        </div>
+<section class="hero">
+    <div class="container">
+        <h1>Building with AI, one system at a time.</h1>
+        <p>
+            I'm a developer working at the intersection of software engineering
+            and AI. I build tools, agents, and infrastructure that let humans
+            and machines collaborate effectively.
+        </p>
     </div>
 </section>
 
 <section class="section">
     <div class="container">
-        <h2 class="title is-3 has-text-centered mb-6">What I Work On</h2>
-        <div class="columns">
-            <div class="column">
-                <div class="box">
-                    <h3 class="title is-5">AI-Assisted Development</h3>
-                    <p class="has-text-grey">
-                        Multi-agent workflows, agentic coding systems, and tooling
-                        that makes AI a practical collaborator in real engineering work.
-                    </p>
-                </div>
+        <h2 class="section-title">What I Work On</h2>
+        <div class="cards">
+            <div class="card">
+                <h3>AI-Assisted Development</h3>
+                <p>
+                    Multi-agent workflows, agentic coding systems, and tooling
+                    that makes AI a practical collaborator in real engineering work.
+                </p>
             </div>
-            <div class="column">
-                <div class="box">
-                    <h3 class="title is-5">Infrastructure</h3>
-                    <p class="has-text-grey">
-                        Cloud architecture, CI/CD pipelines, Docker, and Git worktree
-                        workflows. Systems that are reliable and easy to reason about.
-                    </p>
-                </div>
+            <div class="card">
+                <h3>Infrastructure</h3>
+                <p>
+                    Cloud architecture, CI/CD pipelines, Docker, and Git worktree
+                    workflows. Systems that are reliable and easy to reason about.
+                </p>
             </div>
-            <div class="column">
-                <div class="box">
-                    <h3 class="title is-5">Open Source Tools</h3>
-                    <p class="has-text-grey">
-                        CLI tools, workstream managers, and developer utilities.
-                        Small, focused software that solves real problems.
-                    </p>
-                </div>
+            <div class="card">
+                <h3>Open Source Tools</h3>
+                <p>
+                    CLI tools, workstream managers, and developer utilities.
+                    Small, focused software that solves real problems.
+                </p>
             </div>
         </div>
     </div>
 </section>
 
-<section class="section has-background-light">
-    <div class="container">
-        <div class="columns is-centered">
-            <div class="column is-8 has-text-centered">
-                <h2 class="title is-3">Want to get in touch?</h2>
-                <p class="subtitle is-5 has-text-grey">
-                    I'm always interested in hearing about interesting problems
-                    and collaboration opportunities.
-                </p>
-                <a class="button is-dark is-medium" href="mailto:jason@hooperdevelopment.com">
-                    Contact Me
-                </a>
-            </div>
-        </div>
+<section class="section section-alt">
+    <div class="container cta">
+        <h2>Want to get in touch?</h2>
+        <p>
+            I'm always interested in hearing about interesting problems
+            and collaboration opportunities.
+        </p>
+        <a class="btn btn-dark" href="mailto:jason@hooperdevelopment.com">
+            Contact Me
+        </a>
     </div>
 </section>
 {{end}}
