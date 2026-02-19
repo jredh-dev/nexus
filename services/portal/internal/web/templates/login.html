@@ -1,46 +1,42 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.2/css/bulma.min.css">
-    <style>
-        html, body { height: 100%; }
-    </style>
-</head>
-<body>
-    <section class="hero is-fullheight">
-        <div class="hero-body">
-            <div class="container">
-                <div class="columns is-centered">
-                    <div class="column is-narrow" style="min-width: 360px;">
-                        <h1 class="title has-text-centered">Login</h1>
-                        <div class="box">
-                            <form action="/login" method="POST">
-                                <div class="field">
-                                    <label class="label" for="email">Email</label>
-                                    <div class="control">
-                                        <input class="input" type="email" id="email" name="email" placeholder="you@example.com" required>
-                                    </div>
-                                </div>
-                                <div class="field">
-                                    <label class="label" for="password">Password</label>
-                                    <div class="control">
-                                        <input class="input" type="password" id="password" name="password" placeholder="••••••••" required>
-                                    </div>
-                                </div>
-                                <div class="field mt-5">
-                                    <div class="control">
-                                        <button class="button is-link is-fullwidth" type="submit">Login</button>
-                                    </div>
-                                </div>
-                            </form>
-                        </div>
+{{template "base" .}}
+
+{{define "content"}}
+<section class="section">
+    <div class="container">
+        <div class="columns is-centered">
+            <div class="column is-4">
+                <div class="box">
+                    <h1 class="title is-4 has-text-centered">Client Login</h1>
+                    {{if .Error}}
+                    <div class="notification is-danger is-light">
+                        {{.Error}}
                     </div>
+                    {{end}}
+                    <form action="/login" method="POST">
+                        <div class="field">
+                            <label class="label" for="email">Email</label>
+                            <div class="control">
+                                <input class="input" type="email" id="email" name="email" placeholder="you@company.com" required>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="label" for="password">Password</label>
+                            <div class="control">
+                                <input class="input" type="password" id="password" name="password" required>
+                            </div>
+                        </div>
+                        <div class="field mt-5">
+                            <div class="control">
+                                <button class="button is-link is-fullwidth" type="submit">Login</button>
+                            </div>
+                        </div>
+                    </form>
                 </div>
+                <p class="has-text-centered has-text-grey mt-4">
+                    <a href="/">Back to home</a>
+                </p>
             </div>
         </div>
-    </section>
-</body>
-</html>
+    </div>
+</section>
+{{end}}

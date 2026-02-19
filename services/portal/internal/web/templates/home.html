@@ -1,12 +1,78 @@
-{{define "home.html"}}
 {{template "base" .}}
-{{end}}
 
 {{define "content"}}
-<div class="card">
-    <h1>Welcome to Client Portal</h1>
-    <p>Manage your consulting projects, track GitHub issues, and view invoices.</p>
-    <br>
-    <a href="/login" class="btn">Login</a>
-</div>
+<section class="hero is-dark is-large">
+    <div class="hero-body">
+        <div class="container">
+            <div class="columns is-vcentered">
+                <div class="column is-7">
+                    <h1 class="title is-1 has-text-white">
+                        Technology consulting that delivers.
+                    </h1>
+                    <p class="subtitle is-4 has-text-grey-lighter mt-4">
+                        We help organizations build reliable software, modernize infrastructure,
+                        and solve hard engineering problems.
+                    </p>
+                    <div class="buttons mt-5">
+                        <a class="button is-link is-medium" href="mailto:contact@deanoctua.com">
+                            Get in Touch
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container">
+        <h2 class="title is-3 has-text-centered mb-6">What We Do</h2>
+        <div class="columns">
+            <div class="column">
+                <div class="box">
+                    <h3 class="title is-5">Software Engineering</h3>
+                    <p class="has-text-grey">
+                        Full-stack development, API design, and system architecture.
+                        We write code that's tested, documented, and built to last.
+                    </p>
+                </div>
+            </div>
+            <div class="column">
+                <div class="box">
+                    <h3 class="title is-5">Infrastructure</h3>
+                    <p class="has-text-grey">
+                        Cloud architecture, CI/CD pipelines, and infrastructure as code.
+                        Deploy with confidence and scale when you need to.
+                    </p>
+                </div>
+            </div>
+            <div class="column">
+                <div class="box">
+                    <h3 class="title is-5">Technical Strategy</h3>
+                    <p class="has-text-grey">
+                        Technology assessments, migration planning, and team enablement.
+                        Make better technical decisions with experienced guidance.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section has-background-light">
+    <div class="container">
+        <div class="columns is-centered">
+            <div class="column is-8 has-text-centered">
+                <h2 class="title is-3">Ready to talk?</h2>
+                <p class="subtitle is-5 has-text-grey">
+                    We keep things straightforward. Tell us what you're working on
+                    and we'll let you know if we can help.
+                </p>
+                <a class="button is-dark is-medium" href="mailto:contact@deanoctua.com">
+                    Contact Us
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
 {{end}}

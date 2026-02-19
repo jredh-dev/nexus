@@ -85,25 +85,14 @@ func main() {
 	// Initialize handlers
 	h := handlers.New(db, cfg, tokenService)
 
-	// Initialize auth service for middleware
-	authService := h.AuthService()
-
 	// Public routes
 	r.Get("/", h.Home)
 	r.Get("/login", h.LoginPage)
 	r.Post("/login", h.Login)
 	r.Get("/logout", h.Logout)
 
-	// API routes for token validation (no auth required - microservices call this)
+	// API routes for token validation (used by microservices)
 	r.Post("/api/validate", h.ValidateToken)
-
-	// Protected routes (require auth)
-	r.Group(func(r chi.Router) {
-		r.Use(handlers.AuthMiddleware(db, authService))
-		r.Get("/welcome", h.Welcome)
-		r.Get("/api/token", h.GetToken)       // Get JWT token for microservice calls
-		r.Get("/api/userinfo", h.GetUserInfo) // Get user information
-	})
 
 	// Start server
 	addr := fmt.Sprintf(":%s", cfg.Server.Port)
