@@ -1,0 +1,20 @@
+{{template "base" .}}
+
+{{define "content"}}
+<h1>Projects</h1>
+
+<div class="card">
+    <p>No projects yet. Projects will appear here once they're added.</p>
+</div>
+
+{{range .Projects}}
+<div class="card">
+    <h2>{{.Name}}</h2>
+    <p>{{.Description}}</p>
+    <p><strong>Status:</strong> {{.Status}}</p>
+    <p><strong>GitHub:</strong> <a href="https://github.com/{{.GitHubRepo}}" target="_blank">{{.GitHubRepo}}</a></p>
+    <br>
+    <a href="/projects/{{.ID}}" class="btn">View Details</a>
+</div>
+{{end}}
+{{end}}

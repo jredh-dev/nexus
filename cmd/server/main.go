@@ -1,5 +1,5 @@
-// nascent-nexus - Personal AI assistant system
-// Copyright (C) 2025  nascent-nexus contributors
+// nexus - Personal AI assistant system
+// Copyright (C) 2025  nexus contributors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published
@@ -18,7 +18,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/jredh-dev/nascent-nexus/internal/handlers"
+	"github.com/jredh-dev/nexus/internal/handlers"
 )
 
 func main() {
@@ -49,7 +49,7 @@ func main() {
 
 	// Start server
 	port := "8080"
-	fmt.Printf("🚀 nascent-nexus server starting on port %s\n", port)
+	fmt.Printf("🚀 nexus server starting on port %s\n", port)
 	fmt.Printf("🌐 Website available at: http://localhost:%s\n", port)
 	fmt.Printf("📱 SMS webhook available at: http://localhost:%s/sms\n", port)
 	fmt.Printf("💚 Health check at: http://localhost:%s/health\n", port)

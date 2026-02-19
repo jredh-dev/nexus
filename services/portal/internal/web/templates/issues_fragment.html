@@ -1,0 +1,14 @@
+<div>
+    {{if .Issues}}
+        {{range .Issues}}
+        <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 4px;">
+            <h3>#{{.Number}} - {{.Title}}</h3>
+            <p>{{.Body}}</p>
+            <p><strong>Status:</strong> {{.State}}</p>
+            <p><a href="{{.URL}}" target="_blank">View on GitHub</a></p>
+        </div>
+        {{end}}
+    {{else}}
+        <p>No issues found for this project.</p>
+    {{end}}
+</div>

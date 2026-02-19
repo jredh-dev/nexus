@@ -1,0 +1,23 @@
+# Example Terraform Variables for DEV Environment
+# Copy this file to terraform.tfvars and fill in the values
+# DO NOT commit terraform.tfvars to git (contains sensitive data)
+
+# GCP Configuration
+project_id = "dea-noctua"
+region     = "us-central1"
+
+# Cloud Run Image
+# This will be updated by CI/CD pipeline, but you can set initial value
+cloud_run_image = "gcr.io/dea-noctua/nexus-portal-dev:latest"
+
+# Firebase Credentials (JSON as string)
+# Get from: cat firebase-credentials-dev.json | jq -c
+firebase_credentials = "PASTE_FIREBASE_JSON_HERE"
+
+# Session Secret (base64 encoded, 32+ bytes)
+# Generate with: openssl rand -base64 32
+session_secret = "GENERATE_RANDOM_SECRET_HERE"
+
+# Example:
+# firebase_credentials = "{\"type\":\"service_account\",\"project_id\":\"dea-noctua\",...}"
+# session_secret = "aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789+/=="
