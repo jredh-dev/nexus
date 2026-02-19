@@ -30,7 +30,7 @@ func testHandler(t *testing.T) *Handler {
 
 func testRouter(h *Handler) *chi.Mux {
 	r := chi.NewRouter()
-	r.Get("/cal/{token}.ics", h.Subscribe)
+	r.Get("/{token}.ics", h.Subscribe)
 	r.Route("/api", func(r chi.Router) {
 		r.Post("/feeds", h.CreateFeed)
 		r.Get("/feeds", h.ListFeeds)
@@ -123,7 +123,7 @@ func TestCreateEventAndSubscribe(t *testing.T) {
 	}
 
 	// Subscribe to the feed
-	req = httptest.NewRequest(http.MethodGet, "/cal/"+feed.Token+".ics", nil)
+	req = httptest.NewRequest(http.MethodGet, "/"+feed.Token+".ics", nil)
 	w = httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -158,7 +158,7 @@ func TestSubscribe_InvalidToken(t *testing.T) {
 	h := testHandler(t)
 	r := testRouter(h)
 
-	req := httptest.NewRequest(http.MethodGet, "/cal/nonexistent.ics", nil)
+	req := httptest.NewRequest(http.MethodGet, "/nonexistent.ics", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -278,12 +278,12 @@ func TestCreateFeed_WithSlug(t *testing.T) {
 	if created.Token != "my-calendar" {
 		t.Errorf("expected token 'my-calendar', got %q", created.Token)
 	}
-	if created.URL != "/cal/my-calendar.ics" {
-		t.Errorf("expected URL '/cal/my-calendar.ics', got %q", created.URL)
+	if created.URL != "/my-calendar.ics" {
+		t.Errorf("expected URL '/my-calendar.ics', got %q", created.URL)
 	}
 
 	// Subscribe using the slug
-	req = httptest.NewRequest(http.MethodGet, "/cal/my-calendar.ics", nil)
+	req = httptest.NewRequest(http.MethodGet, "/my-calendar.ics", nil)
 	w = httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 

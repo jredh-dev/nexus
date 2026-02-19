@@ -15,29 +15,29 @@ type DB struct {
 
 // Feed represents a calendar feed with a unique subscription token.
 type Feed struct {
-	ID        string
-	Name      string
-	Token     string // unguessable token for subscription URL
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Token     string    `json:"token"` // unguessable token for subscription URL
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // Event represents a single calendar event within a feed.
 type Event struct {
-	ID          string
-	FeedID      string
-	Summary     string
-	Description string
-	Location    string
-	URL         string
-	Start       time.Time
-	End         *time.Time // nil = no end time (all-day or point-in-time)
-	AllDay      bool
-	Deadline    *time.Time // optional deadline (used as DTSTART if set, with VALARM)
-	Status      string     // TENTATIVE, CONFIRMED, CANCELLED
-	Categories  string     // comma-separated
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID          string     `json:"id"`
+	FeedID      string     `json:"feed_id"`
+	Summary     string     `json:"summary"`
+	Description string     `json:"description"`
+	Location    string     `json:"location"`
+	URL         string     `json:"url"`
+	Start       time.Time  `json:"start"`
+	End         *time.Time `json:"end,omitempty"` // nil = no end time (all-day or point-in-time)
+	AllDay      bool       `json:"all_day"`
+	Deadline    *time.Time `json:"deadline,omitempty"` // optional deadline (used as DTSTART if set, with VALARM)
+	Status      string     `json:"status"`             // TENTATIVE, CONFIRMED, CANCELLED
+	Categories  string     `json:"categories"`         // comma-separated
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 const schema = `

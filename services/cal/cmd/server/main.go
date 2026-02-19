@@ -68,8 +68,8 @@ func main() {
 	})
 
 	// Calendar subscription endpoint (served to calendar clients)
-	// webcal://host/cal/{token}.ics
-	r.Get("/cal/{token}.ics", h.Subscribe)
+	// webcal://host/{token}.ics
+	r.Get("/{token}.ics", h.Subscribe)
 
 	// Management API
 	r.Route("/api", func(r chi.Router) {
@@ -106,7 +106,7 @@ func main() {
 	}()
 
 	log.Printf("nexus-cal starting on %s", addr)
-	log.Printf("  Subscribe: webcal://localhost%s/cal/{token}.ics", addr)
+	log.Printf("  Subscribe: webcal://localhost%s/{token}.ics", addr)
 	log.Printf("  API:       http://localhost%s/api/", addr)
 
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {

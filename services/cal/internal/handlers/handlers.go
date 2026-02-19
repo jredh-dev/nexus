@@ -31,7 +31,7 @@ func New(db *database.DB) *Handler {
 // --- Subscription endpoint (served to calendar clients) ---
 
 // Subscribe serves the iCal feed for a given token.
-// GET /cal/{token}.ics
+// GET /{token}.ics
 func (h *Handler) Subscribe(w http.ResponseWriter, r *http.Request) {
 	token := chi.URLParam(r, "token")
 	if token == "" {
@@ -144,7 +144,7 @@ func (h *Handler) CreateFeed(w http.ResponseWriter, r *http.Request) {
 		ID:    feed.ID,
 		Name:  feed.Name,
 		Token: feed.Token,
-		URL:   "/cal/" + feed.Token + ".ics",
+		URL:   "/" + feed.Token + ".ics",
 	}
 	jsonOK(w, http.StatusCreated, resp)
 }
