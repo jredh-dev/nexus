@@ -32,6 +32,7 @@ WORKDIR /app
 
 COPY --from=builder /app/server /app/server
 COPY --from=builder /app/services/portal/internal/web/templates /app/services/portal/internal/web/templates
+COPY --from=builder /app/services/portal/static /app/services/portal/static
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data && chown -R appuser:appuser /app
