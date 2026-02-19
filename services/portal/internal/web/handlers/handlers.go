@@ -49,7 +49,8 @@ func (h *Handler) AuthService() *auth.Service {
 // Home renders the public landing page.
 func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
 	h.renderTemplate(w, "home.html", map[string]interface{}{
-		"Year": time.Now().Year(),
+		"Year":     time.Now().Year(),
+		"LoggedIn": h.isLoggedIn(r),
 	})
 }
 
@@ -135,10 +136,20 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		"Year":     time.Now().Year(),
 		"User":     user,
 		"Sessions": sessions,
+		"LoggedIn": true,
 	})
 }
 
 // --- helpers ---
+
+func (h *Handler) isLoggedIn(r *http.Request) bool {
+	cookie, err := r.Cookie("session")
+	if err != nil || cookie.Value == "" {
+		return false
+	}
+	user, _, err := h.auth.ValidateSession(cookie.Value)
+	return err == nil && user != nil
+}
 
 func (h *Handler) loginError(w http.ResponseWriter, msg string) {
 	h.renderTemplate(w, "login.html", map[string]interface{}{

@@ -41,9 +41,16 @@
             <div id="mainNav" class="navbar-menu">
                 <div class="navbar-end">
                     <a class="navbar-item" href="/">Home</a>
+                    {{if .LoggedIn}}
+                    <a class="navbar-item" href="/dashboard">Dashboard</a>
+                    <div class="navbar-item">
+                        <a class="button is-light is-small" href="/logout">Logout</a>
+                    </div>
+                    {{else}}
                     <div class="navbar-item">
                         <a class="button is-light is-small" href="/login">Login</a>
                     </div>
+                    {{end}}
                 </div>
             </div>
         </div>
