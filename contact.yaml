@@ -1,0 +1,33 @@
+# Contact & Social Media Reference
+# Single source of truth for all personal/professional info used across the site.
+
+name: Jared Hooper
+location: Seattle, WA
+email: dev@jredh.com
+
+employer:
+  company: Outreach
+  url: https://www.outreach.io
+
+education:
+  school: University of New Hampshire
+  abbreviation: UNH
+
+socials:
+  linkedin:
+    url: https://www.linkedin.com/in/jredhooper/
+    icon: fab fa-linkedin
+  threads:
+    url: https://www.threads.com/@jredhoo
+    icon: fab fa-threads
+  instagram:
+    url: https://www.instagram.com/jredhoo
+    icon: fab fa-instagram
+  discord:
+    url: https://discord.gg/4GaWgtaZ
+    icon: fab fa-discord
+
+github:
+  username: jredh
+  org: jredh-dev
+  url: https://github.com/jredh-dev

@@ -13,12 +13,18 @@
         border-radius: 12px;
         overflow: hidden;
     }
-    .profile-image {
+    .hero-profile-figure {
+        width: 180px;
+        height: 180px;
+        margin: 0 auto;
+    }
+    .hero-profile-figure img {
+        width: 180px;
+        height: 180px;
         border-radius: 50%;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
         object-fit: cover;
-        width: 200px;
-        height: 200px;
+        object-position: top;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
     }
     .social-icon {
         font-size: 1.5rem;
@@ -34,8 +40,8 @@
 <section class="hero is-medium is-dark">
     <div class="hero-body">
         <div class="container has-text-centered">
-            <figure class="image is-128x128 is-inline-block mb-4">
-                <img class="profile-image" src="/static/images/profile.jpeg" alt="Jason Hooper">
+            <figure class="hero-profile-figure mb-4">
+                <img src="/static/images/profile.jpeg" alt="Jared Hooper">
             </figure>
             <p class="title is-2">About Me</p>
             <p class="subtitle is-5 has-text-grey-light mt-3">
@@ -53,21 +59,23 @@
                     <div class="columns is-vcentered">
                         <div class="column is-5">
                             <figure class="image is-4by5 about-image-container">
-                                <img class="about-image" src="/static/images/profile.jpeg" alt="Jason Hooper">
+                                <img class="about-image" src="/static/images/profile.jpeg" alt="Jared Hooper">
                             </figure>
                         </div>
                         <div class="column is-7">
-                            <h2 class="title is-3">Jason Hooper</h2>
-                            <p class="subtitle is-5 has-text-grey">Software Engineer</p>
+                            <h2 class="title is-3">Jared Hooper</h2>
+                            <p class="subtitle is-5 has-text-grey">Software Engineer at Outreach</p>
                             <div class="content is-medium">
                                 <p>
-                                    I work at the intersection of software engineering and AI,
-                                    building tools, agents, and infrastructure that let humans
-                                    and machines collaborate effectively.
+                                    Software engineer based in Seattle, WA. I work at
+                                    <a href="https://www.outreach.io" target="_blank" rel="noopener">Outreach</a>
+                                    and spend my free time building tools, agents, and
+                                    infrastructure at the intersection of software engineering
+                                    and AI.
                                 </p>
                                 <p>
-                                    When I'm not writing code, I'm probably hanging out with
-                                    Bigs -- my dog and loyal co-pilot.
+                                    University of New Hampshire alum. When I'm not writing code,
+                                    I'm probably hanging out with Bigs -- my dog and loyal co-pilot.
                                 </p>
                             </div>
                             {{if .LoggedIn}}
@@ -115,7 +123,7 @@
                 <div class="card" style="border-radius: 12px; overflow: hidden;">
                     <div class="card-image">
                         <figure class="image is-square">
-                            <img class="about-image" src="/static/images/me-and-bigs.jpeg" alt="Jason and Bigs">
+                            <img class="about-image" src="/static/images/me-and-bigs.jpeg" alt="Jared and Bigs">
                         </figure>
                     </div>
                     <div class="card-content">
