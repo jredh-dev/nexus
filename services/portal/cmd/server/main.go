@@ -80,6 +80,8 @@ func main() {
 	r.Get("/", h.Home)
 	r.Get("/login", h.LoginPage)
 	r.Post("/login", h.Login)
+	r.Get("/signup", h.SignupPage)
+	r.Post("/signup", h.Signup)
 	r.Get("/logout", h.Logout)
 
 	// Protected routes.

@@ -1,0 +1,45 @@
+{{template "base" .}}
+
+{{define "content"}}
+<section class="section">
+    <div class="container">
+        <div class="box">
+            <h1>Sign Up</h1>
+            {{if .Error}}
+            <div class="alert alert-error">{{.Error}}</div>
+            {{end}}
+            <form action="/signup" method="POST">
+                <div class="field">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" placeholder="jsmith" value="{{.Username}}" required>
+                </div>
+                <div class="field">
+                    <label for="name">Full Name</label>
+                    <input type="text" id="name" name="name" placeholder="John Smith" value="{{.Name}}">
+                </div>
+                <div class="field">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" placeholder="you@example.com" value="{{.Email}}" required>
+                </div>
+                <div class="field">
+                    <label for="phone">Phone Number</label>
+                    <input type="tel" id="phone" name="phone" placeholder="(555) 123-4567" value="{{.Phone}}" required>
+                </div>
+                <div class="field">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <div class="field mt-2">
+                    <button class="btn" type="submit">Create Account</button>
+                </div>
+            </form>
+        </div>
+        <p class="text-center text-muted mt-2">
+            Already have an account? <a href="/login">Login</a>
+        </p>
+        <p class="text-center text-muted mt-1">
+            <a href="/">Back to home</a>
+        </p>
+    </div>
+</section>
+{{end}}
