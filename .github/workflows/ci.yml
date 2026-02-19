@@ -58,6 +58,9 @@ jobs:
       - name: Build portal server
         run: go build -v ./services/portal/cmd/server
 
+      - name: Build cal server
+        run: CGO_ENABLED=1 go build -v ./services/cal/cmd/server
+
   test:
     name: Test
     runs-on: ubuntu-latest
