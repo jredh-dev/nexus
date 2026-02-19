@@ -47,6 +47,24 @@ func AuthMiddleware(authService *auth.Service) func(http.Handler) http.Handler {
 	}
 }
 
+// AdminMiddleware requires the authenticated user to have the admin role.
+// MUST be used after AuthMiddleware so the user is already in context.
+// Returns 403 Forbidden if the user is not an admin.
+func AdminMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, ok := GetUserFromContext(r.Context())
+		if !ok || user == nil {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+		if !user.IsAdmin() {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // GetUserFromContext extracts the authenticated user from request context.
 func GetUserFromContext(ctx context.Context) (*models.User, bool) {
 	user, ok := ctx.Value(UserContextKey).(*models.User)

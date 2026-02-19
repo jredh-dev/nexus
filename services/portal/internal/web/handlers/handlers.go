@@ -233,6 +233,75 @@ func (h *Handler) About(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// MagicLogin handles GET /auth/magic?token=X — validates a magic login token,
+// creates a session, and redirects to the dashboard.
+func (h *Handler) MagicLogin(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		http.Error(w, "Missing token", http.StatusBadRequest)
+		return
+	}
+
+	sessionID, err := h.auth.ValidateMagicToken(token, r.RemoteAddr, r.UserAgent())
+	if err != nil {
+		log.Printf("Magic login failed: %v", err)
+		if errors.Is(err, auth.ErrInvalidMagicToken) {
+			http.Error(w, "Invalid or expired magic login link.", http.StatusUnauthorized)
+			return
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    sessionID,
+		Path:     "/",
+		MaxAge:   h.cfg.Session.MaxAge,
+		HttpOnly: true,
+		Secure:   h.cfg.Server.Env == "production",
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+}
+
+// AdminGenerateMagicLink handles POST /admin/magic-link — generates a magic
+// login token for a given email and returns it as JSON. Requires admin role.
+func (h *Handler) AdminGenerateMagicLink(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form data", http.StatusBadRequest)
+		return
+	}
+
+	email := strings.TrimSpace(r.FormValue("email"))
+	if email == "" {
+		http.Error(w, "Email is required", http.StatusBadRequest)
+		return
+	}
+
+	token, err := h.auth.CreateMagicToken(email)
+	if err != nil {
+		log.Printf("Failed to generate magic link for %s: %v", email, err)
+		if errors.Is(err, auth.ErrUserNotFound) {
+			http.Error(w, "User not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Build the magic link URL.
+	scheme := "https"
+	if h.cfg.Server.Env != "production" {
+		scheme = "http"
+	}
+	link := fmt.Sprintf("%s://%s/auth/magic?token=%s", scheme, r.Host, token)
+
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, `{"link":%q}`, link)
+}
+
 // --- helpers ---
 
 func (h *Handler) isLoggedIn(r *http.Request) bool {
