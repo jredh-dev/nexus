@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	cryptoRand "crypto/rand"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"log"
@@ -64,10 +66,8 @@ func main() {
 	// Seed demo user in all environments so visitors can log in.
 	seedDemoUser(authService)
 
-	// Seed admin user in development only.
-	if cfg.Server.Env == "development" {
-		seedDevUsers(authService)
-	}
+	// Seed admin user (dev@jredh.com) in all environments.
+	seedAdminUser(db, authService)
 
 	// Initialize router.
 	r := chi.NewRouter()
@@ -100,6 +100,7 @@ func main() {
 	r.Get("/signup", h.SignupPage)
 	r.Post("/signup", h.Signup)
 	r.Get("/logout", h.Logout)
+	r.Get("/auth/magic", h.MagicLogin)
 
 	// Public giveaway routes (no auth required).
 	r.Get("/giveaway", h.GiveawayList)
@@ -113,10 +114,16 @@ func main() {
 		r.Post("/claims", h.APICreateClaim)
 	})
 
-	// Protected routes.
+	// Protected routes (login required).
 	r.Group(func(r chi.Router) {
 		r.Use(handlers.AuthMiddleware(authService))
 		r.Get("/dashboard", h.Dashboard)
+	})
+
+	// Admin routes (login + admin role required).
+	r.Group(func(r chi.Router) {
+		r.Use(handlers.AuthMiddleware(authService))
+		r.Use(handlers.AdminMiddleware)
 
 		// Admin giveaway management.
 		r.Get("/admin/giveaway", h.AdminGiveawayList)
@@ -125,6 +132,9 @@ func main() {
 		r.Post("/admin/giveaway/save", h.AdminGiveawaySave)
 		r.Post("/admin/giveaway/{id}/delete", h.AdminGiveawayDelete)
 		r.Post("/admin/giveaway/claims/{id}", h.AdminClaimUpdate)
+
+		// Admin utilities.
+		r.Post("/admin/magic-link", h.AdminGenerateMagicLink)
 	})
 
 	// Start server.
@@ -173,17 +183,55 @@ func seedDemoUser(authService *auth.Service) {
 	log.Printf("Seeded demo user: %s (%s)", created.Email, created.ID)
 }
 
-// seedDevUsers creates admin users for development only.
-func seedDevUsers(authService *auth.Service) {
-	_, err := authService.Login("admin@admin.com", "admin", "seed", "seed")
-	if err == nil {
+// seedAdminUser ensures dev@jredh.com exists as an admin in all environments.
+// Uses a random password since the primary login method is magic links.
+func seedAdminUser(db *database.DB, authService *auth.Service) {
+	const adminEmail = "dev@jredh.com"
+
+	// Check if the user already exists.
+	existing, err := authService.Login(adminEmail, "not-the-real-password", "seed", "seed")
+	if existing != "" {
+		return // somehow logged in, user exists — shouldn't happen with random pw
+	}
+	_ = err // expected to fail
+
+	// Try to look up by email directly (login will fail with wrong password).
+	user, lookupErr := db.GetUserByEmail(adminEmail)
+	if lookupErr != nil {
+		log.Printf("Error looking up admin user: %v", lookupErr)
 		return
 	}
 
-	created, err := authService.CreateUser("admin@admin.com", "admin", "Admin")
+	if user != nil {
+		// User exists, ensure admin role.
+		if err := db.UpdateUserRole(user.ID, "admin"); err != nil {
+			log.Printf("Failed to set admin role for %s: %v", adminEmail, err)
+		} else {
+			log.Printf("Admin role ensured for existing user: %s", adminEmail)
+		}
+		return
+	}
+
+	// Create the admin user with a random password (magic links are primary auth).
+	created, err := authService.CreateUser(adminEmail, randomPassword(), "Jared Hooper")
 	if err != nil {
 		log.Printf("Admin user skipped (may already exist): %v", err)
 		return
 	}
-	log.Printf("Seeded admin user: %s (%s)", created.Email, created.ID)
+
+	if err := db.UpdateUserRole(created.ID, "admin"); err != nil {
+		log.Printf("Failed to set admin role for %s: %v", adminEmail, err)
+		return
+	}
+	log.Printf("Seeded admin user: %s (%s) with role=admin", created.Email, created.ID)
+}
+
+// randomPassword generates a 32-byte hex-encoded random password.
+func randomPassword() string {
+	b := make([]byte, 32)
+	if _, err := cryptoRand.Read(b); err != nil {
+		// Fallback — shouldn't happen.
+		return "fallback-password-change-me"
+	}
+	return hex.EncodeToString(b)
 }

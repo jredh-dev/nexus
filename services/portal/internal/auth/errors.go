@@ -10,4 +10,6 @@ var (
 	ErrEmailTaken         = errors.New("an account with this email already exists")
 	ErrPhoneTaken         = errors.New("an account with this phone number already exists")
 	ErrUsernameTaken      = errors.New("this username is already taken")
+	ErrInvalidMagicToken  = errors.New("invalid or expired magic login token")
+	ErrForbidden          = errors.New("forbidden: admin access required")
 )

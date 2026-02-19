@@ -62,9 +62,16 @@ func testServer(t *testing.T) (srv *httptest.Server, client *http.Client, cleanu
 	r.Get("/signup", h.SignupPage)
 	r.Post("/signup", h.Signup)
 	r.Get("/logout", h.Logout)
+	r.Get("/auth/magic", h.MagicLogin)
 	r.Group(func(r chi.Router) {
 		r.Use(handlers.AuthMiddleware(authService))
 		r.Get("/dashboard", h.Dashboard)
+	})
+	r.Group(func(r chi.Router) {
+		r.Use(handlers.AuthMiddleware(authService))
+		r.Use(handlers.AdminMiddleware)
+		r.Get("/admin/giveaway", h.AdminGiveawayList)
+		r.Post("/admin/magic-link", h.AdminGenerateMagicLink)
 	})
 
 	srv = httptest.NewServer(r)

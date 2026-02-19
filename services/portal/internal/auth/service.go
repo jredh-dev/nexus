@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -87,6 +89,7 @@ func (s *Service) Signup(username, email, phone, password, name string) (*models
 		Email:        email,
 		PhoneNumber:  phone,
 		Name:         name,
+		Role:         models.RoleUser,
 		PasswordHash: pwHash,
 		EmailHash:    eHash,
 		PhoneHash:    pHash,
@@ -182,6 +185,7 @@ func (s *Service) CreateUser(email, password, name string) (*models.User, error)
 		ID:           uuid.New().String(),
 		Email:        email,
 		Name:         name,
+		Role:         models.RoleUser,
 		PasswordHash: hash,
 		EmailHash:    identity.EmailHash(email),
 		CreatedAt:    now,
@@ -203,4 +207,90 @@ func (s *Service) GetSessionsByUserID(userID string) ([]models.Session, error) {
 // CleanExpiredSessions removes all expired sessions from the database.
 func (s *Service) CleanExpiredSessions() error {
 	return s.db.DeleteExpiredSessions()
+}
+
+// UpdateUserRole changes a user's role.
+func (s *Service) UpdateUserRole(userID, role string) error {
+	if role != models.RoleUser && role != models.RoleAdmin {
+		return fmt.Errorf("invalid role: %s", role)
+	}
+	return s.db.UpdateUserRole(userID, role)
+}
+
+// --- Magic link operations ---
+
+const (
+	magicTokenBytes  = 32               // 256-bit token
+	magicTokenExpiry = 15 * time.Minute // tokens expire after 15 minutes
+)
+
+// CreateMagicToken generates a one-time login token for the given user email.
+// Returns the raw token string (hex-encoded).
+func (s *Service) CreateMagicToken(email string) (string, error) {
+	user, err := s.db.GetUserByEmail(email)
+	if err != nil {
+		return "", fmt.Errorf("lookup user: %w", err)
+	}
+	if user == nil {
+		return "", ErrUserNotFound
+	}
+
+	// Generate a cryptographically secure random token.
+	tokenBytes := make([]byte, magicTokenBytes)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return "", fmt.Errorf("generate token: %w", err)
+	}
+	token := hex.EncodeToString(tokenBytes)
+
+	now := time.Now()
+	mt := &models.MagicToken{
+		ID:        token,
+		UserID:    user.ID,
+		ExpiresAt: now.Add(magicTokenExpiry),
+		CreatedAt: now,
+	}
+
+	if err := s.db.CreateMagicToken(mt); err != nil {
+		return "", fmt.Errorf("store magic token: %w", err)
+	}
+
+	return token, nil
+}
+
+// ValidateMagicToken checks and consumes a magic token, returning the user
+// and creating a new session. Returns the session ID (cookie value).
+func (s *Service) ValidateMagicToken(token, ipAddress, userAgent string) (string, error) {
+	mt, err := s.db.GetMagicToken(token)
+	if err != nil {
+		return "", fmt.Errorf("get magic token: %w", err)
+	}
+	if mt == nil {
+		return "", ErrInvalidMagicToken
+	}
+
+	// Consume the token so it can't be reused.
+	if err := s.db.ConsumeMagicToken(token); err != nil {
+		return "", fmt.Errorf("consume magic token: %w", err)
+	}
+
+	// Create a session for the user.
+	now := time.Now()
+	session := &models.Session{
+		ID:        uuid.New().String(),
+		UserID:    mt.UserID,
+		ExpiresAt: now.Add(time.Duration(s.cfg.Session.MaxAge) * time.Second),
+		CreatedAt: now,
+		IPAddress: ipAddress,
+		UserAgent: userAgent,
+	}
+
+	if err := s.db.CreateSession(session); err != nil {
+		return "", fmt.Errorf("create session: %w", err)
+	}
+
+	if err := s.db.UpdateLastLogin(mt.UserID, now); err != nil {
+		return "", fmt.Errorf("update last login: %w", err)
+	}
+
+	return session.ID, nil
 }
