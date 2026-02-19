@@ -5,9 +5,13 @@ import "time"
 // User represents a registered user.
 type User struct {
 	ID           string    `json:"id"`
+	Username     string    `json:"username"`
 	Email        string    `json:"email"`
+	PhoneNumber  string    `json:"phone_number"`
 	Name         string    `json:"name"`
 	PasswordHash string    `json:"-"`
+	EmailHash    string    `json:"-"`
+	PhoneHash    string    `json:"-"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 	LastLoginAt  time.Time `json:"last_login_at"`
