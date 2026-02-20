@@ -149,7 +149,7 @@ func TestSearchActions_AnonymousEmptyQuery(t *testing.T) {
 			t.Errorf("expected action %q for anonymous user, not found", want)
 		}
 	}
-	for _, notWant := range []string{"nav-dashboard", "nav-admin-giveaway", "fn-logout"} {
+	for _, notWant := range []string{"nav-dashboard", "nav-admin-giveaway", "nav-logout"} {
 		if ids[notWant] {
 			t.Errorf("action %q should not be visible to anonymous user", notWant)
 		}
@@ -180,7 +180,7 @@ func TestSearchActions_LoggedInUser(t *testing.T) {
 	ids := actionIDs(results)
 
 	// Logged-in user should see public + logged-in actions, NOT logged-out actions.
-	for _, want := range []string{"nav-home", "nav-about", "nav-giveaway", "nav-dashboard", "fn-logout"} {
+	for _, want := range []string{"nav-home", "nav-about", "nav-giveaway", "nav-dashboard", "nav-logout"} {
 		if !ids[want] {
 			t.Errorf("expected action %q for logged-in user, not found", want)
 		}
@@ -227,7 +227,7 @@ func TestSearchActions_AdminUser(t *testing.T) {
 	ids := actionIDs(results)
 
 	// Admin should see everything except logged-out actions.
-	for _, want := range []string{"nav-home", "nav-about", "nav-giveaway", "nav-dashboard", "nav-admin-giveaway", "fn-logout"} {
+	for _, want := range []string{"nav-home", "nav-about", "nav-giveaway", "nav-dashboard", "nav-admin-giveaway", "nav-logout"} {
 		if !ids[want] {
 			t.Errorf("expected action %q for admin user, not found", want)
 		}

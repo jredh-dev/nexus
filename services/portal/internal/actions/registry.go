@@ -172,13 +172,13 @@ func defaultActions() []Action {
 			Visibility:  VisibleAdmin,
 		},
 
-		// Function actions — logged in only
+		// Logout — logged in only
 		{
-			ID:          "fn-logout",
-			Type:        TypeFunction,
+			ID:          "nav-logout",
+			Type:        TypeNavigation,
 			Title:       "Logout",
 			Description: "Sign out of your account",
-			Target:      "logout",
+			Target:      "/logout",
 			Keywords:    []string{"logout", "log out", "sign out", "signout", "exit"},
 			Visibility:  VisibleLoggedIn,
 		},

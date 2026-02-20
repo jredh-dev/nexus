@@ -7,12 +7,8 @@
 
   var input, results, selectedIndex, items, debounceTimer;
 
-  // Action executors keyed by function target
-  var executors = {
-    logout: function () {
-      window.location.href = '/logout';
-    },
-  };
+  // Action executors keyed by function target (extensible for future function actions)
+  var executors = {};
 
   function init() {
     // Bind to all magic bar instances (primary + clone navbar)

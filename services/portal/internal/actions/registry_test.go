@@ -27,18 +27,18 @@ func TestSearch_EmptyQueryReturnsVisibleActions(t *testing.T) {
 			name:     "anonymous sees public + logged-out actions",
 			ctx:      SearchContext{},
 			mustHave: []string{"nav-home", "nav-about", "nav-giveaway", "nav-login", "nav-signup"},
-			mustNot:  []string{"nav-dashboard", "nav-admin-giveaway", "fn-logout"},
+			mustNot:  []string{"nav-dashboard", "nav-admin-giveaway", "nav-logout"},
 		},
 		{
 			name:     "logged-in user sees public + logged-in actions",
 			ctx:      SearchContext{LoggedIn: true},
-			mustHave: []string{"nav-home", "nav-about", "nav-giveaway", "nav-dashboard", "fn-logout"},
+			mustHave: []string{"nav-home", "nav-about", "nav-giveaway", "nav-dashboard", "nav-logout"},
 			mustNot:  []string{"nav-login", "nav-signup", "nav-admin-giveaway"},
 		},
 		{
 			name:     "admin sees public + logged-in + admin actions",
 			ctx:      SearchContext{LoggedIn: true, IsAdmin: true},
-			mustHave: []string{"nav-home", "nav-about", "nav-giveaway", "nav-dashboard", "nav-admin-giveaway", "fn-logout"},
+			mustHave: []string{"nav-home", "nav-about", "nav-giveaway", "nav-dashboard", "nav-admin-giveaway", "nav-logout"},
 			mustNot:  []string{"nav-login", "nav-signup"},
 		},
 	}
@@ -102,7 +102,7 @@ func TestSearch_QueryFiltering(t *testing.T) {
 			name:    "search for logout when logged in",
 			query:   "logout",
 			ctx:     SearchContext{LoggedIn: true},
-			wantIDs: []string{"fn-logout"},
+			wantIDs: []string{"nav-logout"},
 		},
 		{
 			name:    "search for logout when logged out returns nothing",
@@ -190,7 +190,7 @@ func TestSearch_ActionFields(t *testing.T) {
 	}
 }
 
-func TestSearch_FunctionActionType(t *testing.T) {
+func TestSearch_LogoutActionType(t *testing.T) {
 	reg := New()
 	results := reg.Search("logout", SearchContext{LoggedIn: true})
 	if len(results) != 1 {
@@ -198,11 +198,11 @@ func TestSearch_FunctionActionType(t *testing.T) {
 	}
 
 	logout := results[0]
-	if logout.Type != TypeFunction {
-		t.Errorf("type = %q, want function", logout.Type)
+	if logout.Type != TypeNavigation {
+		t.Errorf("type = %q, want navigation", logout.Type)
 	}
-	if logout.Target != "logout" {
-		t.Errorf("target = %q, want logout", logout.Target)
+	if logout.Target != "/logout" {
+		t.Errorf("target = %q, want /logout", logout.Target)
 	}
 }
 
