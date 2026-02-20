@@ -20,16 +20,15 @@ import (
 
 // Handler holds dependencies for HTTP handlers.
 type Handler struct {
-	db         *database.DB
-	giveawayDB *database.GiveawayDB
-	cfg        *config.Config
-	auth       *auth.Service
-	templates  map[string]*template.Template
-	actions    *actions.Registry
+	db        *database.DB
+	cfg       *config.Config
+	auth      *auth.Service
+	templates map[string]*template.Template
+	actions   *actions.Registry
 }
 
 // New creates a new handler with parsed templates.
-func New(db *database.DB, giveawayDB *database.GiveawayDB, cfg *config.Config, authService *auth.Service) *Handler {
+func New(db *database.DB, cfg *config.Config, authService *auth.Service) *Handler {
 	tmplMap := make(map[string]*template.Template)
 
 	// Collect shared templates: base.html + all partials.
@@ -42,8 +41,6 @@ func New(db *database.DB, giveawayDB *database.GiveawayDB, cfg *config.Config, a
 
 	for _, page := range []string{
 		"home.html", "login.html", "signup.html", "dashboard.html", "about.html",
-		"giveaway.html", "giveaway_item.html",
-		"admin_giveaway.html", "admin_giveaway_edit.html",
 	} {
 		files := make([]string, 0, len(shared)+1)
 		files = append(files, shared...)
@@ -55,12 +52,11 @@ func New(db *database.DB, giveawayDB *database.GiveawayDB, cfg *config.Config, a
 	}
 
 	return &Handler{
-		db:         db,
-		giveawayDB: giveawayDB,
-		cfg:        cfg,
-		auth:       authService,
-		templates:  tmplMap,
-		actions:    actions.New(),
+		db:        db,
+		cfg:       cfg,
+		auth:      authService,
+		templates: tmplMap,
+		actions:   actions.New(),
 	}
 }
 

@@ -26,19 +26,19 @@ func TestSearch_EmptyQueryReturnsVisibleActions(t *testing.T) {
 		{
 			name:     "anonymous sees public + logged-out actions",
 			ctx:      SearchContext{},
-			mustHave: []string{"nav-home", "nav-about", "nav-giveaway", "nav-login", "nav-signup"},
-			mustNot:  []string{"nav-dashboard", "nav-admin-giveaway", "nav-logout"},
+			mustHave: []string{"nav-home", "nav-about", "nav-login", "nav-signup"},
+			mustNot:  []string{"nav-dashboard", "nav-logout"},
 		},
 		{
 			name:     "logged-in user sees public + logged-in actions",
 			ctx:      SearchContext{LoggedIn: true},
-			mustHave: []string{"nav-home", "nav-about", "nav-giveaway", "nav-dashboard", "nav-logout"},
-			mustNot:  []string{"nav-login", "nav-signup", "nav-admin-giveaway"},
+			mustHave: []string{"nav-home", "nav-about", "nav-dashboard", "nav-logout"},
+			mustNot:  []string{"nav-login", "nav-signup"},
 		},
 		{
 			name:     "admin sees public + logged-in + admin actions",
 			ctx:      SearchContext{LoggedIn: true, IsAdmin: true},
-			mustHave: []string{"nav-home", "nav-about", "nav-giveaway", "nav-dashboard", "nav-admin-giveaway", "nav-logout"},
+			mustHave: []string{"nav-home", "nav-about", "nav-dashboard", "nav-logout"},
 			mustNot:  []string{"nav-login", "nav-signup"},
 		},
 	}
@@ -81,18 +81,6 @@ func TestSearch_QueryFiltering(t *testing.T) {
 			wantIDs: []string{"nav-home"},
 		},
 		{
-			name:    "search for giveaway matches free stuff",
-			query:   "giveaway",
-			ctx:     SearchContext{},
-			wantIDs: []string{"nav-giveaway"},
-		},
-		{
-			name:    "search for free matches giveaway via keywords",
-			query:   "free",
-			ctx:     SearchContext{},
-			wantIDs: []string{"nav-giveaway"},
-		},
-		{
 			name:    "case insensitive search",
 			query:   "HOME",
 			ctx:     SearchContext{},
@@ -117,12 +105,6 @@ func TestSearch_QueryFiltering(t *testing.T) {
 			wantIDs: []string{},
 		},
 		{
-			name:    "search for admin when admin returns manage giveaways",
-			query:   "admin",
-			ctx:     SearchContext{LoggedIn: true, IsAdmin: true},
-			wantIDs: []string{"nav-admin-giveaway"},
-		},
-		{
 			name:    "no match returns empty",
 			query:   "xyznonexistent",
 			ctx:     SearchContext{},
@@ -132,7 +114,7 @@ func TestSearch_QueryFiltering(t *testing.T) {
 			name:    "whitespace-only query returns all visible",
 			query:   "   ",
 			ctx:     SearchContext{},
-			wantIDs: []string{"nav-home", "nav-about", "nav-giveaway", "nav-login", "nav-signup"},
+			wantIDs: []string{"nav-home", "nav-about", "nav-login", "nav-signup"},
 		},
 	}
 

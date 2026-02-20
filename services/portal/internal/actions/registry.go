@@ -120,16 +120,6 @@ func defaultActions() []Action {
 			Keywords:    []string{"about", "bio", "jared", "hooper", "info"},
 			Visibility:  VisibleAlways,
 		},
-		{
-			ID:          "nav-giveaway",
-			Type:        TypeNavigation,
-			Title:       "Free Stuff",
-			Description: "Browse free items available for pickup or delivery",
-			Target:      "/giveaway",
-			Keywords:    []string{"giveaway", "free", "stuff", "items", "pickup", "delivery", "claim"},
-			Visibility:  VisibleAlways,
-		},
-
 		// Auth pages — only when logged out
 		{
 			ID:          "nav-login",
@@ -159,17 +149,6 @@ func defaultActions() []Action {
 			Target:      "/dashboard",
 			Keywords:    []string{"dashboard", "account", "profile", "settings", "sessions"},
 			Visibility:  VisibleLoggedIn,
-		},
-
-		// Admin navigation
-		{
-			ID:          "nav-admin-giveaway",
-			Type:        TypeNavigation,
-			Title:       "Manage Giveaways",
-			Description: "Admin panel for giveaway items and claims",
-			Target:      "/admin/giveaway",
-			Keywords:    []string{"admin", "manage", "giveaway", "items", "claims", "crud"},
-			Visibility:  VisibleAdmin,
 		},
 
 		// Logout — logged in only
