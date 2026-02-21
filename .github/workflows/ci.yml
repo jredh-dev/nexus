@@ -29,6 +29,15 @@ jobs:
             exit 1
           fi
 
+      - name: Run go fix
+        run: |
+          go fix ./...
+          if [ -n "$(git diff --name-only)" ]; then
+            echo "go fix produced changes — commit them first:"
+            git diff --name-only
+            exit 1
+          fi
+
       - name: Run go vet
         run: go vet ./...
 

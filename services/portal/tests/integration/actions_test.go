@@ -31,7 +31,6 @@ func testServerWithActions(t *testing.T) (srv *httptest.Server, client *http.Cli
 
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "test.db")
-	giveawayDBPath := filepath.Join(dir, "giveaway_test.db")
 
 	var err error
 	db, err = database.New(dbPath)
@@ -39,20 +38,14 @@ func testServerWithActions(t *testing.T) (srv *httptest.Server, client *http.Cli
 		t.Fatalf("open test db: %v", err)
 	}
 
-	giveawayDB, err := database.NewGiveaway(giveawayDBPath)
-	if err != nil {
-		t.Fatalf("open giveaway test db: %v", err)
-	}
-
 	cfg := &config.Config{
-		Server:   config.ServerConfig{Port: "0", Env: "test"},
-		DB:       config.DBConfig{Path: dbPath},
-		Giveaway: config.GiveawayConfig{DBPath: giveawayDBPath},
-		Session:  config.SessionConfig{Secret: "test-secret", MaxAge: 3600},
+		Server:  config.ServerConfig{Port: "0", Env: "test"},
+		DB:      config.DBConfig{Path: dbPath},
+		Session: config.SessionConfig{Secret: "test-secret", MaxAge: 3600},
 	}
 
 	authSvc = auth.New(db, cfg)
-	h := handlers.New(db, giveawayDB, cfg, authSvc)
+	h := handlers.New(db, cfg, authSvc)
 
 	r := chi.NewRouter()
 	r.Get("/", h.Home)
@@ -83,7 +76,6 @@ func testServerWithActions(t *testing.T) (srv *httptest.Server, client *http.Cli
 	cleanup = func() {
 		srv.Close()
 		db.Close()
-		giveawayDB.Close()
 		_ = os.Chdir(origDir)
 	}
 
@@ -144,12 +136,12 @@ func TestSearchActions_AnonymousEmptyQuery(t *testing.T) {
 	ids := actionIDs(results)
 
 	// Anonymous user should see public + logged-out actions.
-	for _, want := range []string{"nav-home", "nav-about", "nav-giveaway", "nav-login", "nav-signup"} {
+	for _, want := range []string{"nav-home", "nav-about", "nav-login", "nav-signup"} {
 		if !ids[want] {
 			t.Errorf("expected action %q for anonymous user, not found", want)
 		}
 	}
-	for _, notWant := range []string{"nav-dashboard", "nav-admin-giveaway", "nav-logout"} {
+	for _, notWant := range []string{"nav-dashboard", "nav-logout"} {
 		if ids[notWant] {
 			t.Errorf("action %q should not be visible to anonymous user", notWant)
 		}
@@ -180,12 +172,12 @@ func TestSearchActions_LoggedInUser(t *testing.T) {
 	ids := actionIDs(results)
 
 	// Logged-in user should see public + logged-in actions, NOT logged-out actions.
-	for _, want := range []string{"nav-home", "nav-about", "nav-giveaway", "nav-dashboard", "nav-logout"} {
+	for _, want := range []string{"nav-home", "nav-about", "nav-dashboard", "nav-logout"} {
 		if !ids[want] {
 			t.Errorf("expected action %q for logged-in user, not found", want)
 		}
 	}
-	for _, notWant := range []string{"nav-login", "nav-signup", "nav-admin-giveaway"} {
+	for _, notWant := range []string{"nav-login", "nav-signup"} {
 		if ids[notWant] {
 			t.Errorf("action %q should not be visible to non-admin logged-in user", notWant)
 		}
@@ -227,7 +219,7 @@ func TestSearchActions_AdminUser(t *testing.T) {
 	ids := actionIDs(results)
 
 	// Admin should see everything except logged-out actions.
-	for _, want := range []string{"nav-home", "nav-about", "nav-giveaway", "nav-dashboard", "nav-admin-giveaway", "nav-logout"} {
+	for _, want := range []string{"nav-home", "nav-about", "nav-dashboard", "nav-logout"} {
 		if !ids[want] {
 			t.Errorf("expected action %q for admin user, not found", want)
 		}

@@ -33,27 +33,20 @@ func testServer(t *testing.T) (srv *httptest.Server, client *http.Client, cleanu
 
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "test.db")
-	giveawayDBPath := filepath.Join(dir, "giveaway_test.db")
 
 	db, err := database.New(dbPath)
 	if err != nil {
 		t.Fatalf("open test db: %v", err)
 	}
 
-	giveawayDB, err := database.NewGiveaway(giveawayDBPath)
-	if err != nil {
-		t.Fatalf("open giveaway test db: %v", err)
-	}
-
 	cfg := &config.Config{
-		Server:   config.ServerConfig{Port: "0", Env: "test"},
-		DB:       config.DBConfig{Path: dbPath},
-		Giveaway: config.GiveawayConfig{DBPath: giveawayDBPath},
-		Session:  config.SessionConfig{Secret: "test-secret", MaxAge: 3600},
+		Server:  config.ServerConfig{Port: "0", Env: "test"},
+		DB:      config.DBConfig{Path: dbPath},
+		Session: config.SessionConfig{Secret: "test-secret", MaxAge: 3600},
 	}
 
 	authService := auth.New(db, cfg)
-	h := handlers.New(db, giveawayDB, cfg, authService)
+	h := handlers.New(db, cfg, authService)
 
 	r := chi.NewRouter()
 	r.Get("/", h.Home)
@@ -70,7 +63,6 @@ func testServer(t *testing.T) (srv *httptest.Server, client *http.Client, cleanu
 	r.Group(func(r chi.Router) {
 		r.Use(handlers.AuthMiddleware(authService))
 		r.Use(handlers.AdminMiddleware)
-		r.Get("/admin/giveaway", h.AdminGiveawayList)
 		r.Post("/admin/magic-link", h.AdminGenerateMagicLink)
 	})
 
@@ -91,7 +83,6 @@ func testServer(t *testing.T) (srv *httptest.Server, client *http.Client, cleanu
 	cleanup = func() {
 		srv.Close()
 		db.Close()
-		giveawayDB.Close()
 		_ = os.Chdir(origDir)
 	}
 

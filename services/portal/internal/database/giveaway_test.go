@@ -1,3 +1,5 @@
+//go:build giveaway
+
 package database
 
 import (
