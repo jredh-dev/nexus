@@ -49,17 +49,12 @@ func testServerWithDB(t *testing.T) (srv *httptest.Server, client *http.Client, 
 	h := handlers.New(db, cfg, authSvc, actions.New())
 
 	r := chi.NewRouter()
-	r.Get("/", h.Home)
-	r.Get("/login", h.LoginPage)
+	// Portal owns: form auth POSTs, logout, magic link, admin, API.
+	// Astro owns: GET /, /login, /signup, /about, /dashboard.
 	r.Post("/login", h.Login)
-	r.Get("/signup", h.SignupPage)
 	r.Post("/signup", h.Signup)
 	r.Get("/logout", h.Logout)
 	r.Get("/auth/magic", h.MagicLogin)
-	r.Group(func(r chi.Router) {
-		r.Use(handlers.AuthMiddleware(authSvc))
-		r.Get("/dashboard", h.Dashboard)
-	})
 	r.Group(func(r chi.Router) {
 		r.Use(handlers.AuthMiddleware(authSvc))
 		r.Use(handlers.AdminMiddleware)

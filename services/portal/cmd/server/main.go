@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
@@ -86,11 +85,6 @@ func main() {
 	// Initialize handlers.
 	h := handlers.New(db, cfg, authService, actionsRegistry)
 
-	// Static file serving.
-	staticDir := filepath.Join("services", "portal", "static")
-	fileServer := http.FileServer(http.Dir(staticDir))
-	r.Handle("/static/*", http.StripPrefix("/static/", fileServer))
-
 	// Connect RPC handlers (Astro frontend talks to these).
 	authPath, authHandler := portalv1connect.NewAuthServiceHandler(
 		rpc.NewAuthServer(authService, cfg),
@@ -101,12 +95,8 @@ func main() {
 	r.Handle(authPath+"*", authHandler)
 	r.Handle(actionsPath+"*", actionsHandler)
 
-	// Public routes.
-	r.Get("/", h.Home)
-	r.Get("/about", h.About)
-	r.Get("/login", h.LoginPage)
+	// Public routes (form auth + magic link — Astro owns GET pages).
 	r.Post("/login", h.Login)
-	r.Get("/signup", h.SignupPage)
 	r.Post("/signup", h.Signup)
 	r.Get("/logout", h.Logout)
 	r.Get("/auth/magic", h.MagicLogin)
@@ -114,12 +104,6 @@ func main() {
 	// Public JSON API.
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/actions", h.SearchActions)
-	})
-
-	// Protected routes (login required).
-	r.Group(func(r chi.Router) {
-		r.Use(handlers.AuthMiddleware(authService))
-		r.Get("/dashboard", h.Dashboard)
 	})
 
 	// Admin routes (login + admin role required).

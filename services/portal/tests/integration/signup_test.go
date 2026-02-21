@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jredh-dev/nexus/services/portal/config"
@@ -20,12 +19,11 @@ import (
 )
 
 // testServer spins up a full portal stack backed by a temp SQLite file.
+// Matches the production router: no Go-rendered pages (Astro owns those).
 // Caller must defer cleanup().
 func testServer(t *testing.T) (srv *httptest.Server, client *http.Client, cleanup func()) {
 	t.Helper()
 
-	// Chdir to monorepo root first so template paths resolve correctly.
-	// handlers.New() uses template.Must which panics if files aren't found.
 	root := findMonorepoRoot(t)
 	origDir, _ := os.Getwd()
 	if err := os.Chdir(root); err != nil {
@@ -50,17 +48,13 @@ func testServer(t *testing.T) (srv *httptest.Server, client *http.Client, cleanu
 	h := handlers.New(db, cfg, authService, actions.New())
 
 	r := chi.NewRouter()
-	r.Get("/", h.Home)
-	r.Get("/login", h.LoginPage)
+	// Portal owns: form auth POSTs, logout, magic link, admin, API.
+	// Astro owns: GET /, /login, /signup, /about, /dashboard.
 	r.Post("/login", h.Login)
-	r.Get("/signup", h.SignupPage)
 	r.Post("/signup", h.Signup)
 	r.Get("/logout", h.Logout)
 	r.Get("/auth/magic", h.MagicLogin)
-	r.Group(func(r chi.Router) {
-		r.Use(handlers.AuthMiddleware(authService))
-		r.Get("/dashboard", h.Dashboard)
-	})
+	r.Get("/api/actions", h.SearchActions)
 	r.Group(func(r chi.Router) {
 		r.Use(handlers.AuthMiddleware(authService))
 		r.Use(handlers.AdminMiddleware)
@@ -72,8 +66,8 @@ func testServer(t *testing.T) (srv *httptest.Server, client *http.Client, cleanu
 	jar, _ := cookiejar.New(nil)
 	client = &http.Client{
 		Jar: jar,
+		// Stop at redirects to pages that Astro would serve (404 in test).
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			// Follow redirects but cap at 10.
 			if len(via) >= 10 {
 				return http.ErrUseLastResponse
 			}
@@ -122,18 +116,8 @@ func TestSignupAndLogin(t *testing.T) {
 	srv, client, cleanup := testServer(t)
 	defer cleanup()
 
-	// 1. GET /signup should return 200.
-	resp, err := client.Get(srv.URL + "/signup")
-	if err != nil {
-		t.Fatalf("GET /signup: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("GET /signup status = %d, want 200", resp.StatusCode)
-	}
-	resp.Body.Close()
-
-	// 2. POST /signup with valid data should redirect to /dashboard (auto-login).
-	resp, err = postForm(client, srv.URL+"/signup", url.Values{
+	// POST /signup with valid data should redirect to /dashboard (auto-login).
+	resp, err := postForm(client, srv.URL+"/signup", url.Values{
 		"username": {"testuser"},
 		"email":    {"test@example.com"},
 		"phone":    {"5551234567"},
@@ -145,22 +129,20 @@ func TestSignupAndLogin(t *testing.T) {
 	}
 	resp.Body.Close()
 
-	// After redirect chain, should land on /dashboard.
+	// Portal redirects to /dashboard; Astro would serve that page.
+	// In test, we just verify the redirect points to /dashboard.
 	if !strings.HasSuffix(resp.Request.URL.Path, "/dashboard") {
-		t.Errorf("after signup, landed on %s, want /dashboard", resp.Request.URL.Path)
-	}
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("dashboard status = %d, want 200", resp.StatusCode)
+		t.Errorf("after signup, redirected to %s, want /dashboard", resp.Request.URL.Path)
 	}
 
-	// 3. Logout.
+	// Logout clears cookie, redirects to /.
 	resp, err = client.Get(srv.URL + "/logout")
 	if err != nil {
 		t.Fatalf("GET /logout: %v", err)
 	}
 	resp.Body.Close()
 
-	// 4. Login with the credentials we just created.
+	// Login with the credentials we just created.
 	resp, err = postForm(client, srv.URL+"/login", url.Values{
 		"email":    {"test@example.com"},
 		"password": {"securepassword"},
@@ -171,7 +153,7 @@ func TestSignupAndLogin(t *testing.T) {
 	resp.Body.Close()
 
 	if !strings.HasSuffix(resp.Request.URL.Path, "/dashboard") {
-		t.Errorf("after login, landed on %s, want /dashboard", resp.Request.URL.Path)
+		t.Errorf("after login, redirected to %s, want /dashboard", resp.Request.URL.Path)
 	}
 }
 
@@ -179,7 +161,6 @@ func TestSignupDuplicateEmail(t *testing.T) {
 	srv, client, cleanup := testServer(t)
 	defer cleanup()
 
-	// Create first user.
 	resp, err := postForm(client, srv.URL+"/signup", url.Values{
 		"username": {"user1"},
 		"email":    {"dup@example.com"},
@@ -192,14 +173,13 @@ func TestSignupDuplicateEmail(t *testing.T) {
 	}
 	resp.Body.Close()
 
-	// Logout so the cookie jar is clean for the second signup attempt.
 	resp, err = client.Get(srv.URL + "/logout")
 	if err != nil {
 		t.Fatalf("logout: %v", err)
 	}
 	resp.Body.Close()
 
-	// Try to sign up with the same email (different username/phone).
+	// Same email (different username/phone) should be rejected.
 	resp, err = postForm(client, srv.URL+"/signup", url.Values{
 		"username": {"user2"},
 		"email":    {"dup@example.com"},
@@ -212,9 +192,9 @@ func TestSignupDuplicateEmail(t *testing.T) {
 	}
 	resp.Body.Close()
 
-	// Should stay on /signup (not redirect to dashboard).
-	if !strings.HasSuffix(resp.Request.URL.Path, "/signup") {
-		t.Errorf("duplicate email: landed on %s, want /signup", resp.Request.URL.Path)
+	// Redirects back to /signup with error query param.
+	if !strings.Contains(resp.Request.URL.String(), "/signup") {
+		t.Errorf("duplicate email: redirected to %s, want /signup", resp.Request.URL)
 	}
 }
 
@@ -222,7 +202,6 @@ func TestSignupDuplicateGmailAlias(t *testing.T) {
 	srv, client, cleanup := testServer(t)
 	defer cleanup()
 
-	// Create user with Gmail address.
 	resp, err := postForm(client, srv.URL+"/signup", url.Values{
 		"username": {"gmailuser"},
 		"email":    {"testuser@gmail.com"},
@@ -241,7 +220,6 @@ func TestSignupDuplicateGmailAlias(t *testing.T) {
 	}
 	resp.Body.Close()
 
-	// Try to sign up with a Gmail +alias (should be caught by dedup).
 	resp, err = postForm(client, srv.URL+"/signup", url.Values{
 		"username": {"gmailuser2"},
 		"email":    {"test.user+alias@gmail.com"},
@@ -254,9 +232,8 @@ func TestSignupDuplicateGmailAlias(t *testing.T) {
 	}
 	resp.Body.Close()
 
-	// Should be rejected -- stays on /signup.
-	if !strings.HasSuffix(resp.Request.URL.Path, "/signup") {
-		t.Errorf("gmail alias dedup: landed on %s, want /signup", resp.Request.URL.Path)
+	if !strings.Contains(resp.Request.URL.String(), "/signup") {
+		t.Errorf("gmail alias dedup: redirected to %s, want /signup", resp.Request.URL)
 	}
 }
 
@@ -264,7 +241,6 @@ func TestSignupDuplicatePhone(t *testing.T) {
 	srv, client, cleanup := testServer(t)
 	defer cleanup()
 
-	// Create first user.
 	resp, err := postForm(client, srv.URL+"/signup", url.Values{
 		"username": {"phoneuser1"},
 		"email":    {"phone1@example.com"},
@@ -283,7 +259,6 @@ func TestSignupDuplicatePhone(t *testing.T) {
 	}
 	resp.Body.Close()
 
-	// Try to sign up with the same phone in different format.
 	resp, err = postForm(client, srv.URL+"/signup", url.Values{
 		"username": {"phoneuser2"},
 		"email":    {"phone2@example.com"},
@@ -296,9 +271,8 @@ func TestSignupDuplicatePhone(t *testing.T) {
 	}
 	resp.Body.Close()
 
-	// Should be rejected.
-	if !strings.HasSuffix(resp.Request.URL.Path, "/signup") {
-		t.Errorf("phone dedup: landed on %s, want /signup", resp.Request.URL.Path)
+	if !strings.Contains(resp.Request.URL.String(), "/signup") {
+		t.Errorf("phone dedup: redirected to %s, want /signup", resp.Request.URL)
 	}
 }
 
@@ -336,8 +310,8 @@ func TestSignupDuplicateUsername(t *testing.T) {
 	}
 	resp.Body.Close()
 
-	if !strings.HasSuffix(resp.Request.URL.Path, "/signup") {
-		t.Errorf("username dedup: landed on %s, want /signup", resp.Request.URL.Path)
+	if !strings.Contains(resp.Request.URL.String(), "/signup") {
+		t.Errorf("username dedup: redirected to %s, want /signup", resp.Request.URL)
 	}
 }
 
@@ -345,7 +319,6 @@ func TestSignupMissingFields(t *testing.T) {
 	srv, client, cleanup := testServer(t)
 	defer cleanup()
 
-	// Missing phone number.
 	resp, err := postForm(client, srv.URL+"/signup", url.Values{
 		"username": {"incomplete"},
 		"email":    {"incomplete@example.com"},
@@ -357,54 +330,8 @@ func TestSignupMissingFields(t *testing.T) {
 	}
 	resp.Body.Close()
 
-	if !strings.HasSuffix(resp.Request.URL.Path, "/signup") {
-		t.Errorf("missing field: landed on %s, want /signup", resp.Request.URL.Path)
-	}
-}
-
-func TestDashboardRequiresAuth(t *testing.T) {
-	srv, client, cleanup := testServer(t)
-	defer cleanup()
-
-	// Accessing /dashboard without a session should redirect to /login.
-	resp, err := client.Get(srv.URL + "/dashboard")
-	if err != nil {
-		t.Fatalf("GET /dashboard: %v", err)
-	}
-	resp.Body.Close()
-
-	if !strings.HasSuffix(resp.Request.URL.Path, "/login") {
-		t.Errorf("unauthenticated dashboard: landed on %s, want /login", resp.Request.URL.Path)
-	}
-}
-
-func TestHomePage(t *testing.T) {
-	srv, client, cleanup := testServer(t)
-	defer cleanup()
-
-	resp, err := client.Get(srv.URL + "/")
-	if err != nil {
-		t.Fatalf("GET /: %v", err)
-	}
-	resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("home page status = %d, want 200", resp.StatusCode)
-	}
-}
-
-func TestLoginPage(t *testing.T) {
-	srv, client, cleanup := testServer(t)
-	defer cleanup()
-
-	resp, err := client.Get(srv.URL + "/login")
-	if err != nil {
-		t.Fatalf("GET /login: %v", err)
-	}
-	resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("login page status = %d, want 200", resp.StatusCode)
+	if !strings.Contains(resp.Request.URL.String(), "/signup") {
+		t.Errorf("missing field: redirected to %s, want /signup", resp.Request.URL)
 	}
 }
 
@@ -421,19 +348,17 @@ func TestLoginBadCredentials(t *testing.T) {
 	}
 	resp.Body.Close()
 
-	// Should stay on /login (re-rendered with error).
-	if !strings.HasSuffix(resp.Request.URL.Path, "/login") {
-		t.Errorf("bad login: landed on %s, want /login", resp.Request.URL.Path)
+	// Redirects to /login?error=...
+	if !strings.Contains(resp.Request.URL.String(), "/login") {
+		t.Errorf("bad login: redirected to %s, want /login", resp.Request.URL)
 	}
 }
 
-// TestSessionExpiry is a lighter check — just verifies the session cookie is set
-// and that the session machinery works round-trip.
+// TestSessionRoundTrip verifies signup sets a session cookie and logout clears it.
 func TestSessionRoundTrip(t *testing.T) {
 	srv, client, cleanup := testServer(t)
 	defer cleanup()
 
-	// Sign up.
 	resp, err := postForm(client, srv.URL+"/signup", url.Values{
 		"username": {"sessionuser"},
 		"email":    {"session@example.com"},
@@ -446,9 +371,9 @@ func TestSessionRoundTrip(t *testing.T) {
 	}
 	resp.Body.Close()
 
-	// Should be on /dashboard now (auto-login).
+	// Portal should redirect toward /dashboard.
 	if !strings.HasSuffix(resp.Request.URL.Path, "/dashboard") {
-		t.Fatalf("after signup: on %s, want /dashboard", resp.Request.URL.Path)
+		t.Fatalf("after signup: redirected to %s, want /dashboard", resp.Request.URL.Path)
 	}
 
 	// Verify session cookie exists.
@@ -465,36 +390,17 @@ func TestSessionRoundTrip(t *testing.T) {
 		t.Error("no session cookie set after signup")
 	}
 
-	// Access dashboard again — should still work.
-	resp, err = client.Get(srv.URL + "/dashboard")
-	if err != nil {
-		t.Fatalf("GET /dashboard: %v", err)
-	}
-	resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("dashboard after signup status = %d, want 200", resp.StatusCode)
-	}
-
-	// Logout.
+	// Logout should clear cookie and redirect to /.
 	resp, err = client.Get(srv.URL + "/logout")
 	if err != nil {
 		t.Fatalf("logout: %v", err)
 	}
 	resp.Body.Close()
 
-	// Dashboard should now redirect to login.
-	resp, err = client.Get(srv.URL + "/dashboard")
-	if err != nil {
-		t.Fatalf("GET /dashboard after logout: %v", err)
-	}
-	resp.Body.Close()
-
-	if !strings.HasSuffix(resp.Request.URL.Path, "/login") {
-		t.Errorf("after logout: on %s, want /login", resp.Request.URL.Path)
+	cookies = client.Jar.Cookies(u)
+	for _, c := range cookies {
+		if c.Name == "session" && c.Value != "" {
+			t.Error("session cookie still set after logout")
+		}
 	}
 }
-
-// Ensure the _ import of time is used (compilation guard for template rendering
-// which calls .Format, ensuring the server doesn't panic on time fields).
-var _ = time.Now

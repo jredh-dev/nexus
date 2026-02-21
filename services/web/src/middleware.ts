@@ -12,8 +12,12 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const isProxiedPost = context.request.method === 'POST' &&
     (pathname === '/login' || pathname === '/signup');
 
-  // Proxy Connect RPC, legacy API calls, and auth form POSTs to portal
-  if (pathname.startsWith('/portal.v1.') || pathname.startsWith('/api/') || isProxiedPost) {
+  // Proxy GET routes that the portal backend owns (not Astro pages)
+  const isProxiedGet = context.request.method === 'GET' &&
+    (pathname === '/logout' || pathname.startsWith('/auth/'));
+
+  // Proxy Connect RPC, legacy API calls, auth form POSTs, and portal-owned GETs
+  if (pathname.startsWith('/portal.v1.') || pathname.startsWith('/api/') || isProxiedPost || isProxiedGet) {
     const target = new URL(pathname + context.url.search, portalUrl);
 
     const headers = new Headers(context.request.headers);

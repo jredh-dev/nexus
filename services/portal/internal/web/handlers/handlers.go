@@ -4,59 +4,31 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html/template"
-	"io/fs"
 	"log"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/jredh-dev/nexus/services/portal/config"
 	"github.com/jredh-dev/nexus/services/portal/internal/actions"
 	"github.com/jredh-dev/nexus/services/portal/internal/auth"
 	"github.com/jredh-dev/nexus/services/portal/internal/database"
-	"github.com/jredh-dev/nexus/services/portal/internal/web/templates"
 )
 
 // Handler holds dependencies for HTTP handlers.
 type Handler struct {
-	db        *database.DB
-	cfg       *config.Config
-	auth      *auth.Service
-	templates map[string]*template.Template
-	actions   *actions.Registry
+	db      *database.DB
+	cfg     *config.Config
+	auth    *auth.Service
+	actions *actions.Registry
 }
 
-// New creates a new handler with parsed templates.
+// New creates a new handler.
 func New(db *database.DB, cfg *config.Config, authService *auth.Service, registry *actions.Registry) *Handler {
-	tmplMap := make(map[string]*template.Template)
-
-	// Collect shared templates: base.html + all partials.
-	shared := []string{"base.html"}
-	partials, err := fs.Glob(templates.FS, "partials/*.html")
-	if err != nil {
-		log.Fatalf("Error globbing partials: %v", err)
-	}
-	shared = append(shared, partials...)
-
-	for _, page := range []string{
-		"home.html", "login.html", "signup.html", "dashboard.html", "about.html",
-	} {
-		files := make([]string, 0, len(shared)+1)
-		files = append(files, shared...)
-		files = append(files, page)
-
-		tmplMap[page] = template.Must(
-			template.New(page).ParseFS(templates.FS, files...),
-		)
-	}
-
 	return &Handler{
-		db:        db,
-		cfg:       cfg,
-		auth:      authService,
-		templates: tmplMap,
-		actions:   registry,
+		db:      db,
+		cfg:     cfg,
+		auth:    authService,
+		actions: registry,
 	}
 }
 
@@ -65,27 +37,11 @@ func (h *Handler) AuthService() *auth.Service {
 	return h.auth
 }
 
-// Home renders the public landing page.
-func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
-	h.renderTemplate(w, "home.html", map[string]interface{}{
-		"Year":     time.Now().Year(),
-		"LoggedIn": h.isLoggedIn(r),
-	})
-}
-
-// LoginPage renders the login form.
-func (h *Handler) LoginPage(w http.ResponseWriter, r *http.Request) {
-	h.renderTemplate(w, "login.html", map[string]interface{}{
-		"Title": "Login",
-		"Year":  time.Now().Year(),
-	})
-}
-
 // Login handles login form submission.
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		log.Printf("Error parsing login form: %v", err)
-		h.loginError(w, "Invalid form data.")
+		h.jsonError(w, "Invalid form data.", http.StatusBadRequest)
 		return
 	}
 
@@ -93,14 +49,14 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 
 	if email == "" || password == "" {
-		h.loginError(w, "Email and password are required.")
+		h.redirectWithError(w, r, "/login", "Email and password are required.")
 		return
 	}
 
 	sessionID, err := h.auth.Login(email, password, r.RemoteAddr, r.UserAgent())
 	if err != nil {
 		log.Printf("Login failed for %s: %v", email, err)
-		h.loginError(w, "Invalid email or password.")
+		h.redirectWithError(w, r, "/login", "Invalid email or password.")
 		return
 	}
 
@@ -136,19 +92,11 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-// SignupPage renders the signup form.
-func (h *Handler) SignupPage(w http.ResponseWriter, r *http.Request) {
-	h.renderTemplate(w, "signup.html", map[string]interface{}{
-		"Title": "Sign Up",
-		"Year":  time.Now().Year(),
-	})
-}
-
 // Signup handles signup form submission.
 func (h *Handler) Signup(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		log.Printf("Error parsing signup form: %v", err)
-		h.signupError(w, "Invalid form data.", r)
+		h.jsonError(w, "Invalid form data.", http.StatusBadRequest)
 		return
 	}
 
@@ -159,7 +107,7 @@ func (h *Handler) Signup(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimSpace(r.FormValue("name"))
 
 	if username == "" || email == "" || phone == "" || password == "" {
-		h.signupError(w, "Username, email, phone number, and password are required.", r)
+		h.redirectWithError(w, r, "/signup", "Username, email, phone number, and password are required.")
 		return
 	}
 
@@ -167,16 +115,18 @@ func (h *Handler) Signup(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Signup failed for %s: %v", email, err)
 
+		var msg string
 		switch {
 		case errors.Is(err, auth.ErrUsernameTaken):
-			h.signupError(w, "This username is already taken.", r)
+			msg = "This username is already taken."
 		case errors.Is(err, auth.ErrEmailTaken):
-			h.signupError(w, "An account with this email already exists.", r)
+			msg = "An account with this email already exists."
 		case errors.Is(err, auth.ErrPhoneTaken):
-			h.signupError(w, "An account with this phone number already exists.", r)
+			msg = "An account with this phone number already exists."
 		default:
-			h.signupError(w, "Something went wrong. Please try again.", r)
+			msg = "Something went wrong. Please try again."
 		}
+		h.redirectWithError(w, r, "/signup", msg)
 		return
 	}
 
@@ -199,38 +149,6 @@ func (h *Handler) Signup(w http.ResponseWriter, r *http.Request) {
 	})
 
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
-}
-
-// Dashboard renders the authenticated dashboard page.
-func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
-	user, ok := GetUserFromContext(r.Context())
-	if !ok {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
-	sessions, err := h.auth.GetSessionsByUserID(user.ID)
-	if err != nil {
-		log.Printf("Error fetching sessions for user %s: %v", user.ID, err)
-		sessions = nil
-	}
-
-	h.renderTemplate(w, "dashboard.html", map[string]interface{}{
-		"Title":    "Dashboard",
-		"Year":     time.Now().Year(),
-		"User":     user,
-		"Sessions": sessions,
-		"LoggedIn": true,
-	})
-}
-
-// About renders the about page.
-func (h *Handler) About(w http.ResponseWriter, r *http.Request) {
-	h.renderTemplate(w, "about.html", map[string]interface{}{
-		"Title":    "About",
-		"Year":     time.Now().Year(),
-		"LoggedIn": h.isLoggedIn(r),
-	})
 }
 
 // MagicLogin handles GET /auth/magic?token=X — validates a magic login token,
@@ -336,35 +254,15 @@ func (h *Handler) isLoggedIn(r *http.Request) bool {
 	return err == nil && user != nil
 }
 
-func (h *Handler) loginError(w http.ResponseWriter, msg string) {
-	h.renderTemplate(w, "login.html", map[string]interface{}{
-		"Title": "Login",
-		"Year":  time.Now().Year(),
-		"Error": msg,
-	})
+// jsonError writes a JSON error response.
+func (h *Handler) jsonError(w http.ResponseWriter, msg string, status int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	fmt.Fprintf(w, `{"error":%q}`, msg)
 }
 
-func (h *Handler) signupError(w http.ResponseWriter, msg string, r *http.Request) {
-	h.renderTemplate(w, "signup.html", map[string]interface{}{
-		"Title":    "Sign Up",
-		"Year":     time.Now().Year(),
-		"Error":    msg,
-		"Username": r.FormValue("username"),
-		"Email":    r.FormValue("email"),
-		"Phone":    r.FormValue("phone"),
-		"Name":     r.FormValue("name"),
-	})
-}
-
-func (h *Handler) renderTemplate(w http.ResponseWriter, name string, data interface{}) {
-	tmpl, ok := h.templates[name]
-	if !ok {
-		http.Error(w, fmt.Sprintf("template %s not found", name), http.StatusInternalServerError)
-		return
-	}
-
-	if err := tmpl.ExecuteTemplate(w, "base", data); err != nil {
-		log.Printf("Error rendering template %s: %v", name, err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+// redirectWithError redirects to the given path with an error query param.
+func (h *Handler) redirectWithError(w http.ResponseWriter, r *http.Request, path, msg string) {
+	target := path + "?error=" + strings.ReplaceAll(msg, " ", "+")
+	http.Redirect(w, r, target, http.StatusSeeOther)
 }

@@ -1,31 +1,77 @@
 ---
 import Base from '../layouts/Base.astro';
 import Topbar from '../components/Topbar.astro';
+import { createConnectTransport } from '@connectrpc/connect-web';
+import { createClient } from '@connectrpc/connect';
+import { AuthService } from '../gen/portal/v1/auth_pb.js';
 
-// TODO: Fetch user/session data via Connect RPC AuthService.GetSession
+// Redirect to login if no session cookie present.
 const sessionCookie = Astro.cookies.get('session');
 if (!sessionCookie?.value) {
     return Astro.redirect('/login');
 }
 
-// Placeholder user data - will come from GetSession RPC
-const user = {
-    username: '',
-    name: 'User',
-    email: '',
-    phoneNumber: '',
-    createdAt: new Date(),
-    lastLoginAt: new Date(),
-};
+// Call GetSession via Connect RPC, forwarding the session cookie.
+// In SSR, we talk directly to the portal backend (bypasses Astro middleware).
+const portalUrl = import.meta.env.PORTAL_URL || process.env.PORTAL_URL || 'http://localhost:8080';
 
-interface Session {
-    ipAddress: string;
-    userAgent: string;
-    createdAt: Date;
-    expiresAt: Date;
+const transport = createConnectTransport({
+    baseUrl: portalUrl,
+    fetch: (input, init) => fetch(input, {
+        ...init,
+        headers: {
+            ...Object.fromEntries(new Headers(init?.headers ?? {})),
+            Cookie: `session=${sessionCookie.value}`,
+        },
+    }),
+});
+
+const client = createClient(AuthService, transport);
+
+let user = { username: '', name: 'User', email: '', phone: '', createdAt: '', lastLogin: '' };
+let sessions: { ipAddress: string; userAgent: string; createdAt: string; expiresAt: string }[] = [];
+
+try {
+    const resp = await client.getSession({});
+    if (resp.user) {
+        user = {
+            username: resp.user.username,
+            name: resp.user.name || resp.user.username || 'User',
+            email: resp.user.email,
+            phone: resp.user.phone,
+            createdAt: resp.user.createdAt,
+            lastLogin: resp.user.lastLogin,
+        };
+    }
+    sessions = resp.sessions.map(s => ({
+        ipAddress: s.ipAddress,
+        userAgent: s.userAgent,
+        createdAt: s.createdAt,
+        expiresAt: s.expiresAt,
+    }));
+} catch (err) {
+    // Session invalid — redirect to login.
+    return Astro.redirect('/login');
 }
 
-const sessions: Session[] = [];
+function fmtDate(iso: string): string {
+    if (!iso) return '—';
+    try {
+        return new Date(iso).toLocaleDateString('en-US', {
+            month: 'short', day: 'numeric', year: 'numeric',
+        });
+    } catch { return iso; }
+}
+
+function fmtDateTime(iso: string): string {
+    if (!iso) return '—';
+    try {
+        return new Date(iso).toLocaleDateString('en-US', {
+            month: 'short', day: 'numeric', year: 'numeric',
+            hour: 'numeric', minute: '2-digit',
+        });
+    } catch { return iso; }
+}
 ---
 
 <Base title="Dashboard">
@@ -56,24 +102,30 @@ const sessions: Session[] = [];
                                             <th style="color: var(--fresh-dark);">Email</th>
                                             <td style="color: var(--fresh-muted);">{user.email}</td>
                                         </tr>
-                                        {user.phoneNumber && (
+                                        {user.phone && (
                                             <tr>
                                                 <th style="color: var(--fresh-dark);">Phone</th>
-                                                <td style="color: var(--fresh-muted);">{user.phoneNumber}</td>
+                                                <td style="color: var(--fresh-muted);">{user.phone}</td>
                                             </tr>
                                         )}
-                                        <tr>
-                                            <th style="color: var(--fresh-dark);">Name</th>
-                                            <td style="color: var(--fresh-muted);">{user.name}</td>
-                                        </tr>
-                                        <tr>
-                                            <th style="color: var(--fresh-dark);">Member since</th>
-                                            <td style="color: var(--fresh-muted);">{user.createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                                        </tr>
-                                        <tr>
-                                            <th style="color: var(--fresh-dark);">Last login</th>
-                                            <td style="color: var(--fresh-muted);">{user.lastLoginAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
-                                        </tr>
+                                        {user.name && (
+                                            <tr>
+                                                <th style="color: var(--fresh-dark);">Name</th>
+                                                <td style="color: var(--fresh-muted);">{user.name}</td>
+                                            </tr>
+                                        )}
+                                        {user.createdAt && (
+                                            <tr>
+                                                <th style="color: var(--fresh-dark);">Member since</th>
+                                                <td style="color: var(--fresh-muted);">{fmtDate(user.createdAt)}</td>
+                                            </tr>
+                                        )}
+                                        {user.lastLogin && (
+                                            <tr>
+                                                <th style="color: var(--fresh-dark);">Last login</th>
+                                                <td style="color: var(--fresh-muted);">{fmtDateTime(user.lastLogin)}</td>
+                                            </tr>
+                                        )}
                                     </tbody>
                                 </table>
                                 <div class="mt-4">
@@ -105,8 +157,8 @@ const sessions: Session[] = [];
                                                     <tr>
                                                         <td>{session.ipAddress}</td>
                                                         <td class="is-size-7 has-text-fresh-muted">{session.userAgent}</td>
-                                                        <td style="color: var(--fresh-muted);">{session.createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
-                                                        <td style="color: var(--fresh-muted);">{session.expiresAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
+                                                        <td style="color: var(--fresh-muted);">{fmtDateTime(session.createdAt)}</td>
+                                                        <td style="color: var(--fresh-muted);">{fmtDateTime(session.expiresAt)}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>
