@@ -8,8 +8,12 @@ const portalUrl = import.meta.env.PORTAL_URL || process.env.PORTAL_URL || 'http:
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;
 
-  // Proxy Connect RPC and legacy API calls to portal
-  if (pathname.startsWith('/portal.v1.') || pathname.startsWith('/api/')) {
+  // Proxy form POSTs (login/signup) to portal backend
+  const isProxiedPost = context.request.method === 'POST' &&
+    (pathname === '/login' || pathname === '/signup');
+
+  // Proxy Connect RPC, legacy API calls, and auth form POSTs to portal
+  if (pathname.startsWith('/portal.v1.') || pathname.startsWith('/api/') || isProxiedPost) {
     const target = new URL(pathname + context.url.search, portalUrl);
 
     const headers = new Headers(context.request.headers);
