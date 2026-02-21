@@ -1,4 +1,4 @@
-/* === BulmaPlay / Fresh Theme Overrides === */
+/* === Fresh Theme — Minimal === */
 :root {
     --fresh-primary: #4FC1EA;
     --fresh-secondary: #F39200;
@@ -15,6 +15,8 @@ body {
     flex-direction: column;
     min-height: 100vh;
     font-family: "Open Sans", BlinkMacSystemFont, -apple-system, sans-serif;
+    background: #fff;
+    color: var(--fresh-dark);
 }
 .main-content { flex: 1; }
 
@@ -27,62 +29,7 @@ body {
     color: var(--fresh-muted);
 }
 
-/* Navbar - Fresh style */
-.navbar.is-fresh {
-    position: relative;
-    min-height: 3.8rem;
-    transition: all 0.3s;
-    z-index: 29;
-    background: transparent;
-}
-.navbar.is-fresh .navbar-brand {
-    min-height: 4rem;
-}
-.navbar.is-fresh .navbar-item {
-    color: var(--fresh-muted);
-    transition: color 0.3s;
-}
-.navbar.is-fresh .navbar-item:hover {
-    color: var(--fresh-primary);
-    background: transparent;
-}
-.navbar.is-fresh .navbar-item.is-secondary:hover {
-    color: var(--fresh-secondary);
-}
-.navbar.is-fresh .navbar-dropdown {
-    border-top: 2px solid var(--fresh-secondary);
-    border-radius: 0 0 6px 6px;
-    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.15);
-}
-.navbar.is-fresh .navbar-dropdown .navbar-item:hover {
-    background: var(--fresh-light-grey);
-    color: var(--fresh-secondary);
-}
-
-/* Fixed navbar clone (shows on scroll) */
-#navbar-clone {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    background: #fff;
-    transform: translateY(-100%);
-    z-index: 100;
-    box-shadow: 0 0 8px 0 rgba(0, 0, 0, 0.12);
-    transition: transform 0.3s;
-}
-#navbar-clone.is-active {
-    transform: translateY(0);
-}
-#navbar-clone .navbar-item {
-    color: var(--fresh-dark);
-}
-#navbar-clone .navbar-item:hover {
-    color: var(--fresh-primary);
-    background: transparent;
-}
-
-/* Buttons - Fresh style */
+/* Buttons */
 .button {
     transition: all 0.4s;
     font-weight: 500;
@@ -131,10 +78,18 @@ body {
     background-color: var(--fresh-primary);
     color: #fff;
 }
+.button.btn-outlined.secondary-btn {
+    border-color: var(--fresh-secondary);
+    color: var(--fresh-secondary);
+    background: transparent;
+}
+.button.btn-outlined.secondary-btn:hover {
+    background-color: var(--fresh-secondary);
+    color: #fff;
+}
 
 /* Sections */
 .section-light-grey { background-color: var(--fresh-light-grey); }
-.section-feature-grey { background-color: var(--fresh-feature-grey); }
 
 /* Divider accent bar */
 .divider {
@@ -145,84 +100,10 @@ body {
 }
 .divider.is-centered { margin: 0 auto; }
 
-/* Cards - Fresh style */
-.fresh-card {
-    background: #fff;
-    border-radius: 6px;
-    border: 1px solid #ededed;
-    box-shadow: none;
-    transition: box-shadow 0.3s, transform 0.3s;
-}
-.fresh-card:hover {
-    box-shadow: -1px 3px 15px 0 rgba(0, 0, 0, 0.06);
-}
-
-/* Hero gradient */
-.hero.is-fresh-primary .hero-body {
-    background-image: linear-gradient(141deg, #15dbf1 0%, #4FC1EA 71%, #61b3f1 100%);
-}
-.hero.is-fresh-primary .title,
-.hero.is-fresh-primary .subtitle {
-    color: #fff;
-}
-
-/* Feature icon containers */
-.feature-icon {
-    width: 70px;
-    height: 70px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 1.5rem;
-    border: 1px solid #e3e3e3;
-    transition: box-shadow 0.3s;
-}
-.feature-icon:hover {
-    box-shadow: -1px 3px 15px 0 rgba(0, 0, 0, 0.06);
-}
-.feature-icon i {
-    font-size: 1.5rem;
-    color: var(--fresh-primary);
-}
-
-/* Footer - Fresh dark */
-.footer-dark {
-    background: var(--fresh-dark);
-    color: #fff;
-    padding: 3rem 1.5rem 2rem;
-}
-.footer-dark .footer-header {
-    font-weight: 500;
-    font-size: 1.1rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 1rem;
-    color: #fff;
-}
-.footer-dark a {
-    color: var(--fresh-link-light);
-    transition: color 0.3s;
-}
-.footer-dark a:hover {
-    color: #fcfcfc;
-}
-.footer-dark .social-link {
-    color: var(--fresh-secondary);
-}
-.footer-dark .social-link:hover {
-    color: #fcfcfc;
-}
-.footer-dark .footer-bottom {
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    padding-top: 1.5rem;
-    margin-top: 2rem;
-}
-
-/* Auth forms - Fresh style */
+/* Auth forms */
 .auth-card {
-    border-radius: 6px;
-    box-shadow: 0px 5px 25px 0px rgba(0, 0, 0, 0.12);
+    border-radius: 8px;
+    box-shadow: 0px 5px 25px 0px rgba(0, 0, 0, 0.1);
     border: none;
 }
 .auth-card .input {
@@ -234,39 +115,30 @@ body {
 }
 .auth-card .input:focus {
     border-color: var(--fresh-primary);
-    box-shadow: -1px 3px 15px 0 rgba(0, 0, 0, 0.06);
+    box-shadow: 0 0 0 2px rgba(79, 193, 234, 0.15);
 }
 
-/* Back to top */
-#backtotop {
-    position: fixed;
-    right: 25px;
-    bottom: 25px;
-    z-index: 9999;
-    opacity: 0;
-    visibility: hidden;
-    transform: scale(0.7);
-    transition: all 0.5s;
-}
-#backtotop.visible {
-    opacity: 1;
-    visibility: visible;
-    transform: scale(1);
-}
-#backtotop a {
+/* Minimal page header bar (subpages) */
+.page-topbar {
     display: flex;
     align-items: center;
-    justify-content: center;
-    width: 46px;
-    height: 46px;
-    background-color: #66676b;
-    color: #fff;
-    border-radius: 50%;
-    font-size: 22px;
-    transition: background 0.3s;
+    justify-content: space-between;
+    padding: 0.75rem 1.5rem;
+    background: #fff;
+    border-bottom: 1px solid #f0f0f0;
 }
-#backtotop a:hover {
-    background: var(--fresh-secondary);
+.page-topbar-brand {
+    font-family: "Montserrat", sans-serif;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--fresh-dark);
+    text-decoration: none;
+}
+.page-topbar-brand:hover {
+    color: var(--fresh-primary);
+}
+.page-topbar .magic-bar {
+    max-width: 400px;
 }
 
 /* Utility */

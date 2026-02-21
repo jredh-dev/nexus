@@ -1,10 +1,11 @@
 ---
 interface Props {
   title?: string;
-  extraHead?: string;
+  /** Full-bleed mode (no topbar) — used by homepage */
+  minimal?: boolean;
 }
 
-const { title } = Astro.props;
+const { title, minimal = false } = Astro.props;
 const pageTitle = title ? `${title} - Hooper Development` : 'Hooper Development';
 ---
 
@@ -22,49 +23,13 @@ const pageTitle = title ? `${title} - Hooper Development` : 'Hooper Development'
     <slot name="head" />
 </head>
 <body>
-    <slot name="navbar" />
+    {!minimal && (
+        <slot name="topbar" />
+    )}
 
     <div class="main-content">
         <slot />
     </div>
-
-    <slot name="footer" />
-
-    <!-- Back to top button -->
-    <div id="backtotop">
-        <a href="#"><i class="fas fa-angle-up"></i></a>
-    </div>
-
-    <script>
-        // Mobile navbar burger toggle
-        document.querySelectorAll('.navbar-burger').forEach(el => {
-            el.addEventListener('click', () => {
-                const target = document.getElementById(el.dataset.target!);
-                el.classList.toggle('is-active');
-                target?.classList.toggle('is-active');
-            });
-        });
-
-        // Scroll-based navbar clone
-        const navbarClone = document.getElementById('navbar-clone');
-        if (navbarClone) {
-            window.addEventListener('scroll', () => {
-                navbarClone.classList.toggle('is-active', window.scrollY >= 60);
-            });
-        }
-
-        // Back to top button
-        const backToTop = document.getElementById('backtotop');
-        if (backToTop) {
-            window.addEventListener('scroll', () => {
-                backToTop.classList.toggle('visible', window.scrollY >= 400);
-            });
-            backToTop.querySelector('a')?.addEventListener('click', (e) => {
-                e.preventDefault();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            });
-        }
-    </script>
 </body>
 </html>
 

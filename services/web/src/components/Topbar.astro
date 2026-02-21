@@ -1,0 +1,12 @@
+---
+/**
+ * Minimal top bar for subpages: brand link + compact MagicBar.
+ * Replaces the old Navbar on all non-homepage pages.
+ */
+import MagicBar from './MagicBar';
+---
+
+<div class="page-topbar">
+    <a class="page-topbar-brand" href="/">Hooper Development</a>
+    <MagicBar client:load />
+</div>

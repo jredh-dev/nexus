@@ -1,10 +1,8 @@
 ---
 import Base from '../layouts/Base.astro';
-import Navbar from '../components/Navbar.astro';
-import Footer from '../components/Footer.astro';
+import Topbar from '../components/Topbar.astro';
 
 // TODO: Fetch user/session data via Connect RPC AuthService.GetSession
-// For now, redirect to login if no session cookie
 const sessionCookie = Astro.cookies.get('session');
 if (!sessionCookie?.value) {
     return Astro.redirect('/login');
@@ -31,120 +29,97 @@ const sessions: Session[] = [];
 ---
 
 <Base title="Dashboard">
-    <Navbar slot="navbar" loggedIn={true} userName={user.name} />
+    <Topbar slot="topbar" />
 
     <section class="section">
         <div class="container">
-            <div class="mb-6">
-                <h1 class="title is-3" style="font-family: 'Montserrat', sans-serif;">
-                    <span class="icon-text">
-                        <span class="icon" style="color: var(--fresh-primary);"><i class="fas fa-tachometer-alt"></i></span>
-                        <span>Dashboard</span>
-                    </span>
-                </h1>
-                <p class="subtitle is-5 is-muted">Welcome back, {user.name}</p>
-                <div class="divider"></div>
-            </div>
+            <div class="columns is-centered">
+                <div class="column is-10">
+                    <h1 class="title is-3" style="font-family: 'Montserrat', sans-serif;">Dashboard</h1>
+                    <p class="subtitle is-6 is-muted">Welcome back, {user.name}</p>
+                    <div class="divider mb-5"></div>
 
-            <div class="columns">
-                <!-- Profile Card -->
-                <div class="column is-4">
-                    <div class="box" style="border-radius: 6px; box-shadow: 0px 5px 25px 0px rgba(0,0,0,0.08); border: none;">
-                        <h2 class="title is-5 mb-4">
-                            <span class="icon-text">
-                                <span class="icon" style="color: var(--fresh-primary);"><i class="fas fa-user-circle"></i></span>
-                                <span>Profile</span>
-                            </span>
-                        </h2>
-                        <table class="table is-fullwidth is-narrow">
-                            <tbody>
-                                {user.username && (
-                                    <tr>
-                                        <th style="color: var(--fresh-dark);"><span class="icon"><i class="fas fa-at"></i></span> Username</th>
-                                        <td style="color: var(--fresh-muted);">{user.username}</td>
-                                    </tr>
-                                )}
-                                <tr>
-                                    <th style="color: var(--fresh-dark);"><span class="icon"><i class="fas fa-envelope"></i></span> Email</th>
-                                    <td style="color: var(--fresh-muted);">{user.email}</td>
-                                </tr>
-                                {user.phoneNumber && (
-                                    <tr>
-                                        <th style="color: var(--fresh-dark);"><span class="icon"><i class="fas fa-phone"></i></span> Phone</th>
-                                        <td style="color: var(--fresh-muted);">{user.phoneNumber}</td>
-                                    </tr>
-                                )}
-                                <tr>
-                                    <th style="color: var(--fresh-dark);"><span class="icon"><i class="fas fa-id-card"></i></span> Name</th>
-                                    <td style="color: var(--fresh-muted);">{user.name}</td>
-                                </tr>
-                                <tr>
-                                    <th style="color: var(--fresh-dark);"><span class="icon"><i class="fas fa-calendar"></i></span> Member since</th>
-                                    <td style="color: var(--fresh-muted);">{user.createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                                </tr>
-                                <tr>
-                                    <th style="color: var(--fresh-dark);"><span class="icon"><i class="fas fa-clock"></i></span> Last login</th>
-                                    <td style="color: var(--fresh-muted);">{user.lastLoginAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        <div class="mt-4">
-                            <a class="button secondary-btn btn-outlined is-rounded is-fullwidth" href="/logout">
-                                <span class="icon"><i class="fas fa-sign-out-alt"></i></span>
-                                <span>Logout</span>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Active Sessions -->
-                <div class="column is-8">
-                    <div class="box" style="border-radius: 6px; box-shadow: 0px 5px 25px 0px rgba(0,0,0,0.08); border: none;">
-                        <h2 class="title is-5 mb-4">
-                            <span class="icon-text">
-                                <span class="icon" style="color: var(--fresh-primary);"><i class="fas fa-desktop"></i></span>
-                                <span>Active Sessions</span>
-                            </span>
-                        </h2>
-                        {sessions.length > 0 ? (
-                            <div class="table-container">
-                                <table class="table is-fullwidth is-striped is-hoverable">
-                                    <thead>
-                                        <tr>
-                                            <th style="color: var(--fresh-dark);">IP Address</th>
-                                            <th style="color: var(--fresh-dark);">User Agent</th>
-                                            <th style="color: var(--fresh-dark);">Created</th>
-                                            <th style="color: var(--fresh-dark);">Expires</th>
-                                        </tr>
-                                    </thead>
+                    <div class="columns">
+                        <!-- Profile -->
+                        <div class="column is-4">
+                            <div class="box" style="border-radius: 8px; border: none; box-shadow: 0 2px 12px rgba(0,0,0,0.06);">
+                                <h2 class="title is-5 mb-4">Profile</h2>
+                                <table class="table is-fullwidth is-narrow">
                                     <tbody>
-                                        {sessions.map(session => (
+                                        {user.username && (
                                             <tr>
-                                                <td>
-                                                    <span class="icon-text">
-                                                        <span class="icon" style="color: var(--fresh-primary);"><i class="fas fa-network-wired"></i></span>
-                                                        <span>{session.ipAddress}</span>
-                                                    </span>
-                                                </td>
-                                                <td><span class="is-size-7 has-text-fresh-muted">{session.userAgent}</span></td>
-                                                <td style="color: var(--fresh-muted);">{session.createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
-                                                <td style="color: var(--fresh-muted);">{session.expiresAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
+                                                <th style="color: var(--fresh-dark);">Username</th>
+                                                <td style="color: var(--fresh-muted);">{user.username}</td>
                                             </tr>
-                                        ))}
+                                        )}
+                                        <tr>
+                                            <th style="color: var(--fresh-dark);">Email</th>
+                                            <td style="color: var(--fresh-muted);">{user.email}</td>
+                                        </tr>
+                                        {user.phoneNumber && (
+                                            <tr>
+                                                <th style="color: var(--fresh-dark);">Phone</th>
+                                                <td style="color: var(--fresh-muted);">{user.phoneNumber}</td>
+                                            </tr>
+                                        )}
+                                        <tr>
+                                            <th style="color: var(--fresh-dark);">Name</th>
+                                            <td style="color: var(--fresh-muted);">{user.name}</td>
+                                        </tr>
+                                        <tr>
+                                            <th style="color: var(--fresh-dark);">Member since</th>
+                                            <td style="color: var(--fresh-muted);">{user.createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                                        </tr>
+                                        <tr>
+                                            <th style="color: var(--fresh-dark);">Last login</th>
+                                            <td style="color: var(--fresh-muted);">{user.lastLoginAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
+                                        </tr>
                                     </tbody>
                                 </table>
+                                <div class="mt-4">
+                                    <a class="button secondary-btn btn-outlined is-rounded is-fullwidth" href="/logout">
+                                        <span class="icon"><i class="fas fa-right-from-bracket"></i></span>
+                                        <span>Logout</span>
+                                    </a>
+                                </div>
                             </div>
-                        ) : (
-                            <p class="has-text-fresh-muted">
-                                <span class="icon"><i class="fas fa-info-circle"></i></span>
-                                No active sessions.
-                            </p>
-                        )}
+                        </div>
+
+                        <!-- Sessions -->
+                        <div class="column is-8">
+                            <div class="box" style="border-radius: 8px; border: none; box-shadow: 0 2px 12px rgba(0,0,0,0.06);">
+                                <h2 class="title is-5 mb-4">Active Sessions</h2>
+                                {sessions.length > 0 ? (
+                                    <div class="table-container">
+                                        <table class="table is-fullwidth is-striped is-hoverable">
+                                            <thead>
+                                                <tr>
+                                                    <th>IP Address</th>
+                                                    <th>User Agent</th>
+                                                    <th>Created</th>
+                                                    <th>Expires</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {sessions.map(session => (
+                                                    <tr>
+                                                        <td>{session.ipAddress}</td>
+                                                        <td class="is-size-7 has-text-fresh-muted">{session.userAgent}</td>
+                                                        <td style="color: var(--fresh-muted);">{session.createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
+                                                        <td style="color: var(--fresh-muted);">{session.expiresAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <p class="has-text-fresh-muted">No active sessions.</p>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </section>
-
-    <Footer slot="footer" />
 </Base>

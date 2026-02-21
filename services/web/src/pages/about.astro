@@ -1,75 +1,75 @@
 ---
 import Base from '../layouts/Base.astro';
-import Navbar from '../components/Navbar.astro';
-import Footer from '../components/Footer.astro';
+import Topbar from '../components/Topbar.astro';
 
 // TODO: Read session from cookie via Connect RPC GetSession call
 const loggedIn = false;
 ---
 
 <Base title="About">
-    <Navbar slot="navbar" loggedIn={loggedIn} />
+    <Topbar slot="topbar" />
 
-    <!-- Hero with gradient -->
-    <section class="hero is-medium is-fresh-primary">
-        <div class="hero-body">
-            <div class="container has-text-centered">
-                <figure class="hero-profile-figure mb-4">
-                    <img src="/images/profile.jpeg" alt="Jared Hooper">
-                </figure>
-                <h1 class="title is-2 has-text-white" style="font-family: 'Montserrat', sans-serif; font-weight: 700;">About Me</h1>
-                <p class="subtitle is-5 mt-3" style="color: rgba(255,255,255,0.85);">
-                    Developer, dog dad, and builder of things.
-                </p>
-            </div>
-        </div>
-    </section>
-
-    <!-- Bio section -->
     <section class="section">
         <div class="container">
             <div class="columns is-centered">
-                <div class="column is-10">
-                    <div class="box about-bio-card">
-                        <div class="columns is-vcentered">
-                            <div class="column is-5">
-                                <figure class="image is-4by5 about-image-container">
-                                    <img class="about-image" src="/images/profile.jpeg" alt="Jared Hooper">
+                <div class="column is-8">
+                    <div class="about-header">
+                        <figure class="about-avatar">
+                            <img src="/images/profile.jpeg" alt="Jared Hooper">
+                        </figure>
+                        <div>
+                            <h1 class="title is-3" style="margin-bottom: 0.25rem;">Jared Hooper</h1>
+                            <p class="subtitle is-6 is-muted" style="margin-bottom: 0;">Software Engineer at Outreach</p>
+                        </div>
+                    </div>
+
+                    <div class="divider mt-4 mb-5"></div>
+
+                    <div class="content is-medium" style="color: var(--fresh-muted);">
+                        <p>
+                            Software engineer based in Seattle, WA. I work at
+                            <a href="https://www.outreach.io" target="_blank" rel="noopener" style="color: var(--fresh-primary);">Outreach</a>
+                            and spend my free time building tools, agents, and
+                            infrastructure at the intersection of software engineering
+                            and AI.
+                        </p>
+                        <p>
+                            University of New Hampshire alum. When I'm not writing code,
+                            I'm probably hanging out with Bigsby — my dog and loyal co-pilot.
+                        </p>
+                    </div>
+
+                    {loggedIn && (
+                        <div class="buttons are-medium mt-4">
+                            <a class="button primary-btn btn-outlined is-rounded" href="https://www.linkedin.com/in/jredhooper/" target="_blank" rel="noopener" title="LinkedIn">
+                                <span class="icon"><i class="fab fa-linkedin"></i></span>
+                            </a>
+                            <a class="button btn-outlined is-rounded" href="https://www.threads.com/@jredhoo" target="_blank" rel="noopener" title="Threads" style="border-color: var(--fresh-dark); color: var(--fresh-dark);">
+                                <span class="icon"><i class="fab fa-threads"></i></span>
+                            </a>
+                            <a class="button secondary-btn btn-outlined is-rounded" href="https://www.instagram.com/jredhoo" target="_blank" rel="noopener" title="Instagram">
+                                <span class="icon"><i class="fab fa-instagram"></i></span>
+                            </a>
+                            <a class="button btn-outlined is-rounded" href="https://discord.gg/4GaWgtaZ" target="_blank" rel="noopener" title="Discord" style="border-color: #5865F2; color: #5865F2;">
+                                <span class="icon"><i class="fab fa-discord"></i></span>
+                            </a>
+                        </div>
+                    )}
+
+                    <div class="mt-6">
+                        <h2 class="title is-4">Meet Bigsby</h2>
+                        <div class="columns is-variable is-4 mt-3">
+                            <div class="column is-6">
+                                <figure class="image is-4by3">
+                                    <img class="about-img" src="/images/bigs.jpeg" alt="Bigsby the dog">
                                 </figure>
+                                <p class="has-text-centered has-text-fresh-muted mt-2" style="font-size: 0.9rem;">The best boy.</p>
                             </div>
-                            <div class="column is-7">
-                                <h2 class="title is-3">Jared Hooper</h2>
-                                <p class="subtitle is-5 is-muted">Software Engineer at Outreach</p>
-                                <div class="divider mt-2 mb-4"></div>
-                                <div class="content is-medium">
-                                    <p style="color: var(--fresh-muted);">
-                                        Software engineer based in Seattle, WA. I work at
-                                        <a href="https://www.outreach.io" target="_blank" rel="noopener" style="color: var(--fresh-primary);">Outreach</a>
-                                        and spend my free time building tools, agents, and
-                                        infrastructure at the intersection of software engineering
-                                        and AI.
-                                    </p>
-                                    <p style="color: var(--fresh-muted);">
-                                        University of New Hampshire alum. When I'm not writing code,
-                                        I'm probably hanging out with Bigsby -- my dog and loyal co-pilot.
-                                    </p>
-                                </div>
-                                {loggedIn && (
-                                    <div class="buttons are-medium mt-5">
-                                        <a class="button primary-btn is-rounded social-icon" href="https://www.linkedin.com/in/jredhooper/" target="_blank" rel="noopener" title="LinkedIn">
-                                            <span class="icon"><i class="fab fa-linkedin"></i></span>
-                                        </a>
-                                        <a class="button is-rounded social-icon" href="https://www.threads.com/@jredhoo" target="_blank" rel="noopener" title="Threads" style="background: var(--fresh-dark); border-color: var(--fresh-dark); color: #fff;">
-                                            <span class="icon"><i class="fab fa-threads"></i></span>
-                                        </a>
-                                        <a class="button secondary-btn is-rounded social-icon" href="https://www.instagram.com/jredhoo" target="_blank" rel="noopener" title="Instagram">
-                                            <span class="icon"><i class="fab fa-instagram"></i></span>
-                                        </a>
-                                        <a class="button is-rounded social-icon" href="https://discord.gg/4GaWgtaZ" target="_blank" rel="noopener" title="Discord" style="background: #5865F2; border-color: #5865F2; color: #fff;">
-                                            <span class="icon"><i class="fab fa-discord"></i></span>
-                                        </a>
-                                    </div>
-                                )}
+                            <div class="column is-6">
+                                <figure class="image is-4by3">
+                                    <img class="about-img" src="/images/me-and-bigs.jpeg" alt="Jared and Bigsby">
+                                </figure>
+                                <p class="has-text-centered has-text-fresh-muted mt-2" style="font-size: 0.9rem;">Partners in crime.</p>
                             </div>
                         </div>
                     </div>
@@ -77,98 +77,34 @@ const loggedIn = false;
             </div>
         </div>
     </section>
-
-    <!-- Meet Bigsby - alternating light grey section -->
-    <section class="section section-light-grey">
-        <div class="container">
-            <div class="has-text-centered mb-6">
-                <h2 class="title is-3">Meet Bigsby</h2>
-                <div class="divider is-centered mt-3 mb-3"></div>
-            </div>
-            <div class="columns is-centered is-variable is-6">
-                <div class="column is-5">
-                    <div class="card pet-card">
-                        <div class="card-image">
-                            <figure class="image is-square">
-                                <img class="about-image" src="/images/bigs.jpeg" alt="Bigsby the dog" style="border-radius: 0;">
-                            </figure>
-                        </div>
-                        <div class="card-content has-text-centered">
-                            <p class="title is-5">Bigsby</p>
-                            <p class="has-text-fresh-muted">The best boy.</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="column is-5">
-                    <div class="card pet-card">
-                        <div class="card-image">
-                            <figure class="image is-square">
-                                <img class="about-image" src="/images/me-and-bigs.jpeg" alt="Jared and Bigsby" style="border-radius: 0;">
-                            </figure>
-                        </div>
-                        <div class="card-content has-text-centered">
-                            <p class="title is-5">The Team</p>
-                            <p class="has-text-fresh-muted">Partners in crime.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <Footer slot="footer" />
 </Base>
 
 <style>
-    .about-image {
+    .about-header {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+    }
+    .about-avatar {
+        flex-shrink: 0;
+    }
+    .about-avatar img {
+        width: 90px;
+        height: 90px;
+        border-radius: 50%;
+        object-fit: cover;
+        object-position: top;
+    }
+    .about-img {
         border-radius: 6px;
-        box-shadow: -1px 3px 15px 0 rgba(0, 0, 0, 0.06);
         object-fit: cover;
         width: 100%;
         height: 100%;
     }
-    .about-image-container {
-        border-radius: 6px;
-        overflow: hidden;
-    }
-    .hero-profile-figure {
-        width: 180px;
-        height: 180px;
-        margin: 0 auto;
-    }
-    .hero-profile-figure img {
-        width: 180px;
-        height: 180px;
-        border-radius: 50%;
-        object-fit: cover;
-        object-position: top;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-        border: 4px solid rgba(255, 255, 255, 0.3);
-    }
-    .social-icon {
-        font-size: 1.5rem;
-        transition: all 0.4s;
-    }
-    .social-icon:hover {
-        transform: scale(1.1);
-        box-shadow: 0 14px 26px -12px rgba(79, 193, 234, 0.42),
-                    0 4px 23px 0 rgba(0, 0, 0, 0.12),
-                    0 8px 10px -5px rgba(79, 193, 234, 0.2);
-    }
-    .about-bio-card {
-        border-radius: 6px;
-        box-shadow: 0px 5px 25px 0px rgba(0, 0, 0, 0.08);
-        border: none;
-        padding: 2.5rem;
-    }
-    .pet-card {
-        border-radius: 6px;
-        overflow: hidden;
-        border: 1px solid #ededed;
-        transition: box-shadow 0.3s, transform 0.3s;
-    }
-    .pet-card:hover {
-        box-shadow: -1px 3px 15px 0 rgba(0, 0, 0, 0.08);
-        transform: translateY(-2px);
+    @media screen and (max-width: 768px) {
+        .about-header {
+            flex-direction: column;
+            text-align: center;
+        }
     }
 </style>

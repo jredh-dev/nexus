@@ -1,81 +1,86 @@
 ---
 import Base from '../layouts/Base.astro';
-import Navbar from '../components/Navbar.astro';
-import Footer from '../components/Footer.astro';
+import Topbar from '../components/Topbar.astro';
 
 // TODO: Handle POST via Connect RPC AuthService.Signup
 const error = Astro.url.searchParams.get('error') || '';
 ---
 
 <Base title="Sign Up">
-    <Navbar slot="navbar" />
+    <Topbar slot="topbar" />
 
-    <section class="section section-light-grey" style="min-height: 80vh; display: flex; align-items: center;">
-        <div class="container">
-            <div class="columns is-centered">
-                <div class="column is-5">
-                    <div class="has-text-centered mb-5">
-                        <h1 class="title is-3" style="font-family: 'Montserrat', sans-serif;">Create Account</h1>
-                        <div class="divider is-centered mt-3 mb-3"></div>
-                        <p class="subtitle is-6 is-muted">Join Hooper Development</p>
+    <section class="auth-page">
+        <div class="auth-container">
+            <h1 class="title is-4 has-text-centered" style="font-family: 'Montserrat', sans-serif;">Create Account</h1>
+            <p class="subtitle is-6 is-muted has-text-centered mb-5">Join Hooper Development</p>
+
+            <div class="box auth-card">
+                {error && (
+                    <div class="notification is-danger is-light">
+                        <span class="icon"><i class="fas fa-exclamation-circle"></i></span>
+                        {error}
                     </div>
-                    <div class="box auth-card">
-                        {error && (
-                            <div class="notification is-danger is-light">
-                                <span class="icon"><i class="fas fa-exclamation-circle"></i></span>
-                                {error}
-                            </div>
-                        )}
-                        <form action="/api/signup" method="POST">
-                            <div class="field">
-                                <label class="label" for="username" style="font-size: 0.9rem; color: var(--fresh-dark);">Username</label>
-                                <div class="control has-icons-left">
-                                    <input class="input" type="text" id="username" name="username" placeholder="jsmith" required>
-                                    <span class="icon is-small is-left" style="color: var(--fresh-muted);"><i class="fas fa-at"></i></span>
-                                </div>
-                            </div>
-                            <div class="field">
-                                <label class="label" for="name" style="font-size: 0.9rem; color: var(--fresh-dark);">Full Name</label>
-                                <div class="control has-icons-left">
-                                    <input class="input" type="text" id="name" name="name" placeholder="John Smith">
-                                    <span class="icon is-small is-left" style="color: var(--fresh-muted);"><i class="fas fa-user"></i></span>
-                                </div>
-                            </div>
-                            <div class="field">
-                                <label class="label" for="email" style="font-size: 0.9rem; color: var(--fresh-dark);">Email</label>
-                                <div class="control has-icons-left">
-                                    <input class="input" type="email" id="email" name="email" placeholder="you@example.com" required>
-                                    <span class="icon is-small is-left" style="color: var(--fresh-muted);"><i class="fas fa-envelope"></i></span>
-                                </div>
-                            </div>
-                            <div class="field">
-                                <label class="label" for="phone" style="font-size: 0.9rem; color: var(--fresh-dark);">Phone Number</label>
-                                <div class="control has-icons-left">
-                                    <input class="input" type="tel" id="phone" name="phone" placeholder="(555) 123-4567" required>
-                                    <span class="icon is-small is-left" style="color: var(--fresh-muted);"><i class="fas fa-phone"></i></span>
-                                </div>
-                            </div>
-                            <div class="field">
-                                <label class="label" for="password" style="font-size: 0.9rem; color: var(--fresh-dark);">Password</label>
-                                <div class="control has-icons-left">
-                                    <input class="input" type="password" id="password" name="password" required>
-                                    <span class="icon is-small is-left" style="color: var(--fresh-muted);"><i class="fas fa-lock"></i></span>
-                                </div>
-                            </div>
-                            <div class="field mt-5">
-                                <button class="button primary-btn is-rounded is-fullwidth cta" type="submit">
-                                    Create Account
-                                </button>
-                            </div>
-                        </form>
+                )}
+                <form action="/api/signup" method="POST">
+                    <div class="field">
+                        <label class="label" for="username" style="font-size: 0.9rem;">Username</label>
+                        <div class="control has-icons-left">
+                            <input class="input" type="text" id="username" name="username" placeholder="jsmith" required>
+                            <span class="icon is-small is-left" style="color: var(--fresh-muted);"><i class="fas fa-at"></i></span>
+                        </div>
                     </div>
-                    <p class="has-text-centered has-text-fresh-muted mt-4">
-                        Already have an account? <a href="/login" style="color: var(--fresh-primary);">Login</a>
-                    </p>
-                </div>
+                    <div class="field">
+                        <label class="label" for="name" style="font-size: 0.9rem;">Full Name</label>
+                        <div class="control has-icons-left">
+                            <input class="input" type="text" id="name" name="name" placeholder="John Smith">
+                            <span class="icon is-small is-left" style="color: var(--fresh-muted);"><i class="fas fa-user"></i></span>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" for="email" style="font-size: 0.9rem;">Email</label>
+                        <div class="control has-icons-left">
+                            <input class="input" type="email" id="email" name="email" placeholder="you@example.com" required>
+                            <span class="icon is-small is-left" style="color: var(--fresh-muted);"><i class="fas fa-envelope"></i></span>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" for="phone" style="font-size: 0.9rem;">Phone Number</label>
+                        <div class="control has-icons-left">
+                            <input class="input" type="tel" id="phone" name="phone" placeholder="(555) 123-4567" required>
+                            <span class="icon is-small is-left" style="color: var(--fresh-muted);"><i class="fas fa-phone"></i></span>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" for="password" style="font-size: 0.9rem;">Password</label>
+                        <div class="control has-icons-left">
+                            <input class="input" type="password" id="password" name="password" required>
+                            <span class="icon is-small is-left" style="color: var(--fresh-muted);"><i class="fas fa-lock"></i></span>
+                        </div>
+                    </div>
+                    <div class="field mt-5">
+                        <button class="button primary-btn is-rounded is-fullwidth cta" type="submit">
+                            Create Account
+                        </button>
+                    </div>
+                </form>
             </div>
+            <p class="has-text-centered has-text-fresh-muted mt-4" style="font-size: 0.9rem;">
+                Already have an account? <a href="/login" style="color: var(--fresh-primary);">Login</a>
+            </p>
         </div>
     </section>
-
-    <Footer slot="footer" />
 </Base>
+
+<style>
+    .auth-page {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: calc(100vh - 52px);
+        padding: 2rem 1rem;
+    }
+    .auth-container {
+        width: 100%;
+        max-width: 420px;
+    }
+</style>
