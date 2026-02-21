@@ -70,6 +70,28 @@ jobs:
       - name: Build cal server
         run: CGO_ENABLED=1 go build -v ./services/cal/cmd/server
 
+  build-web:
+    name: Build Web Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: services/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: services/web
+
+      - name: Build
+        run: npm run build
+        working-directory: services/web
+
   test:
     name: Test
     runs-on: ubuntu-latest
