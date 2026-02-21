@@ -46,7 +46,6 @@ module "cloud_run" {
     ENVIRONMENT = local.environment
     PORTAL_URL  = var.portal_url
     HOST        = "0.0.0.0"
-    PORT        = "8080"
   }
 
   secrets = {}
