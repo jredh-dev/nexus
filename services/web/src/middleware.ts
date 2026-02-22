@@ -1,44 +1,18 @@
 import { defineMiddleware } from 'astro:middleware';
+import { proxyToPortal } from './lib/proxy';
 
-// Proxy Connect RPC calls to the portal backend.
-// In production, PORTAL_URL points to the portal Cloud Run service.
-// This avoids CORS issues — browser calls same-origin '/', SSR proxies to portal.
-const portalUrl = import.meta.env.PORTAL_URL || process.env.PORTAL_URL || 'http://localhost:8080';
-
+// Proxy Connect RPC, API calls, and portal-owned GET routes to the Go backend.
+// POST /login and POST /signup are handled by page-level POST exports instead.
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;
-
-  // Proxy form POSTs (login/signup) to portal backend
-  const isProxiedPost = context.request.method === 'POST' &&
-    (pathname === '/login' || pathname === '/signup');
 
   // Proxy GET routes that the portal backend owns (not Astro pages)
   const isProxiedGet = context.request.method === 'GET' &&
     (pathname === '/logout' || pathname.startsWith('/auth/'));
 
-  // Proxy Connect RPC, legacy API calls, auth form POSTs, and portal-owned GETs
-  if (pathname.startsWith('/portal.v1.') || pathname.startsWith('/api/') || isProxiedPost || isProxiedGet) {
-    const target = new URL(pathname + context.url.search, portalUrl);
-
-    const headers = new Headers(context.request.headers);
-    // Remove host header so it doesn't confuse the upstream
-    headers.delete('host');
-
-    const resp = await fetch(target.toString(), {
-      method: context.request.method,
-      headers,
-      body: context.request.method !== 'GET' && context.request.method !== 'HEAD'
-        ? context.request.body
-        : undefined,
-      // @ts-expect-error — Node fetch supports duplex for streaming bodies
-      duplex: 'half',
-    });
-
-    return new Response(resp.body, {
-      status: resp.status,
-      statusText: resp.statusText,
-      headers: resp.headers,
-    });
+  // Proxy Connect RPC, legacy API calls, and portal-owned GETs
+  if (pathname.startsWith('/portal.v1.') || pathname.startsWith('/api/') || isProxiedGet) {
+    return proxyToPortal(context.request, pathname + context.url.search);
   }
 
   return next();

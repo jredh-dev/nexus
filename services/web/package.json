@@ -7,7 +7,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "test:smoke": "node --test tests/smoke.mjs"
+    "test:smoke": "node --test tests/smoke.mjs",
+    "test:e2e": "npx playwright test"
   },
   "dependencies": {
     "@astrojs/node": "^9.5.4",
@@ -18,5 +19,8 @@
     "astro": "^5.17.1",
     "bulma": "^1.0.4",
     "preact": "^10.28.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2"
   }
 }

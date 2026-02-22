@@ -4,6 +4,7 @@ import Topbar from '../components/Topbar.astro';
 import { createConnectTransport } from '@connectrpc/connect-web';
 import { createClient } from '@connectrpc/connect';
 import { AuthService } from '../gen/portal/v1/auth_pb.js';
+import { getPortalUrl } from '../lib/proxy';
 
 // Redirect to login if no session cookie present.
 const sessionCookie = Astro.cookies.get('session');
@@ -13,7 +14,7 @@ if (!sessionCookie?.value) {
 
 // Call GetSession via Connect RPC, forwarding the session cookie.
 // In SSR, we talk directly to the portal backend (bypasses Astro middleware).
-const portalUrl = import.meta.env.PORTAL_URL || process.env.PORTAL_URL || 'http://localhost:8080';
+const portalUrl = getPortalUrl();
 
 const transport = createConnectTransport({
     baseUrl: portalUrl,

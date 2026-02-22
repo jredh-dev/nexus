@@ -2,30 +2,13 @@
 import Base from '../layouts/Base.astro';
 import Topbar from '../components/Topbar.astro';
 import type { APIContext } from 'astro';
+import { proxyToPortal } from '../lib/proxy';
 
 // Proxy POST /login to the portal backend.
 // Astro 5 requires an exported POST function to accept POST on a page route —
 // without it the Node adapter returns 405 before middleware fires.
 export async function POST(context: APIContext): Promise<Response> {
-  const portalUrl = import.meta.env.PORTAL_URL || process.env.PORTAL_URL || 'http://localhost:8080';
-  const target = new URL('/login', portalUrl);
-
-  const headers = new Headers(context.request.headers);
-  headers.delete('host');
-
-  const resp = await fetch(target.toString(), {
-    method: 'POST',
-    headers,
-    body: context.request.body,
-    // @ts-expect-error — Node fetch supports duplex
-    duplex: 'half',
-  });
-
-  return new Response(resp.body, {
-    status: resp.status,
-    statusText: resp.statusText,
-    headers: resp.headers,
-  });
+  return proxyToPortal(context.request, '/login');
 }
 
 const error = Astro.url.searchParams.get('error') || '';
