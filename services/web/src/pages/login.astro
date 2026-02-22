@@ -1,14 +1,20 @@
 ---
 import Base from '../layouts/Base.astro';
 import Topbar from '../components/Topbar.astro';
-import type { APIContext } from 'astro';
 import { proxyToPortal } from '../lib/proxy';
 
-// Proxy POST /login to the portal backend.
-// Astro 5 requires an exported POST function to accept POST on a page route —
-// without it the Node adapter returns 405 before middleware fires.
-export async function POST(context: APIContext): Promise<Response> {
-  return proxyToPortal(context.request, '/login');
+// Handle POST in frontmatter — returning a Response short-circuits the
+// template rendering, so the portal's 303 redirect reaches the browser.
+// The exported POST function below is still required: Astro 5's Node adapter
+// rejects POST on .astro pages that don't export POST (405 before middleware).
+if (Astro.request.method === 'POST') {
+  return proxyToPortal(Astro.request, '/login');
+}
+
+export function POST() {
+  // Never reached — frontmatter return above handles all POSTs.
+  // Exists solely to tell Astro this page accepts POST.
+  return new Response(null, { status: 204 });
 }
 
 const error = Astro.url.searchParams.get('error') || '';
