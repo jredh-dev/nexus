@@ -6,7 +6,8 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "test:smoke": "node --test tests/smoke.mjs"
   },
   "dependencies": {
     "@astrojs/node": "^9.5.4",
