@@ -1,5 +1,5 @@
 // Proxy helper for forwarding requests to the portal backend.
-// Shared by middleware.ts and page POST handlers.
+// Shared by middleware.ts and page frontmatter POST handlers.
 
 // Resolve portal backend URL at runtime only — import.meta.env is inlined
 // at build time and will be undefined for non-PUBLIC_ variables.

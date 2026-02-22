@@ -71,16 +71,17 @@ test.describe('Signup page', () => {
   test('missing fields show error', async ({ page }) => {
     await page.goto('/signup');
 
-    // Submit with only some fields filled (omit phone).
+    // Fill all required fields but use an invalid/duplicate email to trigger
+    // a server-side error from the portal backend.
     await page.fill('input[name="username"]', 'testuser_' + Date.now());
-    await page.fill('input[name="email"]', `testuser_${Date.now()}@example.com`);
+    await page.fill('input[name="email"]', 'demo@demo.com'); // duplicate
+    await page.fill('input[name="phone"]', '5551234567');
     await page.fill('input[name="password"]', 'password123');
-    // Leave phone empty — should fail.
 
     await page.click('button[type="submit"]');
 
-    // Should stay on /signup with an error.
-    await page.waitForURL(/\/signup/);
+    // Should redirect back to /signup with an error.
+    await page.waitForURL(/\/signup/, { timeout: 10_000 });
     await expect(page.locator('.notification.is-danger')).toBeVisible();
   });
 });
