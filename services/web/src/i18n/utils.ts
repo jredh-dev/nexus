@@ -60,6 +60,7 @@ export function getMagicBarTranslations(locale: Locale) {
       { titleKey: 'nav.signup' as TranslationKey, descKey: 'magicbar.desc.signup' as TranslationKey, target: localePath(locale, '/signup'), icon: 'fa-user-plus' },
       { titleKey: 'nav.dashboard' as TranslationKey, descKey: 'magicbar.desc.dashboard' as TranslationKey, target: localePath(locale, '/dashboard'), icon: 'fa-gauge' },
       { titleKey: 'nav.logout' as TranslationKey, descKey: 'magicbar.desc.logout' as TranslationKey, target: '/logout', icon: 'fa-right-from-bracket' },
+      { titleKey: 'nav.lies' as TranslationKey, descKey: 'magicbar.desc.lies' as TranslationKey, target: localePath(locale, '/lies'), icon: 'fa-mask' },
       { titleKey: 'nav.contact' as TranslationKey, descKey: 'magicbar.desc.contact' as TranslationKey, target: 'mailto:dev@jredh.com', icon: 'fa-envelope' },
     ].map(item => ({
       title: t(locale, item.titleKey),

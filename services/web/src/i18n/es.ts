@@ -14,6 +14,7 @@ const es: Record<TranslationKey, string> = {
   'nav.dashboard': 'Panel',
   'nav.logout': 'Cerrar sesión',
   'nav.contact': 'Contacto',
+  'nav.lies': 'Mentiras',
 
   // MagicBar
   'magicbar.placeholder.hero': '¿A dónde quieres ir?',
@@ -32,6 +33,7 @@ const es: Record<TranslationKey, string> = {
   'magicbar.desc.dashboard': 'Ver tu panel',
   'magicbar.desc.logout': 'Cerrar sesión',
   'magicbar.desc.contact': 'Envíame un correo',
+  'magicbar.desc.lies': 'Ver secretos expuestos',
 
   // Homepage
   'home.brand': 'Hooper Development',
@@ -95,6 +97,13 @@ const es: Record<TranslationKey, string> = {
   'dashboard.sessionCreated': 'Creada',
   'dashboard.sessionExpires': 'Expira',
   'dashboard.noSessions': 'No hay sesiones activas.',
+
+  // Lies wall
+  'lies.title': 'Mentiras',
+  'lies.heading': 'El Muro de Mentiras',
+  'lies.subtitle': 'Cada secreto que fue expuesto. Cada visita muestra una página diferente.',
+  'lies.empty': 'Aún no hay mentiras. Envía un secreto para comenzar.',
+  'lies.meta': 'Página {page} de {pages} — {total} mentiras expuestas',
 };
 
 export default es;

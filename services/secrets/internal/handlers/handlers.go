@@ -8,16 +8,21 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/jredh-dev/nexus/services/secrets/internal/store"
+	"github.com/jredh-dev/nexus/services/secrets/internal/wall"
 )
 
 // Handler holds dependencies for HTTP handlers.
 type Handler struct {
 	store *store.Store
+	wall  *wall.Wall
 }
 
-// New creates a new Handler.
+// New creates a new Handler with a rotating lies wall.
 func New(s *store.Store) *Handler {
-	return &Handler{store: s}
+	return &Handler{
+		store: s,
+		wall:  wall.New(s),
+	}
 }
 
 type submitReq struct {
@@ -111,6 +116,47 @@ func (h *Handler) Riddle(w http.ResponseWriter, r *http.Request) {
 		"stats":    h.store.Stats(),
 	}
 	jsonOK(w, http.StatusOK, riddle)
+}
+
+// Lies handles GET /api/lies — returns a rotating page of exposed lies as raw text.
+// Each request gets a different page (round-robin). The response includes metadata
+// headers so clients know their position in the rotation.
+func (h *Handler) Lies(w http.ResponseWriter, r *http.Request) {
+	text, pageIdx, totalPages, totalLies := h.wall.Page()
+
+	if totalLies == 0 {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("X-Lies-Total", "0")
+		w.Header().Set("X-Lies-Page", "0")
+		w.Header().Set("X-Lies-Pages", "0")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("No lies yet. Submit a secret to begin."))
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("X-Lies-Total", itoa(totalLies))
+	w.Header().Set("X-Lies-Page", itoa(pageIdx))
+	w.Header().Set("X-Lies-Pages", itoa(totalPages))
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(text))
+}
+
+// Stop shuts down the background lies wall worker.
+func (h *Handler) Stop() {
+	h.wall.Stop()
+}
+
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	var digits []byte
+	for n > 0 {
+		digits = append([]byte{byte('0' + n%10)}, digits...)
+		n /= 10
+	}
+	return string(digits)
 }
 
 // --- helpers ---
