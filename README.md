@@ -1,8 +1,6 @@
-# nascent-nexus
+# nexus
 
-**Personal AI assistant system** - SMS-based memory, scheduling, and service integration hub.
-
-> "The mind that remembers, reminds, and coordinates everything."
+Monorepo for all services, CLIs, and libraries. Go, stdlib HTTP, PostgreSQL, SSR templates. AGPL-3.0.
 
 ## 🎯 Vision
 
