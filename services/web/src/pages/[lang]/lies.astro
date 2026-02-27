@@ -1,0 +1,70 @@
+---
+import Base from '../../layouts/Base.astro';
+import Topbar from '../../components/Topbar.astro';
+import { isLocale, type Locale } from '../../i18n/config';
+import { t } from '../../i18n/utils';
+
+const { lang } = Astro.params;
+if (!lang || !isLocale(lang)) return Astro.redirect('/en/lies', 302);
+const locale = lang as Locale;
+
+// Fetch a page of lies from the secrets backend.
+const secretsUrl = process.env.SECRETS_URL || 'http://localhost:8082';
+let liesText = '';
+let page = 0;
+let pages = 0;
+let total = 0;
+
+try {
+    const resp = await fetch(`${secretsUrl}/api/lies`);
+    liesText = await resp.text();
+    page = parseInt(resp.headers.get('X-Lies-Page') || '0', 10);
+    pages = parseInt(resp.headers.get('X-Lies-Pages') || '0', 10);
+    total = parseInt(resp.headers.get('X-Lies-Total') || '0', 10);
+} catch (err) {
+    liesText = t(locale, 'lies.empty');
+}
+
+const meta = total > 0
+    ? t(locale, 'lies.meta')
+        .replace('{page}', String(page + 1))
+        .replace('{pages}', String(pages))
+        .replace('{total}', String(total))
+    : '';
+---
+
+<Base title={t(locale, 'lies.title')} lang={locale}>
+    <Topbar slot="topbar" locale={locale} />
+
+    <section class="section">
+        <div class="container">
+            <div class="columns is-centered">
+                <div class="column is-10">
+                    <h1 class="title is-3" style="font-family: 'Montserrat', sans-serif;">
+                        {t(locale, 'lies.heading')}
+                    </h1>
+                    <p class="subtitle is-6 is-muted">{t(locale, 'lies.subtitle')}</p>
+                    {meta && <p class="is-size-7 has-text-grey mb-4">{meta}</p>}
+                    <div class="divider mb-5"></div>
+                    <pre class="lies-wall">{liesText}</pre>
+                </div>
+            </div>
+        </div>
+    </section>
+</Base>
+
+<style>
+.lies-wall {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: monospace;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    background: #fafafa;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    padding: 1.5rem;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+</style>

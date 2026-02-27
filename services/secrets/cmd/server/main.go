@@ -85,6 +85,7 @@ func main() {
 		r.Get("/secrets", h.List)
 		r.Get("/secrets/{id}", h.Get)
 		r.Get("/stats", h.Stats)
+		r.Get("/lies", h.Lies)
 	})
 
 	addr := ":" + cfg.Port
@@ -102,6 +103,7 @@ func main() {
 		<-sigint
 
 		log.Println("Shutting down server...")
+		h.Stop()
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 

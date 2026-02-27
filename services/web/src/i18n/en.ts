@@ -12,6 +12,7 @@ const en = {
   'nav.dashboard': 'Dashboard',
   'nav.logout': 'Logout',
   'nav.contact': 'Contact',
+  'nav.lies': 'Lies',
 
   // MagicBar
   'magicbar.placeholder.hero': 'Where do you want to go?',
@@ -30,6 +31,7 @@ const en = {
   'magicbar.desc.dashboard': 'View your dashboard',
   'magicbar.desc.logout': 'Sign out',
   'magicbar.desc.contact': 'Send me an email',
+  'magicbar.desc.lies': 'Browse exposed secrets',
 
   // Homepage
   'home.brand': 'Hooper Development',
@@ -93,6 +95,13 @@ const en = {
   'dashboard.sessionCreated': 'Created',
   'dashboard.sessionExpires': 'Expires',
   'dashboard.noSessions': 'No active sessions.',
+
+  // Lies wall
+  'lies.title': 'Lies',
+  'lies.heading': 'The Wall of Lies',
+  'lies.subtitle': 'Every secret that was exposed. Each visit shows a different page.',
+  'lies.empty': 'No lies yet. Submit a secret to begin.',
+  'lies.meta': 'Page {page} of {pages} — {total} lies exposed',
 } as const;
 
 export type TranslationKey = keyof typeof en;
