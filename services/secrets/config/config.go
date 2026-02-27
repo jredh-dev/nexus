@@ -8,8 +8,12 @@ type Config struct {
 }
 
 // Load reads config from environment variables with sensible defaults.
+// PORT (Cloud Run standard) takes precedence over SECRETS_PORT.
 func Load() *Config {
-	port := os.Getenv("SECRETS_PORT")
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = os.Getenv("SECRETS_PORT")
+	}
 	if port == "" {
 		port = "8082"
 	}
