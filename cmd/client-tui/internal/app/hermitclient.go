@@ -11,7 +11,7 @@ import (
 	"net"
 	"time"
 
-	pb "github.com/jredh-dev/nexus/cmd/fool/proto"
+	pb "github.com/jredh-dev/nexus/cmd/client-tui/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"

@@ -7,8 +7,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/jredh-dev/nexus/services/secrets/internal/store"
-	"github.com/jredh-dev/nexus/services/secrets/internal/wall"
+	"github.com/jredh-dev/nexus/services/go-http/internal/store"
+	"github.com/jredh-dev/nexus/services/go-http/internal/wall"
 )
 
 // Handler holds dependencies for HTTP handlers.

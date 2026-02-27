@@ -9,8 +9,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/jredh-dev/nexus/cmd/fool/internal/app"
-	"github.com/jredh-dev/nexus/cmd/fool/internal/obf"
+	"github.com/jredh-dev/nexus/cmd/client-tui/internal/app"
+	"github.com/jredh-dev/nexus/cmd/client-tui/internal/obf"
 )
 
 // Build-time embedded values. Set by the Makefile via:
@@ -18,7 +18,7 @@ import (
 //	-ldflags "-X main.obfAddr=<hex> -X main.obfSecret=<hex> -X main.obfKey=<hex>"
 //
 // Encoding scheme:
-//   - obfKey    = Encode(passphrase,   binaryName="fool")
+//   - obfKey    = Encode(passphrase,   binaryName="client-tui")
 //   - obfAddr   = Encode(serverAddr,   passphrase)
 //   - obfSecret = Encode(sharedSecret, passphrase)
 //
@@ -43,26 +43,26 @@ func resolveConfig() (addr, secret, secretsURL string, devMode bool) {
 
 	// The binary name is the seed for decoding obfKey.
 	// Renaming the binary intentionally breaks decoding.
-	binaryName := "fool"
+	binaryName := "client-tui"
 	if len(os.Args) > 0 {
 		binaryName = os.Args[0]
 	}
 
 	passphrase, err := obf.Decode(obfKey, binaryName)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "fool: key decode failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "client-tui: key decode failed: %v\n", err)
 		os.Exit(1)
 	}
 
 	resolvedAddr, err := obf.Decode(obfAddr, passphrase)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "fool: addr decode failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "client-tui: addr decode failed: %v\n", err)
 		os.Exit(1)
 	}
 
 	resolvedSecret, err := obf.Decode(obfSecret, passphrase)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "fool: secret decode failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "client-tui: secret decode failed: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -70,7 +70,7 @@ func resolveConfig() (addr, secret, secretsURL string, devMode bool) {
 	if obfSecretsURL != "" {
 		u, err := obf.Decode(obfSecretsURL, passphrase)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "fool: secrets URL decode failed: %v\n", err)
+			fmt.Fprintf(os.Stderr, "client-tui: secrets URL decode failed: %v\n", err)
 			os.Exit(1)
 		}
 		resolvedSecretsURL = u
@@ -83,12 +83,12 @@ func main() {
 	addr, secret, secretsURL, devMode := resolveConfig()
 
 	if devMode {
-		fmt.Fprintln(os.Stderr, "fool: dev mode (no build-time config baked in)")
+		fmt.Fprintln(os.Stderr, "client-tui: dev mode (no build-time config baked in)")
 	}
 
 	hermitClient, err := app.NewHermitClient(addr, secret)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "fool: hermit dial: %v\n", err)
+		fmt.Fprintf(os.Stderr, "client-tui: hermit dial: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -97,7 +97,7 @@ func main() {
 	m := app.New(addr, secret, hermitClient, secretsClient)
 	p := tea.NewProgram(m)
 	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "fool: %v\n", err)
+		fmt.Fprintf(os.Stderr, "client-tui: %v\n", err)
 		os.Exit(1)
 	}
 }

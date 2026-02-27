@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jredh-dev/nexus/services/secrets/internal/lens"
+	"github.com/jredh-dev/nexus/services/go-http/internal/lens"
 )
 
 // State represents whether a secret is truth or lie.

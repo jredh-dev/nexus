@@ -1,5 +1,5 @@
 # Build stage
-# Build context is the repo root (docker build -f services/secrets/Dockerfile .)
+# Build context is the repo root (docker build -f services/go-http/Dockerfile .)
 FROM golang:1.24-alpine AS builder
 
 RUN apk add --no-cache git
@@ -18,7 +18,7 @@ ARG BUILD_DATE=unknown
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.buildDate=${BUILD_DATE}" \
     -o /app/server \
-    ./services/secrets/cmd/server
+    ./services/go-http/cmd/server
 
 # Runtime stage
 FROM alpine:3.19

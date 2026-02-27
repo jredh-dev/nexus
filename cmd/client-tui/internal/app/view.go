@@ -10,7 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	pb "github.com/jredh-dev/nexus/cmd/fool/proto"
+	pb "github.com/jredh-dev/nexus/cmd/client-tui/proto"
 )
 
 // --- Styles ---

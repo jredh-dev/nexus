@@ -4,7 +4,7 @@
 package app
 
 import (
-	pb "github.com/jredh-dev/nexus/cmd/fool/proto"
+	pb "github.com/jredh-dev/nexus/cmd/client-tui/proto"
 )
 
 // --- Tea messages ---

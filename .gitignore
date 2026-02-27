@@ -37,3 +37,6 @@ ngrok.exe
 
 # Branch-specific development context
 CONTEXT.md
+
+# Rust build artifacts
+target/

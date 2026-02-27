@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (c) 2026 Jared Redh. All rights reserved.
 
-BINARY      := fool
+BINARY      := client-tui
 INSTALL_DIR := $(shell go env GOPATH)/bin
-CMD_DIR     := ./cmd/fool
+CMD_DIR     := ./cmd/client-tui
 
 # Build-time obfuscation (set in CI via secrets; leave empty for dev mode)
 OBF_KEY     ?=
@@ -18,12 +18,12 @@ LDFLAGS := -X main.obfKey=$(OBF_KEY) \
 
 .PHONY: build install test clean encode
 
-## build: compile fool binary to ./bin/fool
+## build: compile client-tui binary to ./bin/client-tui
 build:
 	@mkdir -p bin
 	go build -ldflags "$(LDFLAGS)" -o bin/$(BINARY) $(CMD_DIR)
 
-## install: install fool to GOPATH/bin
+## install: install client-tui to GOPATH/bin
 install:
 	go install -ldflags "$(LDFLAGS)" $(CMD_DIR)
 
@@ -34,7 +34,7 @@ test:
 ## encode: encode a value for ldflags embedding
 ##   Usage: make encode PLAIN=<value> PASS=<passphrase>
 encode:
-	go run ./cmd/fool/internal/obf/encode $(PLAIN) $(PASS)
+	go run ./cmd/client-tui/internal/obf/encode $(PLAIN) $(PASS)
 
 ## clean: remove build artifacts
 clean:

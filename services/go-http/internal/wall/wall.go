@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/jredh-dev/nexus/services/secrets/internal/store"
+	"github.com/jredh-dev/nexus/services/go-http/internal/store"
 )
 
 const (

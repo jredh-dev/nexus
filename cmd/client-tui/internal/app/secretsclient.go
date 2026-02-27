@@ -13,7 +13,7 @@ import (
 )
 
 // SecretsClient is the interface for the secrets REST API.
-// The real implementation talks to nexus/services/secrets over HTTP.
+// The real implementation talks to nexus/services/go-http over HTTP.
 // Tests inject a mock.
 type SecretsClient interface {
 	List() ([]Secret, error)
@@ -21,7 +21,7 @@ type SecretsClient interface {
 	Stats() (SecretsStats, error)
 }
 
-// --- Domain types (mirrors nexus/services/secrets/internal/store) ---
+// --- Domain types (mirrors nexus/services/go-http/internal/store) ---
 
 type Secret struct {
 	ID          string     `json:"id"`

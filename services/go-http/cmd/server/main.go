@@ -22,9 +22,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	"github.com/jredh-dev/nexus/services/secrets/config"
-	"github.com/jredh-dev/nexus/services/secrets/internal/handlers"
-	"github.com/jredh-dev/nexus/services/secrets/internal/store"
+	"github.com/jredh-dev/nexus/services/go-http/config"
+	"github.com/jredh-dev/nexus/services/go-http/internal/handlers"
+	"github.com/jredh-dev/nexus/services/go-http/internal/store"
 )
 
 var (
