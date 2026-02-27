@@ -1,0 +1,35 @@
+# Auto-install binaries on push to main.
+# Detects which projects changed and only rebuilds those.
+name: Install
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  install:
+    runs-on: local
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changes and install
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD)
+
+          # fool — Go TUI client
+          if echo "$CHANGED" | grep -qE '^(cmd/fool/|go\.(mod|sum)$)'; then
+            echo "==> Installing fool"
+            go install ./cmd/fool
+          else
+            echo "--- fool: no changes"
+          fi
+
+          # server — root server
+          if echo "$CHANGED" | grep -qE '^(cmd/server/|internal/|go\.(mod|sum)$)'; then
+            echo "==> Installing server"
+            go install ./cmd/server
+          else
+            echo "--- server: no changes"
+          fi
