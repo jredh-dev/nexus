@@ -1,0 +1,180 @@
+/* === BIG BOARD === */
+
+/* Kind badge colors */
+:root {
+    --bb-kind-static:  #6c757d;
+    --bb-kind-once:    #0d6efd;
+    --bb-kind-polling: #fd7e14;
+    --bb-kind-sse:     #6f42c1;
+    --bb-kind-ws:      #d63384;
+    --bb-kind-grpc:    #198754;
+}
+
+/* Layout */
+.big-board {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+/* Header */
+.big-board__header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 3px solid var(--fresh-secondary);
+}
+
+.big-board__title {
+    font-family: "Montserrat", sans-serif;
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--fresh-dark);
+    margin: 0;
+    text-align: center;
+}
+
+/* Grid controls */
+.big-board__controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.big-board__ctrl-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--fresh-primary);
+    background: transparent;
+    color: var(--fresh-primary);
+    border-radius: 4px;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    padding: 0;
+}
+
+.big-board__ctrl-btn:hover:not(:disabled) {
+    background: var(--fresh-primary);
+    color: #fff;
+}
+
+.big-board__ctrl-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.big-board__grid-label {
+    font-family: "Montserrat", sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--fresh-muted);
+    min-width: 2.5rem;
+    text-align: center;
+}
+
+/* CSS grid — driven by inline custom properties from Preact */
+.big-board__grid {
+    display: grid;
+    grid-template-columns: repeat(var(--cols, 1), 1fr);
+    grid-template-rows: repeat(var(--rows, 1), 1fr);
+    gap: 1rem;
+    min-height: calc(var(--rows, 1) * 220px);
+}
+
+/* Cells */
+.big-board__cell {
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    min-height: 200px;
+}
+
+.big-board__cell--empty {
+    background: var(--fresh-light-grey);
+    box-shadow: none;
+    border: 1px dashed #d0d8e0;
+    align-items: center;
+    justify-content: center;
+}
+
+.big-board__empty-label {
+    font-size: 0.75rem;
+    color: var(--fresh-muted);
+    letter-spacing: 0.05em;
+}
+
+/* Cell header */
+.big-board__cell-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    background: var(--fresh-feature-grey);
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.big-board__cell-label {
+    font-family: "Montserrat", sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--fresh-dark);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+/* Kind badge */
+.big-board__kind-badge {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: #fff;
+}
+
+.big-board__kind-badge--static  { background: var(--bb-kind-static); }
+.big-board__kind-badge--once    { background: var(--bb-kind-once); }
+.big-board__kind-badge--polling { background: var(--bb-kind-polling); }
+.big-board__kind-badge--sse     { background: var(--bb-kind-sse); }
+.big-board__kind-badge--ws      { background: var(--bb-kind-ws); }
+.big-board__kind-badge--grpc    { background: var(--bb-kind-grpc); }
+
+/* Cell body */
+.big-board__cell-body {
+    flex: 1;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* === HelloWorld component === */
+.hw-component {
+    text-align: center;
+}
+
+.hw-component__message {
+    font-family: "Montserrat", sans-serif;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--fresh-dark);
+    margin: 0 0 0.25rem;
+}
+
+.hw-component__sub {
+    font-size: 0.75rem;
+    color: var(--fresh-muted);
+    margin: 0;
+}
