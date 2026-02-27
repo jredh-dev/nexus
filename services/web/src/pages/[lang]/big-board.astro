@@ -1,0 +1,23 @@
+---
+import Base from '../../layouts/Base.astro';
+import Topbar from '../../components/Topbar.astro';
+import BigBoard from '../../components/BigBoard';
+import { isLocale, type Locale } from '../../i18n/config';
+
+const { lang } = Astro.params;
+if (!lang || !isLocale(lang)) return Astro.redirect('/en/big-board', 302);
+const locale = lang as Locale;
+---
+
+<Base title="BIG BOARD" lang={locale}>
+    <Topbar slot="topbar" locale={locale} />
+    <section class="section big-board-section">
+        <BigBoard client:load />
+    </section>
+</Base>
+
+<style>
+.big-board-section {
+    padding: 1.5rem 1rem;
+}
+</style>
