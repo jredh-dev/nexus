@@ -145,39 +145,6 @@ func (s *Store) Submit(value, submitterID string) *SubmitResult {
 		}
 	}
 
-	// Also check identity against all other lenses' existing canonicals.
-	// e.g., someone submits "hi", check if "6869" already exists
-	// (because "6869" has hexdecode canonical "hi" which would match
-	// the identity of "hi").
-	identityForm := canonicals["identity"][0]
-	for lensName := range canonicals {
-		if lensName == "identity" || lensName == "palindrome" {
-			continue
-		}
-		key := lensName + ":" + identityForm
-		if existingID, exists := s.canonicalIndex[key]; exists {
-			existing := s.secrets[existingID]
-			if existing.State == Truth {
-				now := time.Now().UTC()
-				existing.State = Lie
-				existing.ExposedBy = submitterID
-				existing.ExposedVia = lensName + " (reverse)"
-				existing.ExposedAt = &now
-
-				return &SubmitResult{
-					Secret: existing,
-					Exposed: &Exposure{
-						SecretID:   existingID,
-						LensName:   lensName + " (reverse)",
-						Canonical:  identityForm,
-						ExposerID:  submitterID,
-						ExposerVal: value,
-					},
-				}
-			}
-		}
-	}
-
 	// No collision: create new truth
 	s.nextID++
 	secret := &Secret{

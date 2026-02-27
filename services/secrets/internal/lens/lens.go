@@ -60,28 +60,23 @@ func CanonicalizeThroughAll(s string, lenses []Lens) map[string][]string {
 // --- Lens implementations ---
 
 // CaseFold collapses ASCII case: "Hello" → "hello".
+// Always returns the canonical form so both "hello" and "Hello"
+// get indexed under the same key.
 type CaseFold struct{}
 
 func (CaseFold) Name() string { return "casefold" }
 func (CaseFold) Canonicalize(s string) []string {
-	lower := strings.ToLower(s)
-	if lower == s {
-		return nil // already lowercase, no additional collapse
-	}
-	return []string{lower}
+	return []string{strings.ToLower(s)}
 }
 
 // UnicodeCaseFold uses full Unicode case folding.
 // This catches things like ß → ss, ﬁ → fi.
+// Always returns canonical form for consistent indexing.
 type UnicodeCaseFold struct{}
 
 func (UnicodeCaseFold) Name() string { return "unicode_casefold" }
 func (UnicodeCaseFold) Canonicalize(s string) []string {
-	folded := strings.ToLower(norm.NFC.String(s))
-	if folded == norm.NFC.String(s) {
-		return nil
-	}
-	return []string{folded}
+	return []string{strings.ToLower(norm.NFC.String(s))}
 }
 
 // Palindrome detects palindromic inputs. A palindrome is "the same
@@ -126,24 +121,21 @@ type HexDecode struct{}
 
 func (HexDecode) Name() string { return "hexdecode" }
 func (HexDecode) Canonicalize(s string) []string {
-	// Only try if it looks like hex (even length, all hex chars)
+	// Try decoding s as hex
 	cleaned := strings.TrimSpace(s)
-	if len(cleaned) < 2 || len(cleaned)%2 != 0 {
-		return nil
+	if len(cleaned) >= 2 && len(cleaned)%2 == 0 {
+		if decoded, err := hex.DecodeString(cleaned); err == nil && utf8.Valid(decoded) {
+			result := string(decoded)
+			if result != s {
+				return []string{result}
+			}
+		}
 	}
-	decoded, err := hex.DecodeString(cleaned)
-	if err != nil {
-		return nil
-	}
-	if !utf8.Valid(decoded) {
-		return nil
-	}
-	result := string(decoded)
-	// Don't collapse if decoded == input (already plaintext hex chars)
-	if result == s {
-		return nil
-	}
-	return []string{result}
+
+	// Also index the plaintext value itself, so if someone later submits
+	// the hex encoding of this value, it collides.
+	// e.g., "hi" gets indexed so that "6869" can find it.
+	return []string{s}
 }
 
 // Homoglyph maps common visual lookalikes to their ASCII equivalents.
@@ -153,17 +145,12 @@ type Homoglyph struct{}
 func (Homoglyph) Name() string { return "homoglyph" }
 func (Homoglyph) Canonicalize(s string) []string {
 	var b strings.Builder
-	changed := false
 	for _, r := range s {
 		if mapped, ok := homoglyphMap[r]; ok {
 			b.WriteRune(mapped)
-			changed = true
 		} else {
 			b.WriteRune(r)
 		}
-	}
-	if !changed {
-		return nil
 	}
 	return []string{b.String()}
 }

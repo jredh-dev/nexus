@@ -11,9 +11,9 @@ func TestCaseFold(t *testing.T) {
 		want  []string
 	}{
 		{"Hello", []string{"hello"}},
-		{"hello", nil}, // already lowercase
+		{"hello", []string{"hello"}}, // always returns canonical
 		{"WORLD", []string{"world"}},
-		{"123", nil}, // no case to fold
+		{"123", []string{"123"}}, // passthrough
 	}
 	for _, tt := range tests {
 		got := l.Canonicalize(tt.input)
@@ -55,9 +55,9 @@ func TestHexDecode(t *testing.T) {
 	}{
 		{"6869", []string{"hi"}},          // hex for "hi"
 		{"48656c6c6f", []string{"Hello"}}, // hex for "Hello"
-		{"nothex", nil},
-		{"zz", nil}, // invalid hex chars
-		{"1", nil},  // odd length
+		{"nothex", []string{"nothex"}},    // not hex, passthrough
+		{"zz", []string{"zz"}},            // invalid hex, passthrough
+		{"1", []string{"1"}},              // odd length, passthrough
 	}
 	for _, tt := range tests {
 		got := l.Canonicalize(tt.input)
@@ -74,7 +74,7 @@ func TestHomoglyph(t *testing.T) {
 		want  []string
 	}{
 		{"\u0430", []string{"a"}},        // Cyrillic а → Latin a
-		{"hello", nil},                   // all ASCII, no change
+		{"hello", []string{"hello"}},     // all ASCII, passthrough
 		{"\u0430\u0435", []string{"ae"}}, // Cyrillic аe → Latin ae
 	}
 	for _, tt := range tests {
