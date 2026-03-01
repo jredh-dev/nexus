@@ -12,8 +12,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/jredh-dev/nexus/cmd/client-tui/internal/app"
-	pb "github.com/jredh-dev/nexus/cmd/client-tui/proto"
+	"github.com/jredh-dev/nexus/cmd/tui/internal/app"
+	pb "github.com/jredh-dev/nexus/cmd/tui/proto"
 )
 
 // --- Mock HermitClient ---

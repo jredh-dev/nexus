@@ -4,14 +4,14 @@
 // encode is a build helper that XOR-obfuscates a plaintext value.
 // Usage:
 //
-//	go run ./cmd/client-tui/internal/obf/encode <plaintext> <passphrase>
+//	go run ./cmd/tui/internal/obf/encode <plaintext> <passphrase>
 package main
 
 import (
 	"fmt"
 	"os"
 
-	"github.com/jredh-dev/nexus/cmd/client-tui/internal/obf"
+	"github.com/jredh-dev/nexus/cmd/tui/internal/obf"
 )
 
 func main() {
