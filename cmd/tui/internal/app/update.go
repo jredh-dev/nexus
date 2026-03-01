@@ -556,12 +556,10 @@ func (m Model) handleSecretSubmit(msg secretSubmitMsg) (tea.Model, tea.Cmd) {
 	r := msg.result
 	var text string
 	switch {
-	case r.SelfBetrayal:
-		text = fmt.Sprintf("SELF-BETRAYAL  %q → lie (palindrome)", r.Secret.Value)
 	case r.WasNew:
-		text = fmt.Sprintf("TRUTH  %q submitted", r.Secret.Value)
+		text = fmt.Sprintf("SECRET  %q admitted (count=%d)", r.Secret.Value, r.Secret.Count)
 	default:
-		text = fmt.Sprintf("LIE  %q exposed as equivalent", r.Secret.Value)
+		text = fmt.Sprintf("EXPOSED  %q admitted again (count=%d)", r.Secret.Value, r.Secret.Count)
 	}
 	if r.Message != "" {
 		text += "  " + r.Message

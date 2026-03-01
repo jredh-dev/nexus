@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jredh-dev/nexus/services/go-http/internal/store"
+	"github.com/jredh-dev/nexus/services/secrets/internal/store"
 )
 
 func TestWallEmpty(t *testing.T) {
@@ -12,27 +12,27 @@ func TestWallEmpty(t *testing.T) {
 	w := New(s)
 	defer w.Stop()
 
-	text, pageIdx, totalPages, totalLies := w.Page()
-	if text != "" || pageIdx != 0 || totalPages != 0 || totalLies != 0 {
-		t.Fatalf("expected empty wall, got text=%q page=%d/%d lies=%d", text, pageIdx, totalPages, totalLies)
+	text, pageIdx, totalPages, totalExposed := w.Page()
+	if text != "" || pageIdx != 0 || totalPages != 0 || totalExposed != 0 {
+		t.Fatalf("expected empty wall, got text=%q page=%d/%d exposed=%d", text, pageIdx, totalPages, totalExposed)
 	}
 }
 
 func TestWallSinglePage(t *testing.T) {
 	s := store.New()
 
-	// Submit and betray some secrets
+	// Submit and expose some secrets via count > 1
 	s.Submit("hello", "alice")
-	s.Submit("Hello", "bob") // casefold collision → "hello" becomes lie
+	s.Submit("Hello", "bob") // casefold collision → count=2, no longer secret
 
-	s.Submit("racecar", "charlie") // palindrome self-betrayal
+	s.Submit("racecar", "charlie") // palindrome — still count=1, is a secret
 
 	w := New(s)
 	defer w.Stop()
 
-	text, pageIdx, totalPages, totalLies := w.Page()
-	if totalLies != 2 {
-		t.Fatalf("expected 2 lies, got %d", totalLies)
+	text, pageIdx, totalPages, totalExposed := w.Page()
+	if totalExposed != 1 {
+		t.Fatalf("expected 1 exposed, got %d", totalExposed)
 	}
 	if totalPages != 1 {
 		t.Fatalf("expected 1 page, got %d", totalPages)
@@ -48,14 +48,13 @@ func TestWallSinglePage(t *testing.T) {
 func TestWallRoundRobin(t *testing.T) {
 	s := store.New()
 
-	// Create enough lies to span multiple pages.
-	// We need > PageSize lies. Each pair of submits creates 1 lie.
-	// Submit unique values, then betray them.
+	// Create enough exposed entries to span multiple pages.
+	// Each pair of submits (same value via casefold) creates 1 exposed entry.
 	for i := 0; i < PageSize+500; i++ {
 		val := "secret-" + itoa(i)
 		s.Submit(val, "seeder")
 	}
-	// Betray them all — submit again with different case
+	// Expose them all — submit again with different case
 	for i := 0; i < PageSize+500; i++ {
 		val := "Secret-" + itoa(i) // CaseFold collision
 		s.Submit(val, "exposer")
@@ -64,9 +63,9 @@ func TestWallRoundRobin(t *testing.T) {
 	w := New(s)
 	defer w.Stop()
 
-	_, _, totalPages, totalLies := w.Page()
-	if totalLies != PageSize+500 {
-		t.Fatalf("expected %d lies, got %d", PageSize+500, totalLies)
+	_, _, totalPages, totalExposed := w.Page()
+	if totalExposed != PageSize+500 {
+		t.Fatalf("expected %d exposed, got %d", PageSize+500, totalExposed)
 	}
 	if totalPages != 2 {
 		t.Fatalf("expected 2 pages, got %d", totalPages)
@@ -84,14 +83,21 @@ func TestWallTextContent(t *testing.T) {
 	s := store.New()
 
 	s.Submit("alpha", "user1")
-	s.Submit("Alpha", "user2") // exposes "alpha"
+	s.Submit("Alpha", "user2") // exposes "alpha" (count=2)
 
-	s.Submit("kayak", "user3") // palindrome self-betrayal
+	// "kayak" is a palindrome, but in the new model palindromes don't
+	// self-betray — they're just count=1 secrets. To get a second exposed
+	// entry, we need another collision.
+	s.Submit("beta", "user3")
+	s.Submit("Beta", "user4") // exposes "beta" (count=2)
 
 	w := New(s)
 	defer w.Stop()
 
-	text, _, _, _ := w.Page()
+	text, _, _, totalExposed := w.Page()
+	if totalExposed != 2 {
+		t.Fatalf("expected 2 exposed, got %d", totalExposed)
+	}
 	lines := strings.Split(text, "\n")
 	if len(lines) != 2 {
 		t.Fatalf("expected 2 lines, got %d: %v", len(lines), lines)

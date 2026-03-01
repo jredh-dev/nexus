@@ -10,7 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	pb "github.com/jredh-dev/nexus/cmd/client-tui/proto"
+	pb "github.com/jredh-dev/nexus/cmd/tui/proto"
 )
 
 // --- Styles ---
@@ -362,8 +362,8 @@ func (m Model) renderSecretsListPanel(innerW, maxLines int) string {
 	var b strings.Builder
 	stats := m.secretsStats
 	b.WriteString(titleStyle.Render("Secrets") +
-		dimStyle.Render(fmt.Sprintf("  total:%d  truths:%d  lies:%d  lenses:%d",
-			stats.Total, stats.Truths, stats.Lies, stats.Lenses)))
+		dimStyle.Render(fmt.Sprintf("  total:%d  secrets:%d  exposed:%d  lenses:%d",
+			stats.Total, stats.Secrets, stats.NotSecrets, stats.Lenses)))
 	b.WriteString("\n\n")
 
 	if len(m.secretsList) == 0 {
@@ -380,13 +380,17 @@ func (m Model) renderSecretsListPanel(innerW, maxLines int) string {
 		}
 		for _, s := range list {
 			stateColor := lipgloss.Color("#00FF88")
-			if s.State == "lie" {
+			stateLabel := "secret"
+			if !s.IsSecret() {
 				stateColor = lipgloss.Color("#FF4444")
+				stateLabel = "exposed"
 			}
-			stateTag := lipgloss.NewStyle().Foreground(stateColor).Render(s.State)
-			line := fmt.Sprintf("[%s] %s  %s",
+			stateTag := lipgloss.NewStyle().Foreground(stateColor).Render(stateLabel)
+			countInfo := dimStyle.Render(fmt.Sprintf("x%d", s.Count))
+			line := fmt.Sprintf("[%s] %s  %s  %s",
 				stateTag,
 				valueStyle.Render(s.Value),
+				countInfo,
 				dimStyle.Render("by "+s.SubmittedBy),
 			)
 			if len(line) > innerW {

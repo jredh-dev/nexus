@@ -12,8 +12,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/jredh-dev/nexus/cmd/client-tui/internal/app"
-	pb "github.com/jredh-dev/nexus/cmd/client-tui/proto"
+	"github.com/jredh-dev/nexus/cmd/tui/internal/app"
+	pb "github.com/jredh-dev/nexus/cmd/tui/proto"
 )
 
 // --- Mock HermitClient ---
@@ -233,9 +233,9 @@ func newSecretsTestServer(t *testing.T) (*httptest.Server, *secretsState) {
 	t.Helper()
 	state := &secretsState{
 		secrets: []app.Secret{
-			{ID: "1", Value: "hello", SubmittedBy: "alice", State: "truth"},
+			{ID: "1", Value: "hello", SubmittedBy: "alice", Count: 1},
 		},
-		stats: app.SecretsStats{Total: 1, Truths: 1},
+		stats: app.SecretsStats{Total: 1, Secrets: 1},
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/secrets", func(w http.ResponseWriter, r *http.Request) {
@@ -253,11 +253,11 @@ func newSecretsTestServer(t *testing.T) (*httptest.Server, *secretsState) {
 				ID:          fmt.Sprintf("%d", len(state.secrets)+1),
 				Value:       req.Value,
 				SubmittedBy: req.SubmittedBy,
-				State:       "truth",
+				Count:       1,
 			}
 			state.secrets = append(state.secrets, s)
 			state.stats.Total++
-			state.stats.Truths++
+			state.stats.Secrets++
 			result := app.SubmitResult{Secret: &s, WasNew: true, Message: "submitted"}
 			json.NewEncoder(w).Encode(result) //nolint:errcheck
 		}
