@@ -1,4 +1,4 @@
-name: Deploy Secrets to Cloud Run (DEV)
+name: Deploy go-http to Cloud Run (DEV)
 
 on:
   push:
@@ -18,7 +18,7 @@ env:
 
 jobs:
   deploy:
-    name: Build and Deploy Secrets to Cloud Run DEV
+    name: Build and Deploy go-http to Cloud Run DEV
     runs-on: ubuntu-latest
     permissions:
       contents: read
