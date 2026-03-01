@@ -1,0 +1,106 @@
+name: Deploy go-http to Cloud Run (DEV)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'services/go-http/**'
+      - 'go.mod'
+      - 'go.sum'
+  workflow_dispatch:
+
+env:
+  GCP_PROJECT_ID: dea-noctua
+  GCP_REGION: us-central1
+  SERVICE_NAME: nexus-secrets-dev
+  IMAGE_NAME: gcr.io/dea-noctua/nexus-secrets-dev
+
+jobs:
+  deploy:
+    name: Build and Deploy go-http to Cloud Run DEV
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set version variables
+        id: version
+        run: |
+          VERSION="v0.0.1.$(git rev-list --count HEAD)"
+          COMMIT=$(git rev-parse --short HEAD)
+          BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "COMMIT=$COMMIT" >> $GITHUB_OUTPUT
+          echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION (commit: $COMMIT)"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --build-arg VERSION=${{ steps.version.outputs.VERSION }} \
+            --build-arg COMMIT=${{ steps.version.outputs.COMMIT }} \
+            --build-arg BUILD_DATE=${{ steps.version.outputs.BUILD_DATE }} \
+            -f services/go-http/Dockerfile \
+            -t ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }} \
+            -t ${{ env.IMAGE_NAME }}:latest \
+            .
+
+      - name: Push Docker image to GCR
+        run: |
+          docker push ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+          docker push ${{ env.IMAGE_NAME }}:latest
+
+      - name: Deploy to Cloud Run
+        run: |
+          VERSION_LABEL=$(echo "${{ steps.version.outputs.VERSION }}" | tr '.' '-')
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }} \
+            --region ${{ env.GCP_REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --port 8080 \
+            --memory 256Mi \
+            --cpu 1 \
+            --min-instances 0 \
+            --max-instances 5 \
+            --set-env-vars "ENVIRONMENT=dev" \
+            --service-account ${{ secrets.WIF_SERVICE_ACCOUNT }} \
+            --labels "environment=dev,app=nexus-secrets,version=$VERSION_LABEL"
+
+      - name: Get service URL
+        id: service-url
+        run: |
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region ${{ env.GCP_REGION }} \
+            --format 'value(status.url)')
+          echo "url=$SERVICE_URL" >> $GITHUB_OUTPUT
+          echo "Service deployed to: $SERVICE_URL"
+
+      - name: Summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: DEV" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ steps.version.outputs.COMMIT }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Service URL**: ${{ steps.service-url.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY

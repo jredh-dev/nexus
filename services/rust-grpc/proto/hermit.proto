@@ -1,0 +1,83 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2026 Jared Redh. All rights reserved.
+
+syntax = "proto3";
+
+package hermit;
+
+option go_package = "github.com/jredh-dev/hermit/cmd/tui/proto";
+
+import "google/protobuf/timestamp.proto";
+
+service Hermit {
+  // Ping returns server liveness + round-trip timing metadata.
+  rpc Ping(PingRequest) returns (PingResponse);
+
+  // Benchmark runs a latency test: server timestamps request receipt and
+  // response dispatch so the client can compute wire time vs processing time.
+  rpc Benchmark(BenchmarkRequest) returns (BenchmarkResponse);
+
+  // Login authenticates a client session. Hardcoded success for now.
+  rpc Login(LoginRequest) returns (LoginResponse);
+
+  // ServerInfo returns server metadata (version, region, uptime).
+  rpc ServerInfo(ServerInfoRequest) returns (ServerInfoResponse);
+}
+
+message PingRequest {
+  // Client-side monotonic timestamp in nanoseconds (for RTT calculation).
+  int64 client_send_ns = 1;
+}
+
+message PingResponse {
+  int64 client_send_ns = 1;
+  int64 server_recv_ns = 2;
+  int64 server_send_ns = 3;
+}
+
+message BenchmarkRequest {
+  // Number of sequential pings to run server-side for statistical measurement.
+  uint32 iterations = 1;
+  // Payload size in bytes for bandwidth testing (0 = latency-only).
+  uint32 payload_bytes = 2;
+}
+
+message BenchmarkResponse {
+  // Per-iteration timing in nanoseconds.
+  repeated int64 latencies_ns = 1;
+  // Aggregate stats.
+  int64 min_ns = 2;
+  int64 max_ns = 3;
+  int64 mean_ns = 4;
+  int64 p50_ns = 5;
+  int64 p99_ns = 6;
+  // Server-side processing overhead per iteration.
+  int64 processing_overhead_ns = 7;
+  // Whether TLS was active on this connection.
+  bool tls_active = 8;
+  string tls_version = 9;
+}
+
+message LoginRequest {
+  string username = 1;
+  string token = 2;
+}
+
+message LoginResponse {
+  bool success = 1;
+  string session_id = 2;
+  string error = 3;
+}
+
+message ServerInfoRequest {}
+
+message ServerInfoResponse {
+  string version = 1;
+  string region = 2;
+  google.protobuf.Timestamp started_at = 3;
+  int64 uptime_seconds = 4;
+  string rust_version = 5;
+  bool tls_enabled = 6;
+  uint32 grpc_port = 7;
+  uint32 tcp_port = 8;
+}

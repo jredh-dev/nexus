@@ -18,12 +18,12 @@ jobs:
         run: |
           CHANGED=$(git diff --name-only HEAD~1 HEAD)
 
-          # fool — Go TUI client
-          if echo "$CHANGED" | grep -qE '^(cmd/fool/|go\.(mod|sum)$)'; then
-            echo "==> Installing fool"
-            go install ./cmd/fool
+          # client-tui — Go TUI client
+          if echo "$CHANGED" | grep -qE '^(cmd/client-tui/|go\.(mod|sum)$)'; then
+            echo "==> Installing client-tui"
+            go install ./cmd/client-tui
           else
-            echo "--- fool: no changes"
+            echo "--- client-tui: no changes"
           fi
 
           # server — root server
