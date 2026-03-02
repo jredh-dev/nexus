@@ -2,8 +2,11 @@
 
 use crate::hermit::{
     hermit_server::{Hermit, HermitServer},
-    BenchmarkRequest, BenchmarkResponse, LoginRequest, LoginResponse,
+    BenchmarkRequest, BenchmarkResponse, DbStatsRequest, DbStatsResponse,
+    KvGetRequest, KvGetResponse, KvListRequest, KvListResponse,
+    KvSetRequest, KvSetResponse, LoginRequest, LoginResponse,
     PingRequest, PingResponse, ServerInfoRequest, ServerInfoResponse,
+    SqlInsertRequest, SqlInsertResponse, SqlQueryRequest, SqlQueryResponse,
 };
 use crate::bench;
 use crate::tls::TlsConfig;
@@ -127,6 +130,48 @@ impl Hermit for HermitService {
             tcp_port: self.state.tcp_port as u32,
         }))
     }
+
+    async fn kv_set(
+        &self,
+        _req: Request<KvSetRequest>,
+    ) -> Result<Response<KvSetResponse>, Status> {
+        Err(Status::unimplemented("not yet implemented"))
+    }
+
+    async fn kv_get(
+        &self,
+        _req: Request<KvGetRequest>,
+    ) -> Result<Response<KvGetResponse>, Status> {
+        Err(Status::unimplemented("not yet implemented"))
+    }
+
+    async fn kv_list(
+        &self,
+        _req: Request<KvListRequest>,
+    ) -> Result<Response<KvListResponse>, Status> {
+        Err(Status::unimplemented("not yet implemented"))
+    }
+
+    async fn sql_insert(
+        &self,
+        _req: Request<SqlInsertRequest>,
+    ) -> Result<Response<SqlInsertResponse>, Status> {
+        Err(Status::unimplemented("not yet implemented"))
+    }
+
+    async fn sql_query(
+        &self,
+        _req: Request<SqlQueryRequest>,
+    ) -> Result<Response<SqlQueryResponse>, Status> {
+        Err(Status::unimplemented("not yet implemented"))
+    }
+
+    async fn db_stats(
+        &self,
+        _req: Request<DbStatsRequest>,
+    ) -> Result<Response<DbStatsResponse>, Status> {
+        Err(Status::unimplemented("not yet implemented"))
+    }
 }
 
 pub async fn serve(
@@ -147,7 +192,7 @@ pub async fn serve(
 
     tonic::transport::Server::builder()
         .tls_config(tls)?
-        .add_service(HermitServer::new(svc))
+        .add_service(HermitServer::with_interceptor(svc, crate::auth::secret_interceptor))
         .serve(addr)
         .await?;
 
