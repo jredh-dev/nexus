@@ -453,7 +453,6 @@ type ServerInfoResponse struct {
 	RustVersion   string                 `protobuf:"bytes,5,opt,name=rust_version,json=rustVersion,proto3" json:"rust_version,omitempty"`
 	TlsEnabled    bool                   `protobuf:"varint,6,opt,name=tls_enabled,json=tlsEnabled,proto3" json:"tls_enabled,omitempty"`
 	GrpcPort      uint32                 `protobuf:"varint,7,opt,name=grpc_port,json=grpcPort,proto3" json:"grpc_port,omitempty"`
-	TcpPort       uint32                 `protobuf:"varint,8,opt,name=tcp_port,json=tcpPort,proto3" json:"tcp_port,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -533,13 +532,6 @@ func (x *ServerInfoResponse) GetTlsEnabled() bool {
 func (x *ServerInfoResponse) GetGrpcPort() uint32 {
 	if x != nil {
 		return x.GrpcPort
-	}
-	return 0
-}
-
-func (x *ServerInfoResponse) GetTcpPort() uint32 {
-	if x != nil {
-		return x.TcpPort
 	}
 	return 0
 }

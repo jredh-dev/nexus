@@ -50,8 +50,6 @@ type Model struct {
 
 	// Benchmark
 	grpcBench    *pb.BenchmarkResponse
-	tcpPlain     *tcpBenchResultMsg
-	tcpTLS       *tcpBenchResultMsg
 	benchRunning bool
 
 	// DB Console

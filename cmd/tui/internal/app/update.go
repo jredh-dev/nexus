@@ -36,9 +36,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case benchmarkResultMsg:
 		return m.handleBenchmarkResult(msg)
 
-	case tcpBenchResultMsg:
-		return m.handleTCPBenchResult(msg)
-
 	case dbStatsMsg:
 		return m.handleDbStats(msg)
 
@@ -191,9 +188,7 @@ func (m Model) executeMenuItem() (tea.Model, tea.Cmd) {
 		m.state = stateBenchmark
 		m.benchRunning = true
 		m.grpcBench = nil
-		m.tcpPlain = nil
-		m.tcpTLS = nil
-		return m, tea.Batch(m.doBenchmark(), m.doTCPBench(false), m.doTCPBench(true))
+		return m, m.doBenchmark()
 	case "Secrets":
 		m.state = stateSecrets
 		m.secretsInput = ""
@@ -389,25 +384,6 @@ func (m Model) doBenchmark() tea.Cmd {
 	}
 }
 
-func (m Model) doTCPBench(encrypted bool) tea.Cmd {
-	return func() tea.Msg {
-		port := 9091
-		if encrypted {
-			port = 9093
-		}
-		host := m.addr
-		if idx := strings.Index(host, ":"); idx != -1 {
-			host = host[:idx]
-		}
-		addr := fmt.Sprintf("%s:%d", host, port)
-		if m.hermit == nil {
-			return tcpBenchResultMsg{encrypted: encrypted, err: fmt.Errorf("not connected")}
-		}
-		rtt, err := m.hermit.TCPPing(addr, encrypted)
-		return tcpBenchResultMsg{encrypted: encrypted, rttNs: rtt, err: err}
-	}
-}
-
 func (m Model) doDbStats() tea.Cmd {
 	return func() tea.Msg {
 		if m.hermit == nil {
@@ -480,18 +456,7 @@ func (m Model) handleBenchmarkResult(msg benchmarkResultMsg) (tea.Model, tea.Cmd
 	} else {
 		m.grpcBench = msg.resp
 	}
-	m.checkBenchDone()
-	return m, nil
-}
-
-func (m Model) handleTCPBenchResult(msg tcpBenchResultMsg) (tea.Model, tea.Cmd) {
-	cp := msg
-	if msg.encrypted {
-		m.tcpTLS = &cp
-	} else {
-		m.tcpPlain = &cp
-	}
-	m.checkBenchDone()
+	m.benchRunning = false
 	return m, nil
 }
 
@@ -569,10 +534,4 @@ func (m Model) handleSecretSubmit(msg secretSubmitMsg) (tea.Model, tea.Cmd) {
 		m.secretsLog = m.secretsLog[len(m.secretsLog)-50:]
 	}
 	return m, tea.Batch(m.doSecretsList(), m.doSecretsStats())
-}
-
-func (m *Model) checkBenchDone() {
-	if m.grpcBench != nil && m.tcpPlain != nil && m.tcpTLS != nil {
-		m.benchRunning = false
-	}
 }

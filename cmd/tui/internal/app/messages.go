@@ -23,12 +23,6 @@ type benchmarkResultMsg struct {
 	err  error
 }
 
-type tcpBenchResultMsg struct {
-	encrypted bool
-	rttNs     int64
-	err       error
-}
-
 type dbStatsMsg struct {
 	resp *pb.DbStatsResponse
 	err  error
