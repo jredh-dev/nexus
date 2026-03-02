@@ -13,15 +13,16 @@ All files use the `research` build tag and are excluded from default compilation
 | Algorithm | File | Status |
 |-----------|------|--------|
 | BPE Tokenizer | `microtokenizer.go` | Done |
+| Flash Attention | `microflash.go` | Done |
 
 ## Run
 
 ```bash
-go test -tags research -run TestBPE -v ./research/ml/
+go test -tags research -v ./research/ml/
 go test -tags research -bench=. -benchmem ./research/ml/
 ```
 
-To run the demo interactively, call `ml.RunMicrotokenizer()` from a tagged main or test.
+To run demos interactively, call `ml.RunMicrotokenizer()` or `ml.RunMicroflash()` from a tagged main or test.
 
 ## Design
 
