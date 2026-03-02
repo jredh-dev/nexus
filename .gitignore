@@ -40,3 +40,7 @@ CONTEXT.md
 
 # Rust build artifacts
 target/
+
+# nomagic: downloaded datasets and compiled binaries
+names.txt
+/microtokenizer
