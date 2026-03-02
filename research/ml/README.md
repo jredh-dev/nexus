@@ -19,6 +19,7 @@ All files use the `research` build tag and are excluded from default compilation
 | Quantization | `microquant.go` | Done |
 | Decoding Strategies | `microbeam.go` | Done |
 | KV Cache | `microkv.go` | Done |
+| RAG | `microrag.go` | Done |
 
 ## Run
 
@@ -27,7 +28,7 @@ go test -tags research -v ./research/ml/
 go test -tags research -bench=. -benchmem ./research/ml/
 ```
 
-To run demos interactively, call `ml.RunMicrotokenizer()`, `ml.RunMicroflash()`, `ml.RunMicrogpt()`, `ml.RunMicroquant()`, `ml.RunMicrobeam()`, or `ml.RunMicrokv()` from a tagged main or test.
+To run demos interactively, call `ml.RunMicrotokenizer()`, `ml.RunMicroflash()`, `ml.RunMicrogpt()`, `ml.RunMicroquant()`, `ml.RunMicrobeam()`, `ml.RunMicrokv()`, or `ml.RunMicrorag()` from a tagged main or test.
 
 ## Design
 
