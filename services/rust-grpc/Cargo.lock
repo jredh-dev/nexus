@@ -483,7 +483,6 @@ dependencies = [
  "rustls",
  "rustls-pemfile",
  "tokio",
- "tokio-rustls",
  "tonic",
  "tonic-build",
  "tracing",

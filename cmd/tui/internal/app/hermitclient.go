@@ -6,9 +6,7 @@ package app
 import (
 	"context"
 	"crypto/tls"
-	"encoding/binary"
 	"fmt"
-	"net"
 	"time"
 
 	pb "github.com/jredh-dev/nexus/cmd/tui/proto"
@@ -32,7 +30,6 @@ type HermitClient interface {
 	SqlInsert(key, value string) (*pb.SqlInsertResponse, error)
 	SqlQuery(keyFilter string, limit uint32) (*pb.SqlQueryResponse, error)
 	DbStats() (*pb.DbStatsResponse, error)
-	TCPPing(addr string, encrypted bool) (rttNs int64, err error)
 	Close()
 }
 
@@ -133,56 +130,8 @@ func (c *grpcHermitClient) DbStats() (*pb.DbStatsResponse, error) {
 	return c.client.DbStats(ctx, &pb.DbStatsRequest{})
 }
 
-func (c *grpcHermitClient) TCPPing(addr string, encrypted bool) (int64, error) {
-	start := time.Now()
-	var conn net.Conn
-	var err error
-	if encrypted {
-		conn, err = tls.DialWithDialer(
-			&net.Dialer{Timeout: 5 * time.Second}, "tcp", addr,
-			&tls.Config{InsecureSkipVerify: true}, //nolint:gosec
-		)
-	} else {
-		conn, err = net.DialTimeout("tcp", addr, 5*time.Second)
-	}
-	if err != nil {
-		return 0, fmt.Errorf("tcp connect %s: %w", addr, err)
-	}
-	defer conn.Close()
-
-	payload := []byte("FOOL_PING")
-	lenBuf := make([]byte, 4)
-	binary.LittleEndian.PutUint32(lenBuf, uint32(len(payload)))
-	if _, err := conn.Write(lenBuf); err != nil {
-		return 0, err
-	}
-	if _, err := conn.Write(payload); err != nil {
-		return 0, err
-	}
-	resp := make([]byte, 16+len(payload))
-	if _, err := readFull(conn, resp); err != nil {
-		return 0, err
-	}
-	rtt := time.Since(start)
-	binary.LittleEndian.PutUint32(lenBuf, 0)
-	conn.Write(lenBuf) //nolint:errcheck
-	return rtt.Nanoseconds(), nil
-}
-
 func (c *grpcHermitClient) Close() {
 	if c.conn != nil {
 		c.conn.Close()
 	}
-}
-
-func readFull(conn net.Conn, buf []byte) (int, error) {
-	total := 0
-	for total < len(buf) {
-		n, err := conn.Read(buf[total:])
-		total += n
-		if err != nil {
-			return total, err
-		}
-	}
-	return total, nil
 }

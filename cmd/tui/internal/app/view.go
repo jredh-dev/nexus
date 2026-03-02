@@ -207,7 +207,6 @@ func serverInfoLines(si *pb.ServerInfoResponse) []string {
 		fmt.Sprintf("Uptime:    %s", valueStyle.Render(fmt.Sprintf("%ds", si.UptimeSeconds))),
 		fmt.Sprintf("TLS:       %s", valueStyle.Render(fmt.Sprintf("%v", si.TlsEnabled))),
 		fmt.Sprintf("gRPC Port: %s", valueStyle.Render(fmt.Sprintf("%d", si.GrpcPort))),
-		fmt.Sprintf("TCP Port:  %s", valueStyle.Render(fmt.Sprintf("%d", si.TcpPort))),
 	}
 }
 
@@ -256,26 +255,6 @@ func (m Model) renderBenchPanel(innerW, _ int) string {
 			valueStyle.Render(fmtNs(gb.ProcessingOverheadNs)),
 			valueStyle.Render(gb.TlsVersion),
 		))
-	}
-
-	for _, tcp := range []struct {
-		label string
-		r     *tcpBenchResultMsg
-	}{
-		{"TCP (Plaintext)", m.tcpPlain},
-		{"TCP (TLS 1.3)", m.tcpTLS},
-	} {
-		if tcp.r == nil {
-			continue
-		}
-		b.WriteString("\n")
-		b.WriteString(titleStyle.Render(tcp.label))
-		b.WriteString("\n")
-		if tcp.r.err != nil {
-			b.WriteString(errStyle.Render("  " + tcp.r.err.Error()))
-		} else {
-			b.WriteString(fmt.Sprintf("  RTT: %s\n", valueStyle.Render(fmtNs(tcp.r.rttNs))))
-		}
 	}
 
 	return b.String()

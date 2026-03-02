@@ -20,7 +20,6 @@ pub struct ServerState {
     pub started_at: SystemTime,
     pub start_instant: Instant,
     pub grpc_port: u16,
-    pub tcp_port: u16,
 }
 
 pub struct HermitService {
@@ -124,7 +123,6 @@ impl Hermit for HermitService {
             rust_version: env!("CARGO_PKG_VERSION").to_string(),
             tls_enabled: self.tls_enabled,
             grpc_port: self.state.grpc_port as u32,
-            tcp_port: self.state.tcp_port as u32,
         }))
     }
 }

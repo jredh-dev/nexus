@@ -6,7 +6,6 @@ pub mod hermit {
 }
 
 mod grpc;
-mod tcp;
 mod tls;
 mod bench;
 
@@ -20,14 +19,6 @@ struct Args {
     /// gRPC listen port
     #[arg(long, default_value_t = 9090)]
     grpc_port: u16,
-
-    /// Raw TCP benchmark port (unencrypted)
-    #[arg(long, default_value_t = 9091)]
-    tcp_port: u16,
-
-    /// TLS-encrypted TCP benchmark port
-    #[arg(long, default_value_t = 9093)]
-    tls_port: u16,
 
     /// Region identifier for ServerInfo
     #[arg(long, default_value = "us-west1")]
@@ -66,7 +57,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         started_at,
         start_instant: start_time,
         grpc_port: args.grpc_port,
-        tcp_port: args.tcp_port,
     });
 
     // Resolve TLS config (load from files or generate self-signed)
@@ -74,28 +64,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!(
         grpc_port = args.grpc_port,
-        tcp_port = args.tcp_port,
-        tls_port = args.tls_port,
         region = %args.region,
         "hermit-server starting"
     );
 
-    // Spawn all listeners concurrently
-    let grpc_handle = tokio::spawn(grpc::serve(args.grpc_port, server_state.clone(), tls_cfg.clone()));
-    let tcp_handle = tokio::spawn(tcp::serve_plaintext(args.tcp_port));
-    let tls_handle = tokio::spawn(tcp::serve_tls(args.tls_port, tls_cfg));
-
-    // Wait for any to finish (they shouldn't unless error)
-    tokio::select! {
-        r = grpc_handle => {
-            error!("gRPC server exited: {:?}", r);
-        }
-        r = tcp_handle => {
-            error!("TCP server exited: {:?}", r);
-        }
-        r = tls_handle => {
-            error!("TLS server exited: {:?}", r);
-        }
+    // Run gRPC server (only listener for Cloud Run single-port)
+    if let Err(e) = grpc::serve(args.grpc_port, server_state, tls_cfg).await {
+        error!("gRPC server exited with error: {:?}", e);
     }
 
     Ok(())

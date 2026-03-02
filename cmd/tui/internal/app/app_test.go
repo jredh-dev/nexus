@@ -54,9 +54,8 @@ func (m *mockHermit) SqlInsert(_, _ string) (*pb.SqlInsertResponse, error) {
 func (m *mockHermit) SqlQuery(_ string, _ uint32) (*pb.SqlQueryResponse, error) {
 	return &pb.SqlQueryResponse{}, nil
 }
-func (m *mockHermit) DbStats() (*pb.DbStatsResponse, error)   { return m.dbStats, m.dbStatsErr }
-func (m *mockHermit) TCPPing(_ string, _ bool) (int64, error) { return 1_000_000, nil }
-func (m *mockHermit) Close()                                  {}
+func (m *mockHermit) DbStats() (*pb.DbStatsResponse, error) { return m.dbStats, m.dbStatsErr }
+func (m *mockHermit) Close()                                {}
 
 // --- Test helpers ---
 

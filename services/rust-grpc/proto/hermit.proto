@@ -79,5 +79,4 @@ message ServerInfoResponse {
   string rust_version = 5;
   bool tls_enabled = 6;
   uint32 grpc_port = 7;
-  uint32 tcp_port = 8;
 }
