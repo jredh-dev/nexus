@@ -6,9 +6,10 @@ pub mod hermit {
 }
 
 mod auth;
+mod bench;
+mod db;
 mod grpc;
 mod tls;
-mod bench;
 
 use clap::Parser;
 use std::sync::Arc;
@@ -69,8 +70,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "hermit-server starting"
     );
 
+    let database = Arc::new(db::Database::new());
+
     // Run gRPC server (only listener for Cloud Run single-port)
-    if let Err(e) = grpc::serve(args.grpc_port, server_state, tls_cfg).await {
+    if let Err(e) = grpc::serve(args.grpc_port, server_state, tls_cfg, database).await {
         error!("gRPC server exited with error: {:?}", e);
     }
 

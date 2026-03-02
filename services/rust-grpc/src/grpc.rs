@@ -6,9 +6,10 @@ use crate::hermit::{
     KvGetRequest, KvGetResponse, KvListRequest, KvListResponse,
     KvSetRequest, KvSetResponse, LoginRequest, LoginResponse,
     PingRequest, PingResponse, ServerInfoRequest, ServerInfoResponse,
-    SqlInsertRequest, SqlInsertResponse, SqlQueryRequest, SqlQueryResponse,
+    SqlInsertRequest, SqlInsertResponse, SqlQueryRequest, SqlQueryResponse, SqlRow,
 };
 use crate::bench;
+use crate::db::Database;
 use crate::tls::TlsConfig;
 
 use prost_types::Timestamp;
@@ -28,6 +29,7 @@ pub struct ServerState {
 pub struct HermitService {
     state: Arc<ServerState>,
     tls_enabled: bool,
+    db: Arc<Database>,
 }
 
 #[tonic::async_trait]
@@ -131,44 +133,111 @@ impl Hermit for HermitService {
 
     async fn kv_set(
         &self,
-        _req: Request<KvSetRequest>,
+        req: Request<KvSetRequest>,
     ) -> Result<Response<KvSetResponse>, Status> {
-        Err(Status::unimplemented("not yet implemented"))
+        let inner = req.into_inner();
+        match self.db.kv_set(inner.key, inner.value) {
+            Ok(()) => Ok(Response::new(KvSetResponse {
+                ok: true,
+                error: String::new(),
+            })),
+            Err(e) => Ok(Response::new(KvSetResponse {
+                ok: false,
+                error: e,
+            })),
+        }
     }
 
     async fn kv_get(
         &self,
-        _req: Request<KvGetRequest>,
+        req: Request<KvGetRequest>,
     ) -> Result<Response<KvGetResponse>, Status> {
-        Err(Status::unimplemented("not yet implemented"))
+        let inner = req.into_inner();
+        match self.db.kv_get(&inner.key) {
+            Ok(Some(value)) => Ok(Response::new(KvGetResponse {
+                found: true,
+                value,
+                error: String::new(),
+            })),
+            Ok(None) => Ok(Response::new(KvGetResponse {
+                found: false,
+                value: Vec::new(),
+                error: String::new(),
+            })),
+            Err(e) => Ok(Response::new(KvGetResponse {
+                found: false,
+                value: Vec::new(),
+                error: e,
+            })),
+        }
     }
 
     async fn kv_list(
         &self,
         _req: Request<KvListRequest>,
     ) -> Result<Response<KvListResponse>, Status> {
-        Err(Status::unimplemented("not yet implemented"))
+        match self.db.kv_list() {
+            Ok(keys) => Ok(Response::new(KvListResponse { keys })),
+            Err(e) => Err(Status::internal(e)),
+        }
     }
 
     async fn sql_insert(
         &self,
-        _req: Request<SqlInsertRequest>,
+        req: Request<SqlInsertRequest>,
     ) -> Result<Response<SqlInsertResponse>, Status> {
-        Err(Status::unimplemented("not yet implemented"))
+        let inner = req.into_inner();
+        match self.db.sql_insert(inner.key, inner.value) {
+            Ok(_) => Ok(Response::new(SqlInsertResponse {
+                queued: true,
+                error: String::new(),
+            })),
+            Err(e) => Ok(Response::new(SqlInsertResponse {
+                queued: false,
+                error: e,
+            })),
+        }
     }
 
     async fn sql_query(
         &self,
-        _req: Request<SqlQueryRequest>,
+        req: Request<SqlQueryRequest>,
     ) -> Result<Response<SqlQueryResponse>, Status> {
-        Err(Status::unimplemented("not yet implemented"))
+        let inner = req.into_inner();
+        match self.db.sql_query(&inner.key_filter, inner.limit) {
+            Ok(result) => {
+                let rows = result
+                    .rows
+                    .into_iter()
+                    .map(|r| SqlRow {
+                        id: r.id,
+                        key: r.key,
+                        value: r.value,
+                        created_at_unix: r.created_at_unix,
+                    })
+                    .collect();
+                Ok(Response::new(SqlQueryResponse {
+                    rows,
+                    total_committed: result.total_committed,
+                    pending_writes: result.pending_writes,
+                }))
+            }
+            Err(e) => Err(Status::internal(e)),
+        }
     }
 
     async fn db_stats(
         &self,
         _req: Request<DbStatsRequest>,
     ) -> Result<Response<DbStatsResponse>, Status> {
-        Err(Status::unimplemented("not yet implemented"))
+        let (doc_count, doc_bytes) = self.db.kv_stats().map_err(Status::internal)?;
+        let (rel_rows, rel_pending) = self.db.rel_stats().map_err(Status::internal)?;
+        Ok(Response::new(DbStatsResponse {
+            doc_key_count: doc_count,
+            doc_compressed_bytes: doc_bytes,
+            rel_row_count: rel_rows,
+            rel_pending_writes: rel_pending,
+        }))
     }
 }
 
@@ -176,11 +245,13 @@ pub async fn serve(
     port: u16,
     state: Arc<ServerState>,
     tls_cfg: TlsConfig,
+    db: Arc<Database>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let addr = format!("0.0.0.0:{}", port).parse()?;
     let svc = HermitService {
         state,
         tls_enabled: true,
+        db,
     };
 
     let identity = tonic::transport::Identity::from_pem(&tls_cfg.cert_pem, &tls_cfg.key_pem);
