@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - 'services/secrets/**'
       - 'services/go-http/**'
       - 'go.mod'
       - 'go.sum'
@@ -59,7 +60,7 @@ jobs:
             --build-arg VERSION=${{ steps.version.outputs.VERSION }} \
             --build-arg COMMIT=${{ steps.version.outputs.COMMIT }} \
             --build-arg BUILD_DATE=${{ steps.version.outputs.BUILD_DATE }} \
-            -f services/go-http/Dockerfile \
+            -f services/secrets/Dockerfile \
             -t ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }} \
             -t ${{ env.IMAGE_NAME }}:latest \
             .

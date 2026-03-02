@@ -13,7 +13,7 @@ import (
 )
 
 // SecretsClient is the interface for the secrets REST API.
-// The real implementation talks to nexus/services/go-http over HTTP.
+// The real implementation talks to nexus/services/secrets over HTTP.
 // Tests inject a mock.
 type SecretsClient interface {
 	List() ([]Secret, error)
@@ -21,31 +21,31 @@ type SecretsClient interface {
 	Stats() (SecretsStats, error)
 }
 
-// --- Domain types (mirrors nexus/services/go-http/internal/store) ---
+// --- Domain types (mirrors nexus/services/secrets/internal/store) ---
 
 type Secret struct {
-	ID          string     `json:"id"`
-	Value       string     `json:"value"`
-	SubmittedBy string     `json:"submitted_by"`
-	State       string     `json:"state"` // "truth" | "lie"
-	ExposedBy   string     `json:"exposed_by,omitempty"`
-	ExposedVia  string     `json:"exposed_via,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	ExposedAt   *time.Time `json:"exposed_at,omitempty"`
+	ID          string    `json:"id"`
+	Value       string    `json:"value"`
+	SubmittedBy string    `json:"submitted_by"`
+	Count       int       `json:"count"`
+	CreatedAt   time.Time `json:"created_at"`
+	LastAdmitAt time.Time `json:"last_admit_at"`
 }
 
+// IsSecret returns true if this has only been admitted once.
+func (s *Secret) IsSecret() bool { return s.Count <= 1 }
+
 type SecretsStats struct {
-	Total  int `json:"total"`
-	Truths int `json:"truths"`
-	Lies   int `json:"lies"`
-	Lenses int `json:"lenses"`
+	Total      int `json:"total"`
+	Secrets    int `json:"secrets"`
+	NotSecrets int `json:"not_secrets"`
+	Lenses     int `json:"lenses"`
 }
 
 type SubmitResult struct {
-	Secret       *Secret `json:"secret"`
-	WasNew       bool    `json:"was_new"`
-	SelfBetrayal bool    `json:"self_betrayal,omitempty"`
-	Message      string  `json:"message"`
+	Secret  *Secret `json:"secret"`
+	WasNew  bool    `json:"was_new"`
+	Message string  `json:"message"`
 }
 
 // --- HTTP implementation ---
