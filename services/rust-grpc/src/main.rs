@@ -5,6 +5,7 @@ pub mod hermit {
     tonic::include_proto!("hermit");
 }
 
+mod auth;
 mod grpc;
 mod tls;
 mod bench;

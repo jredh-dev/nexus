@@ -5,7 +5,7 @@ syntax = "proto3";
 
 package hermit;
 
-option go_package = "github.com/jredh-dev/hermit/cmd/tui/proto";
+option go_package = "github.com/jredh-dev/nexus/cmd/tui/proto";
 
 import "google/protobuf/timestamp.proto";
 
@@ -22,6 +22,18 @@ service Hermit {
 
   // ServerInfo returns server metadata (version, region, uptime).
   rpc ServerInfo(ServerInfoRequest) returns (ServerInfoResponse);
+
+  // Key-value document store
+  rpc KvSet(KvSetRequest) returns (KvSetResponse);
+  rpc KvGet(KvGetRequest) returns (KvGetResponse);
+  rpc KvList(KvListRequest) returns (KvListResponse);
+
+  // Relational SQL-like store
+  rpc SqlInsert(SqlInsertRequest) returns (SqlInsertResponse);
+  rpc SqlQuery(SqlQueryRequest) returns (SqlQueryResponse);
+
+  // Database stats
+  rpc DbStats(DbStatsRequest) returns (DbStatsResponse);
 }
 
 message PingRequest {
@@ -79,4 +91,67 @@ message ServerInfoResponse {
   string rust_version = 5;
   bool tls_enabled = 6;
   uint32 grpc_port = 7;
+}
+
+message KvSetRequest {
+  string key = 1;
+  bytes value = 2;
+}
+
+message KvSetResponse {
+  bool ok = 1;
+  string error = 2;
+}
+
+message KvGetRequest {
+  string key = 1;
+}
+
+message KvGetResponse {
+  bool found = 1;
+  bytes value = 2;
+  string error = 3;
+}
+
+message KvListRequest {}
+
+message KvListResponse {
+  repeated string keys = 1;
+}
+
+message SqlInsertRequest {
+  string key = 1;
+  string value = 2;
+}
+
+message SqlInsertResponse {
+  bool queued = 1;
+  string error = 2;
+}
+
+message SqlQueryRequest {
+  string key_filter = 1;
+  uint32 limit = 2;
+}
+
+message SqlRow {
+  uint64 id = 1;
+  string key = 2;
+  string value = 3;
+  int64 created_at_unix = 4;
+}
+
+message SqlQueryResponse {
+  repeated SqlRow rows = 1;
+  uint64 total_committed = 2;
+  uint64 pending_writes = 3;
+}
+
+message DbStatsRequest {}
+
+message DbStatsResponse {
+  uint64 doc_key_count = 1;
+  uint64 doc_compressed_bytes = 2;
+  uint64 rel_row_count = 3;
+  uint64 rel_pending_writes = 4;
 }
