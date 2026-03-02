@@ -24,18 +24,18 @@ import (
 
 const (
 	// Model architecture
-	gptNEmbd   = 16                    // embedding dimension (d_model in Transformer papers)
-	gptNHead   = 4                     // number of attention heads
-	gptNLayer  = 1                     // number of transformer blocks
-	gptBlock   = 16                    // context window size (maximum sequence length)
-	gptHeadDim = gptNEmbd / gptNHead   // dimension per attention head (16/4 = 4)
+	gptNEmbd   = 16                  // embedding dimension (d_model in Transformer papers)
+	gptNHead   = 4                   // number of attention heads
+	gptNLayer  = 1                   // number of transformer blocks
+	gptBlock   = 16                  // context window size (maximum sequence length)
+	gptHeadDim = gptNEmbd / gptNHead // dimension per attention head (16/4 = 4)
 
 	// Training parameters
-	gptLR     = 0.01 // Adam base learning rate
-	gptBeta1  = 0.85 // Adam first moment decay
-	gptBeta2  = 0.99 // Adam second moment decay
+	gptLR      = 0.01 // Adam base learning rate
+	gptBeta1   = 0.85 // Adam first moment decay
+	gptBeta2   = 0.99 // Adam second moment decay
 	gptEpsAdam = 1e-8 // Adam epsilon (prevents division by zero)
-	gptSteps  = 1000  // total training steps
+	gptSteps   = 1000 // total training steps
 
 	// Init
 	gptInitStd = 0.08 // weight initialization standard deviation
@@ -49,23 +49,23 @@ const (
 
 // GPTConfig holds the model architecture hyperparameters.
 type GPTConfig struct {
-	NEmbd    int     // embedding dimension
-	NHead    int     // number of attention heads
-	NLayer   int     // number of transformer blocks
-	BlockSize int    // context window length
-	VocabSize int    // number of tokens
-	InitStd  float64 // weight init standard deviation
+	NEmbd     int     // embedding dimension
+	NHead     int     // number of attention heads
+	NLayer    int     // number of transformer blocks
+	BlockSize int     // context window length
+	VocabSize int     // number of tokens
+	InitStd   float64 // weight init standard deviation
 }
 
 // DefaultGPTConfig returns the default tiny GPT config matching the Python original.
 func DefaultGPTConfig(vocabSize int) GPTConfig {
 	return GPTConfig{
-		NEmbd:    gptNEmbd,
-		NHead:    gptNHead,
-		NLayer:   gptNLayer,
+		NEmbd:     gptNEmbd,
+		NHead:     gptNHead,
+		NLayer:    gptNLayer,
 		BlockSize: gptBlock,
 		VocabSize: vocabSize,
-		InitStd:  gptInitStd,
+		InitStd:   gptInitStd,
 	}
 }
 
@@ -354,8 +354,8 @@ func AdamStep(params []*Value, state *AdamState, step, totalSteps int, lr, beta1
 
 // GPTTrainResult holds the outcome of a training run.
 type GPTTrainResult struct {
-	Params     *GPTParams
-	FinalLoss  float64
+	Params      *GPTParams
+	FinalLoss   float64
 	LossHistory []float64 // loss at each step
 }
 
