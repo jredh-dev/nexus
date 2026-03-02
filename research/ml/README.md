@@ -16,6 +16,7 @@ All files use the `research` build tag and are excluded from default compilation
 | Flash Attention | `microflash.go` | Done |
 | Scalar Autograd | `value.go` | Done |
 | GPT (char-level) | `microgpt.go` | Done |
+| Quantization | `microquant.go` | Done |
 
 ## Run
 
@@ -24,7 +25,7 @@ go test -tags research -v ./research/ml/
 go test -tags research -bench=. -benchmem ./research/ml/
 ```
 
-To run demos interactively, call `ml.RunMicrotokenizer()`, `ml.RunMicroflash()`, or `ml.RunMicrogpt()` from a tagged main or test.
+To run demos interactively, call `ml.RunMicrotokenizer()`, `ml.RunMicroflash()`, `ml.RunMicrogpt()`, or `ml.RunMicroquant()` from a tagged main or test.
 
 ## Design
 
