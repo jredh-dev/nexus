@@ -30,13 +30,6 @@ import (
 // startTime is set at server creation for uptime calculation.
 var startTime time.Time
 
-// Server is the discord-monitor HTTP API server.
-type Server struct {
-	db     *database.DB
-	router chi.Router
-	gohttp *gohttp.Server
-}
-
 // Config holds the dependencies for creating a Server.
 type Config struct {
 	DB *database.DB
