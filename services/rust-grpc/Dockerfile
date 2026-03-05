@@ -31,14 +31,9 @@ COPY --from=builder /app/target/release/hermit-server /usr/local/bin/hermit-serv
 USER appuser
 
 # Cloud Run sends traffic to PORT env var (default 8080)
-# hermit uses --grpc-port flag
+# hermit uses --grpc-port flag, --no-tls for plaintext h2c (Cloud Run terminates TLS)
 ENV PORT=8080
 EXPOSE 8080
 
-# Cloud Run terminates TLS -- hermit should NOT use self-signed TLS inside container.
-# We need a flag for this. For now, the server always does TLS.
-# TODO: Add --no-tls flag to hermit-server for Cloud Run mode.
-# For now, self-signed TLS inside the container is fine -- Cloud Run connects to it.
-
 ENTRYPOINT ["hermit-server"]
-CMD ["--grpc-port", "8080"]
+CMD ["--grpc-port", "8080", "--no-tls"]

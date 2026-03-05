@@ -244,26 +244,38 @@ impl Hermit for HermitService {
 pub async fn serve(
     port: u16,
     state: Arc<ServerState>,
-    tls_cfg: TlsConfig,
+    tls_cfg: Option<TlsConfig>,
     db: Arc<Database>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let addr = format!("0.0.0.0:{}", port).parse()?;
+    let tls_enabled = tls_cfg.is_some();
     let svc = HermitService {
         state,
-        tls_enabled: true,
+        tls_enabled,
         db,
     };
 
-    let identity = tonic::transport::Identity::from_pem(&tls_cfg.cert_pem, &tls_cfg.key_pem);
-    let tls = tonic::transport::ServerTlsConfig::new().identity(identity);
+    let grpc_svc = HermitServer::with_interceptor(svc, crate::auth::secret_interceptor);
 
-    info!(%addr, "gRPC server listening (TLS)");
-
-    tonic::transport::Server::builder()
-        .tls_config(tls)?
-        .add_service(HermitServer::with_interceptor(svc, crate::auth::secret_interceptor))
-        .serve(addr)
-        .await?;
+    match tls_cfg {
+        Some(cfg) => {
+            let identity = tonic::transport::Identity::from_pem(&cfg.cert_pem, &cfg.key_pem);
+            let tls = tonic::transport::ServerTlsConfig::new().identity(identity);
+            info!(%addr, "gRPC server listening (TLS)");
+            tonic::transport::Server::builder()
+                .tls_config(tls)?
+                .add_service(grpc_svc)
+                .serve(addr)
+                .await?;
+        }
+        None => {
+            info!(%addr, "gRPC server listening (plaintext h2c)");
+            tonic::transport::Server::builder()
+                .add_service(grpc_svc)
+                .serve(addr)
+                .await?;
+        }
+    }
 
     Ok(())
 }
