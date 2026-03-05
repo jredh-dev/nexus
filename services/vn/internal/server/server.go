@@ -2,21 +2,27 @@
 //
 // Routes:
 //
-//	GET  /health                    — health check
-//	GET  /api/story                 — story metadata (chapters, current state)
-//	POST /api/story/start           — start/resume reading (returns current node)
-//	POST /api/story/advance         — advance to next node or make a choice
-//	POST /api/story/reset           — reset reader state
-//	GET  /api/story/history         — commit log for story YAML files
-//	POST /api/story/commit          — commit current YAML files
-//	POST /api/story/revert          — revert to a previous commit
-//	GET  /api/story/diff            — diff between commits
-//	GET  /api/chapters              — list chapters in order
-//	GET  /api/chapters/{id}         — chapter detail with nodes
-//	GET  /api/chapters/{id}/votes   — vote tallies for a chapter
-//	POST /api/vote                  — cast a vote on a chapter choice
-//	GET  /api/reader                — reader info (tokens, completed chapters)
-//	GET  /api/video/{id}            — stream video (range-request support)
+//	GET    /health                    — health check
+//	GET    /api/story                 — story metadata (chapters, current state)
+//	POST   /api/story/start           — start/resume reading (returns current node)
+//	POST   /api/story/advance         — advance to next node or make a choice
+//	POST   /api/story/reset           — reset reader state
+//	GET    /api/story/history         — commit log for story YAML files
+//	POST   /api/story/commit          — commit current YAML files
+//	POST   /api/story/revert          — revert to a previous commit
+//	GET    /api/story/diff            — diff between commits
+//	GET    /api/chapters              — list chapters in order
+//	GET    /api/chapters/{id}         — chapter detail with nodes
+//	GET    /api/chapters/{id}/votes   — vote tallies for a chapter
+//	POST   /api/vote                  — cast a vote on a chapter choice
+//	GET    /api/reader                — reader info (tokens, completed chapters)
+//	GET    /api/video/{id}            — stream video (range-request support)
+//	DELETE /api/videos/{id}           — delete a video and its large object
+//	DELETE /api/readers/{id}          — delete a reader (cascades votes)
+//	DELETE /api/events/{id}           — delete a significant event
+//	DELETE /api/subtitles/{id}        — delete a subtitle
+//	DELETE /api/votes/chapter/{id}    — delete all votes for a chapter
+//	POST   /api/admin/reset           — truncate all tables (ADMIN_ENABLED only)
 package server
 
 import (
@@ -36,10 +42,11 @@ import (
 
 // Config holds the server dependencies.
 type Config struct {
-	DB        *database.DB
-	Navigator *engine.Navigator
-	Loader    *engine.HotLoader // may be nil if not using hot-reload
-	StoryRepo *storyrepo.Repo   // may be nil if story version control is disabled
+	DB           *database.DB
+	Navigator    *engine.Navigator
+	Loader       *engine.HotLoader // may be nil if not using hot-reload
+	StoryRepo    *storyrepo.Repo   // may be nil if story version control is disabled
+	AdminEnabled bool              // enable destructive admin/test endpoints
 }
 
 // New creates a vn HTTP server with all routes registered.
@@ -86,6 +93,18 @@ func New(cfg Config) *gohttp.Server {
 
 		// Video streaming.
 		r.Get("/video/{id}", video.StreamHandler(cfg.DB))
+
+		// Delete endpoints for individual resources (test/admin cleanup).
+		r.Delete("/videos/{id}", h.deleteVideo)
+		r.Delete("/readers/{id}", h.deleteReader)
+		r.Delete("/events/{id}", h.deleteEvent)
+		r.Delete("/subtitles/{id}", h.deleteSubtitle)
+		r.Delete("/votes/chapter/{id}", h.deleteVotesByChapter)
+
+		// Admin endpoints: destructive operations guarded by AdminEnabled.
+		if cfg.AdminEnabled {
+			r.Post("/admin/reset", h.adminReset)
+		}
 	})
 
 	return srv
@@ -336,6 +355,86 @@ func (h *handlers) getReader(w http.ResponseWriter, r *http.Request) {
 
 // --- unused but kept for compile ---
 var _ = uuid.UUID{}
+
+// --- Delete handlers ---
+
+func (h *handlers) deleteVideo(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		gohttp.WriteError(w, http.StatusBadRequest, "invalid video id")
+		return
+	}
+	if err := h.db.DeleteVideo(r.Context(), id); err != nil {
+		gohttp.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	gohttp.WriteJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+func (h *handlers) deleteReader(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		gohttp.WriteError(w, http.StatusBadRequest, "invalid reader id")
+		return
+	}
+	if err := h.db.DeleteReader(r.Context(), id); err != nil {
+		gohttp.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	gohttp.WriteJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+func (h *handlers) deleteEvent(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		gohttp.WriteError(w, http.StatusBadRequest, "invalid event id")
+		return
+	}
+	if err := h.db.DeleteEvent(r.Context(), id); err != nil {
+		gohttp.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	gohttp.WriteJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+func (h *handlers) deleteSubtitle(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		gohttp.WriteError(w, http.StatusBadRequest, "invalid subtitle id")
+		return
+	}
+	if err := h.db.DeleteSubtitle(r.Context(), id); err != nil {
+		gohttp.WriteError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	gohttp.WriteJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+func (h *handlers) deleteVotesByChapter(w http.ResponseWriter, r *http.Request) {
+	chapterID := chi.URLParam(r, "id")
+	if chapterID == "" {
+		gohttp.WriteError(w, http.StatusBadRequest, "chapter id required")
+		return
+	}
+	if err := h.db.DeleteVotesByChapter(r.Context(), chapterID); err != nil {
+		gohttp.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	gohttp.WriteJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+// --- Admin handlers ---
+
+// adminReset truncates all data tables and resets navigator state.
+// Only registered when AdminEnabled is true.
+func (h *handlers) adminReset(w http.ResponseWriter, r *http.Request) {
+	if err := h.db.ResetAll(r.Context()); err != nil {
+		gohttp.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("reset: %v", err))
+		return
+	}
+	h.nav.ResetAll()
+	gohttp.WriteJSON(w, http.StatusOK, map[string]string{"status": "reset"})
+}
 
 // --- Story version control handlers ---
 //
