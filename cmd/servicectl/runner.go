@@ -227,41 +227,60 @@ func lookupEnv(env []string, name string) string {
 	return ""
 }
 
-// findRepoRoot walks up from the current working directory looking for
-// a go.mod that belongs to the nexus module. This lets servicectl work
-// from any directory — it doesn't need to be invoked from the repo root.
+// findRepoRoot locates the nexus repo root. It tries three strategies
+// in order:
+//  1. Walk up from cwd looking for go.mod (works inside the repo or a worktree).
+//  2. Check $WORK/work/source/jredh-dev/nexus (the canonical source checkout).
+//  3. Give up with a helpful error.
 //
-// The search stops at the filesystem root. If no matching go.mod is found,
-// it returns an error with the starting directory for debugging.
+// This means `servicectl test vn` works from anywhere — inside the repo,
+// inside a worktree, or from ~ with $WORK set.
 func findRepoRoot() (string, error) {
 	dir, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("cannot determine working directory: %w", err)
 	}
 
-	startDir := dir
-	for {
-		modFile := filepath.Join(dir, "go.mod")
-		data, err := os.ReadFile(modFile)
-		if err == nil {
-			// Check that this is actually the nexus module, not some
-			// other Go project we happen to be inside of.
-			content := string(data)
-			if strings.Contains(content, "module github.com/jredh-dev/nexus") {
-				return dir, nil
-			}
-		}
+	// Strategy 1: walk up from cwd.
+	if root, ok := walkUpForGoMod(dir); ok {
+		return root, nil
+	}
 
-		// Move up one level.
+	// Strategy 2: check $WORK/work/source/jredh-dev/nexus.
+	if work := os.Getenv("WORK"); work != "" {
+		candidate := filepath.Join(work, "work", "source", "jredh-dev", "nexus")
+		if isNexusRoot(candidate) {
+			return candidate, nil
+		}
+	}
+
+	return "", fmt.Errorf(
+		"nexus repo root not found (searched up from %s, WORK=%s); "+
+			"run from within the nexus repo, or set $WORK to the agentic root",
+		dir, os.Getenv("WORK"),
+	)
+}
+
+// walkUpForGoMod walks from dir toward the filesystem root looking for
+// a go.mod containing the nexus module declaration.
+func walkUpForGoMod(dir string) (string, bool) {
+	for {
+		if isNexusRoot(dir) {
+			return dir, true
+		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			// Hit filesystem root without finding nexus go.mod.
-			return "", fmt.Errorf(
-				"nexus repo root not found (searched up from %s); "+
-					"run servicectl from within the nexus repo or a worktree",
-				startDir,
-			)
+			return "", false
 		}
 		dir = parent
 	}
+}
+
+// isNexusRoot returns true if dir contains a go.mod with the nexus module.
+func isNexusRoot(dir string) bool {
+	data, err := os.ReadFile(filepath.Join(dir, "go.mod"))
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(data), "module github.com/jredh-dev/nexus")
 }
