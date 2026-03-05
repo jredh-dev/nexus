@@ -42,17 +42,24 @@ type grpcHermitClient struct {
 }
 
 // NewHermitClient dials addr and returns a HermitClient.
-// Uses TLS with InsecureSkipVerify (self-signed accepted; identity validated by secret).
-// Falls back to insecure transport if TLS dial fails (dev/local mode).
+//
+// TLS modes:
+//   - insecurePlaintext=true:  plaintext h2c (local Docker, dev mode)
+//   - insecurePlaintext=false: proper TLS with system CA pool (Cloud Run, production)
+//
 // Non-blocking: errors surface on first RPC call.
-func NewHermitClient(addr, secret string) (HermitClient, error) {
-	tlsCreds := credentials.NewTLS(&tls.Config{InsecureSkipVerify: true}) //nolint:gosec
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(tlsCreds))
+func NewHermitClient(addr, secret string, insecurePlaintext bool) (HermitClient, error) {
+	var creds credentials.TransportCredentials
+	if insecurePlaintext {
+		creds = insecure.NewCredentials()
+	} else {
+		// Production: use system CA pool. Cloud Run has valid certs from Google.
+		creds = credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12})
+	}
+
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(creds))
 	if err != nil {
-		conn, err = grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		if err != nil {
-			return nil, fmt.Errorf("connect to %s: %w", addr, err)
-		}
+		return nil, fmt.Errorf("connect to %s: %w", addr, err)
 	}
 	return &grpcHermitClient{
 		conn:   conn,
