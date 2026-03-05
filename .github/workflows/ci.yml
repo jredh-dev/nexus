@@ -102,6 +102,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Need full history to diff changed files against base branch.
+          fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -109,10 +112,55 @@ jobs:
           go-version: '1.24'
           cache: true
 
+      # Detect which services changed and only test those packages.
+      # Shared code changes (internal/, go-http/, go.mod) trigger full suite.
+      # Pushes to main always run all tests.
+      - name: Detect changed packages
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="origin/${{ github.base_ref }}"
+            CHANGED=$(git diff --name-only "$BASE"...HEAD)
+          else
+            # Push to main — always run everything.
+            echo "packages=./..." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ -z "$CHANGED" ]; then
+            echo "packages=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Shared deps changed → test everything.
+          if echo "$CHANGED" | grep -qE '^(internal/|services/go-http/|go\.(mod|sum)$)'; then
+            echo "packages=./..." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Map changed directories to test package globs.
+          PKGS=""
+          for svc in cmd/tui cmd/server cmd/servicectl services/cal services/portal services/secrets services/vn services/discord-monitor; do
+            if echo "$CHANGED" | grep -q "^${svc}/"; then
+              PKGS="$PKGS ./${svc}/..."
+            fi
+          done
+
+          # Go files changed outside known prefixes → run all as safety net.
+          if [ -z "$PKGS" ] && echo "$CHANGED" | grep -qE '\.go$'; then
+            PKGS="./..."
+          fi
+
+          echo "packages=${PKGS}" >> "$GITHUB_OUTPUT"
+
       - name: Run tests
-        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+        if: steps.changes.outputs.packages != ''
+        run: |
+          echo "Testing: ${{ steps.changes.outputs.packages }}"
+          go test -v -race -coverprofile=coverage.out -covermode=atomic ${{ steps.changes.outputs.packages }}
 
       - name: Upload coverage
+        if: steps.changes.outputs.packages != ''
         uses: codecov/codecov-action@v4
         with:
           file: ./coverage.out
