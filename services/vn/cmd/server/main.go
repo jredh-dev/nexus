@@ -13,6 +13,8 @@
 //	               (default: "./stories")
 //	HOT_RELOAD     Enable fsnotify hot-reload of story files ("true"/"false")
 //	               (default: "true")
+//	ADMIN_ENABLED  Enable destructive admin/test endpoints ("true"/"false")
+//	               (default: "false")
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 package main
@@ -33,9 +35,10 @@ func main() {
 	dbURL := envOr("DATABASE_URL", "host=/tmp/ctl-pg dbname=vn user=jredh")
 	storyDir := envOr("STORY_DIR", "./stories")
 	hotReload := envOr("HOT_RELOAD", "true")
+	adminEnabled := envOr("ADMIN_ENABLED", "false") == "true"
 
-	log.Printf("[vn] starting: port=%s db=%s stories=%s hot_reload=%s",
-		port, dbURL, storyDir, hotReload)
+	log.Printf("[vn] starting: port=%s db=%s stories=%s hot_reload=%s admin=%v",
+		port, dbURL, storyDir, hotReload, adminEnabled)
 
 	// Connect to PostgreSQL and run migrations.
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -78,9 +81,10 @@ func main() {
 
 	// Build and start the HTTP server.
 	srv := server.New(server.Config{
-		DB:        db,
-		Navigator: nav,
-		Loader:    loader,
+		DB:           db,
+		Navigator:    nav,
+		Loader:       loader,
+		AdminEnabled: adminEnabled,
 	})
 
 	// Register cleanup: close DB on graceful shutdown.

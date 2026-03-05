@@ -42,3 +42,30 @@ func New(ctx context.Context, connStr string) (*DB, error) {
 func (db *DB) Close() {
 	db.Pool.Close()
 }
+
+// ResetAll truncates all data tables (not schema_version).
+// This is a destructive operation intended for integration testing.
+// It uses TRUNCATE ... CASCADE to handle foreign key dependencies,
+// then cleans up any orphaned large objects left behind by deleted videos.
+func (db *DB) ResetAll(ctx context.Context) error {
+	tx, err := db.Pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin reset tx: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	// Truncate all data tables. CASCADE handles FK dependencies.
+	_, err = tx.Exec(ctx, `TRUNCATE votes, readers, subtitles, significant_events, videos CASCADE`)
+	if err != nil {
+		return fmt.Errorf("truncate tables: %w", err)
+	}
+
+	// Clean up orphaned large objects. Since videos is now empty, every
+	// large object in pg_largeobject_metadata is orphaned.
+	_, err = tx.Exec(ctx, `SELECT lo_unlink(oid) FROM pg_largeobject_metadata`)
+	if err != nil {
+		return fmt.Errorf("unlink large objects: %w", err)
+	}
+
+	return tx.Commit(ctx)
+}
