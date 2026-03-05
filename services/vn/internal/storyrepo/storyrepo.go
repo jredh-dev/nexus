@@ -28,10 +28,18 @@ import (
 	"time"
 )
 
-// gitBinary is the path to the git executable. Extracted as a package-level
-// var so tests can override it if needed (though in practice /usr/local/bin/git
-// is always present).
-var gitBinary = "/usr/local/bin/git"
+// gitBinary is the path to the git executable. Resolved at init time via
+// exec.LookPath so it works on both macOS (/usr/local/bin/git) and Linux
+// (/usr/bin/git). Falls back to "git" and lets exec handle PATH lookup.
+var gitBinary = resolveGitBinary()
+
+// resolveGitBinary finds the git executable on the system PATH.
+func resolveGitBinary() string {
+	if path, err := exec.LookPath("git"); err == nil {
+		return path
+	}
+	return "git"
+}
 
 // commitAuthor is the fixed author identity used for all storyrepo commits.
 // Using a fixed identity keeps the version history clearly separated from

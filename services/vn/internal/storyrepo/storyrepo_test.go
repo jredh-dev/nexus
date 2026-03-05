@@ -8,6 +8,7 @@ package storyrepo
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -48,6 +49,7 @@ chapters:
 
 // TestInit verifies that Init creates a git repo and can reopen it.
 func TestInit(t *testing.T) {
+	requireGit(t)
 	dir := t.TempDir()
 	repoPath := filepath.Join(dir, "stories")
 
@@ -465,9 +467,18 @@ func TestFileDeletion(t *testing.T) {
 
 // --- Test helpers ---
 
+// requireGit skips the test if the git binary is not available.
+func requireGit(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available, skipping")
+	}
+}
+
 // initTestRepo creates a new storyrepo in a temp directory for testing.
 func initTestRepo(t *testing.T) *Repo {
 	t.Helper()
+	requireGit(t)
 	dir := t.TempDir()
 	repoPath := filepath.Join(dir, "stories")
 
