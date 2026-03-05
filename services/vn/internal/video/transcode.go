@@ -7,9 +7,9 @@ import (
 
 // QualityTier defines a transcoding target.
 type QualityTier struct {
-	Label      string // e.g. "720p", "480p", "360p"
-	Width      int    // output width (-1 for auto-scale)
-	Height     int    // output height
+	Label        string // e.g. "720p", "480p", "360p"
+	Width        int    // output width (-1 for auto-scale)
+	Height       int    // output height
 	VideoBitrate string // e.g. "2000k"
 	AudioBitrate string // e.g. "128k"
 }
