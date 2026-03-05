@@ -113,7 +113,8 @@ func buildEnv(cfg RunConfig) []string {
 // buildArgs constructs the argument list for `go test`.
 //
 // The resulting command looks like:
-//   go test -tags integration -run "^TestVN" -timeout 30s [-v] ./tests/integration/...
+//
+//	go test -tags integration -run "^TestVN" -timeout 30s [-v] ./tests/integration/...
 func buildArgs(cfg RunConfig) []string {
 	args := []string{
 		"test",
