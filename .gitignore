@@ -44,3 +44,4 @@ target/
 # nomagic: downloaded datasets and compiled binaries
 names.txt
 /microtokenizer
+servicectl
