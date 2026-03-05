@@ -66,3 +66,15 @@ jobs:
           else
             echo "--- server: no changes"
           fi
+
+          # servicectl — per-service integration test runner
+          if echo "$CHANGED" | grep -qE '^(cmd/servicectl/|tests/integration/|go\.(mod|sum)$)'; then
+            echo "==> Installing servicectl"
+            if go install ./cmd/servicectl; then
+              notify servicectl success
+            else
+              notify servicectl failure
+            fi
+          else
+            echo "--- servicectl: no changes"
+          fi
