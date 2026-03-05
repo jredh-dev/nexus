@@ -16,19 +16,16 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	gohttp "github.com/jredh-dev/nexus/services/go-http"
 	"github.com/jredh-dev/nexus/services/vn/internal/database"
 	"github.com/jredh-dev/nexus/services/vn/internal/engine"
 	"github.com/jredh-dev/nexus/services/vn/internal/video"
-
-	gohttp "github.com/jredh-dev/nexus/services/go-http"
 )
 
 // Config holds the server dependencies.
@@ -82,25 +79,6 @@ type handlers struct {
 	nav *engine.Navigator
 }
 
-// --- JSON helpers ---
-
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(v); err != nil {
-		log.Printf("[vn/server] encode response: %v", err)
-	}
-}
-
-func writeError(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, map[string]string{"error": msg})
-}
-
-func decodeJSON(r *http.Request, v any) error {
-	defer r.Body.Close()
-	return json.NewDecoder(r.Body).Decode(v)
-}
-
 // readerID extracts the reader identifier from the request. Uses the
 // X-Device-Hash header (anonymous fingerprint). Falls back to remote addr.
 func readerID(r *http.Request) string {
@@ -124,7 +102,7 @@ func (h *handlers) getStory(w http.ResponseWriter, r *http.Request) {
 		StartNode   string   `json:"start_node"`
 	}
 
-	writeJSON(w, http.StatusOK, storyResponse{
+	gohttp.WriteJSON(w, http.StatusOK, storyResponse{
 		Title:       story.Title,
 		Version:     story.Version,
 		Description: story.Description,
@@ -140,17 +118,17 @@ func (h *handlers) startStory(w http.ResponseWriter, r *http.Request) {
 	// Ensure DB reader exists (for token tracking).
 	dbReader, err := h.db.GetOrCreateReader(r.Context(), rid)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("create reader: %v", err))
+		gohttp.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("create reader: %v", err))
 		return
 	}
 
 	state, node, err := h.nav.Start(rid)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("start: %v", err))
+		gohttp.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("start: %v", err))
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	gohttp.WriteJSON(w, http.StatusOK, map[string]any{
 		"state":  state,
 		"node":   node,
 		"reader": dbReader,
@@ -167,15 +145,15 @@ func (h *handlers) advanceStory(w http.ResponseWriter, r *http.Request) {
 	req.ChoiceIndex = -1 // default: linear advance
 
 	if r.ContentLength > 0 {
-		if err := decodeJSON(r, &req); err != nil {
-			writeError(w, http.StatusBadRequest, fmt.Sprintf("decode body: %v", err))
+		if err := gohttp.DecodeJSON(r, &req); err != nil {
+			gohttp.WriteError(w, http.StatusBadRequest, fmt.Sprintf("decode body: %v", err))
 			return
 		}
 	}
 
 	state, node, completedChapter, err := h.nav.Advance(rid, req.ChoiceIndex)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		gohttp.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -201,14 +179,14 @@ func (h *handlers) advanceStory(w http.ResponseWriter, r *http.Request) {
 		resp["completed_chapter"] = completedChapter
 	}
 
-	writeJSON(w, http.StatusOK, resp)
+	gohttp.WriteJSON(w, http.StatusOK, resp)
 }
 
 // resetStory clears the reader's position.
 func (h *handlers) resetStory(w http.ResponseWriter, r *http.Request) {
 	rid := readerID(r)
 	h.nav.Reset(rid)
-	writeJSON(w, http.StatusOK, map[string]string{"status": "reset"})
+	gohttp.WriteJSON(w, http.StatusOK, map[string]string{"status": "reset"})
 }
 
 // --- Chapter handlers ---
@@ -239,7 +217,7 @@ func (h *handlers) listChapters(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	writeJSON(w, http.StatusOK, chapters)
+	gohttp.WriteJSON(w, http.StatusOK, chapters)
 }
 
 func (h *handlers) getChapter(w http.ResponseWriter, r *http.Request) {
@@ -248,11 +226,11 @@ func (h *handlers) getChapter(w http.ResponseWriter, r *http.Request) {
 
 	ch, ok := story.Chapters[id]
 	if !ok {
-		writeError(w, http.StatusNotFound, fmt.Sprintf("chapter %q not found", id))
+		gohttp.WriteError(w, http.StatusNotFound, fmt.Sprintf("chapter %q not found", id))
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	gohttp.WriteJSON(w, http.StatusOK, map[string]any{
 		"id":           id,
 		"title":        ch.Title,
 		"description":  ch.Description,
@@ -268,11 +246,11 @@ func (h *handlers) getChapterVotes(w http.ResponseWriter, r *http.Request) {
 
 	tallies, err := h.db.TallyVotes(r.Context(), id)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("tally votes: %v", err))
+		gohttp.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("tally votes: %v", err))
 		return
 	}
 
-	writeJSON(w, http.StatusOK, tallies)
+	gohttp.WriteJSON(w, http.StatusOK, tallies)
 }
 
 // --- Vote handler ---
@@ -285,29 +263,29 @@ func (h *handlers) castVote(w http.ResponseWriter, r *http.Request) {
 		Choice      string `json:"choice"`
 		TokensSpent int    `json:"tokens_spent"`
 	}
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("decode body: %v", err))
+	if err := gohttp.DecodeJSON(r, &req); err != nil {
+		gohttp.WriteError(w, http.StatusBadRequest, fmt.Sprintf("decode body: %v", err))
 		return
 	}
 
 	if req.ChapterID == "" || req.Choice == "" || req.TokensSpent < 1 {
-		writeError(w, http.StatusBadRequest, "chapter_id, choice, and tokens_spent (>=1) required")
+		gohttp.WriteError(w, http.StatusBadRequest, "chapter_id, choice, and tokens_spent (>=1) required")
 		return
 	}
 
 	dbReader, err := h.db.GetOrCreateReader(r.Context(), rid)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("get reader: %v", err))
+		gohttp.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("get reader: %v", err))
 		return
 	}
 
 	vote, err := h.db.CastVote(r.Context(), dbReader.ReaderID, req.ChapterID, req.Choice, req.TokensSpent)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		gohttp.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, vote)
+	gohttp.WriteJSON(w, http.StatusOK, vote)
 }
 
 // --- Reader handler ---
@@ -317,7 +295,7 @@ func (h *handlers) getReader(w http.ResponseWriter, r *http.Request) {
 
 	dbReader, err := h.db.GetOrCreateReader(r.Context(), rid)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("get reader: %v", err))
+		gohttp.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("get reader: %v", err))
 		return
 	}
 
@@ -335,7 +313,7 @@ func (h *handlers) getReader(w http.ResponseWriter, r *http.Request) {
 		resp["completed"] = state.Completed
 	}
 
-	writeJSON(w, http.StatusOK, resp)
+	gohttp.WriteJSON(w, http.StatusOK, resp)
 }
 
 // --- unused but kept for compile ---
