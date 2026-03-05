@@ -18,6 +18,14 @@ public release when it's ready.
 - **Phase 2**: Native apps (iOS via Swift/SwiftUI, Android TBD)
 - **Phase 3**: Offline/PWA support for mobile web
 
+## State Management
+
+- Generic YAML state loader (`state.Load[T]` / `state.LoadDir[T]`) for any entity type
+- `State` interface: `StateID() + Validate()` — characters, items, locations, factions, etc.
+- YAML is for versioned entity state, not branching narrative scripts
+- Git-backed version control for all state definitions
+- Content is hand-written, never AI-generated
+
 ## Story Engine
 
 - Branching narrative with YAML-defined story graphs
@@ -68,6 +76,16 @@ public release when it's ready.
 - Unit tests for engine, subtitle visibility, storyrepo
 - Per-service test runner via servicectl
 - Heavy commenting — code explains intent, not just behavior
+
+## Build Order
+
+Phased implementation, backend-first:
+
+1. **Database + engine + story** — schema, migrations, story graph, hot-reload, voting ✅
+2. **State management** — generic YAML loader, character schema, State interface ✅
+3. **Video processing** — FFmpeg palindrome loop generation, adaptive transcoding, HTTP streaming
+4. **Subtitle visibility engine** — toggle-point model implementation, client sync
+5. **Web client** — mobile-first HTML/CSS/JS, video player, subtitle renderer
 
 ## Not Goals (at least not yet)
 

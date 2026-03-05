@@ -13,11 +13,14 @@ Visual novel engine for branching narrative with video, subtitles, and community
 services/vn/
 ├── cmd/server/             -- server entrypoint (main.go)
 ├── internal/
+│   ├── character/          -- Character type implementing state.State
 │   ├── database/           -- PostgreSQL schema, migrations, CRUD (pgx + large objects)
 │   ├── engine/             -- Story graph traversal, chapter state machine, YAML hot-reload
 │   ├── server/             -- HTTP API handlers (chi router, uses shared go-http helpers)
+│   ├── state/              -- Generic YAML state loader (Load[T] / LoadDir[T])
 │   ├── subtitle/           -- Toggle-point visibility engine
 │   └── video/              -- FFmpeg palindrome generation, transcoding, HTTP streaming
+├── characters/             -- YAML character definitions (the-fool.yaml)
 ├── stories/                -- YAML story definitions (seed.yaml)
 ├── web/                    -- Mobile-first HTML/CSS/JS client (TODO)
 ├── Dockerfile              -- Multi-stage build with ffmpeg
