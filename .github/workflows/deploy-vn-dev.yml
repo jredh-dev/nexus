@@ -1,15 +1,17 @@
 name: Deploy vn to Cloud Run (DEV)
 
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'services/vn/**'
-      - 'services/go-http/**'
-      - 'go.mod'
-      - 'go.sum'
-  workflow_dispatch:
+# DISABLED: Cloud SQL not provisioned yet. Re-enable when vn-database-url secret exists.
+# on:
+#   push:
+#     branches:
+#       - main
+#     paths:
+#       - 'services/vn/**'
+#       - 'services/go-http/**'
+#       - 'go.mod'
+#       - 'go.sum'
+#   workflow_dispatch:
+on: workflow_dispatch
 
 env:
   GCP_PROJECT_ID: dea-noctua
