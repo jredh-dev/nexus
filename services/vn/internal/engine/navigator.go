@@ -125,21 +125,39 @@ func (n *Navigator) Advance(readerID string, choiceIdx int) (*ReaderState, *Node
 		return nil, nil, "", fmt.Errorf("resolve target %q: %w", targetRef, err)
 	}
 
-	// Check if we're crossing chapter boundaries.
+	// Detect chapter completion. Two triggers:
+	//
+	// 1. Crossing chapter boundaries — the old chapter is complete.
+	//    The returned completedChapter is the OLD chapter (for token grant).
+	//
+	// 2. Landing on an IsEnd node — the target node's chapter is complete.
+	//    If this is a same-chapter end, this is the returned completedChapter.
+	//    If cross-chapter AND IsEnd, both are marked complete in state, but
+	//    only the old chapter is returned (single token grant per advance).
 	oldChapter := chapterFromRef(state.CurrentNode)
 	newChapter := chapterFromRef(targetRef)
 	completedChapter := ""
+
 	if oldChapter != newChapter {
-		// Mark the old chapter as completed (if not already).
+		// Crossing chapters: mark the old chapter as completed.
 		if !contains(state.Completed, oldChapter) {
 			state.Completed = append(state.Completed, oldChapter)
 			completedChapter = oldChapter
 		}
 	}
 
-	// Check if the current node is an end node AND is the last node visited
-	// in its chapter — also marks completion.
-	_ = currentChapter // suppress unused; used for future chapter-end detection
+	if targetNode.IsEnd && !contains(state.Completed, newChapter) {
+		// Landed on an end node — mark the target's chapter complete too.
+		state.Completed = append(state.Completed, newChapter)
+		// Only set as the return value if nothing else was completed this
+		// advance (i.e., same-chapter end). Cross-chapter completion takes
+		// priority for the token grant.
+		if completedChapter == "" {
+			completedChapter = newChapter
+		}
+	}
+
+	_ = currentChapter // reserved for future chapter-end detection variants
 
 	state.CurrentNode = targetRef
 	state.Visited = append(state.Visited, targetRef)

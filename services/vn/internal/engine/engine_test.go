@@ -362,8 +362,68 @@ func TestNavigator_ChoiceAdvance_CrossChapter(t *testing.T) {
 	if completed != "ch1" {
 		t.Errorf("completed = %q, want ch1", completed)
 	}
+	// Cross-chapter landing on IsEnd marks both chapters complete in state,
+	// but only the old chapter (ch1) is returned for token grant.
+	if len(state.Completed) != 2 {
+		t.Errorf("completed list = %v, want [ch1, ch2]", state.Completed)
+	}
+}
+
+// TestNavigator_SameChapterEndCompletion verifies that landing on an IsEnd
+// node within the same chapter correctly marks that chapter as completed.
+// This is the single-chapter story case (e.g., the seed story prologue).
+func TestNavigator_SameChapterEndCompletion(t *testing.T) {
+	dir := t.TempDir()
+	writeYAML(t, dir, "single.yaml", `
+version: 1
+title: "Single Chapter"
+start_node: "ch1.start"
+chapters:
+  ch1:
+    title: "Only Chapter"
+    sort_order: 1
+    token_reward: 10
+    start_node: start
+    nodes:
+      start:
+        video_ref: "v1"
+        next_node: middle
+      middle:
+        video_ref: "v2"
+        next_node: end
+      end:
+        video_ref: "v3"
+        is_end: true
+`)
+	story, err := LoadStory(filepath.Join(dir, "single.yaml"))
+	if err != nil {
+		t.Fatalf("LoadStory: %v", err)
+	}
+	nav := NewNavigator(story)
+	_, _, _ = nav.Start("r1")
+
+	// start → middle (no completion)
+	_, _, completed, err := nav.Advance("r1", -1)
+	if err != nil {
+		t.Fatalf("Advance to middle: %v", err)
+	}
+	if completed != "" {
+		t.Errorf("completed = %q after middle, want empty", completed)
+	}
+
+	// middle → end (should complete ch1)
+	state, _, completed, err := nav.Advance("r1", -1)
+	if err != nil {
+		t.Fatalf("Advance to end: %v", err)
+	}
+	if completed != "ch1" {
+		t.Errorf("completed = %q, want ch1", completed)
+	}
 	if len(state.Completed) != 1 || state.Completed[0] != "ch1" {
 		t.Errorf("completed list = %v, want [ch1]", state.Completed)
+	}
+	if state.CurrentNode != "ch1.end" {
+		t.Errorf("current = %q, want ch1.end", state.CurrentNode)
 	}
 }
 
