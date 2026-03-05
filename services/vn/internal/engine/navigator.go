@@ -13,7 +13,7 @@ type ReaderState struct {
 }
 
 // Navigator provides a state machine for traversing the story graph.
-// It is safe for concurrent use; each reader has independent state
+// It is safe for concurrent use — each reader has independent state
 // protected by the mutex.
 type Navigator struct {
 	story   *Story
