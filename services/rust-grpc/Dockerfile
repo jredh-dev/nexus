@@ -13,11 +13,11 @@ COPY proto/ proto/
 COPY build.rs ./
 RUN mkdir src && echo 'fn main() {}' > src/main.rs
 RUN cargo build --release 2>/dev/null || true
-RUN rm -rf src
+RUN rm -rf src target/release/hermit-server target/release/deps/hermit*
 
 # Build real binary
 COPY src/ src/
-RUN cargo build --release
+RUN touch src/main.rs && cargo build --release
 
 # Runtime stage
 FROM debian:bookworm-slim
