@@ -154,6 +154,14 @@ func (n *Navigator) Reset(readerID string) {
 	delete(n.readers, readerID)
 }
 
+// ResetAll clears all reader states. Intended for integration testing
+// alongside database.ResetAll to fully reset server state.
+func (n *Navigator) ResetAll() {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.readers = make(map[string]*ReaderState)
+}
+
 // SetStory atomically replaces the underlying story (used by hot-reload).
 // Existing reader states are preserved — if their current node no longer
 // exists in the new story, they'll get an error on next Advance/CurrentNode

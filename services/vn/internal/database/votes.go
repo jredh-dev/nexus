@@ -122,6 +122,28 @@ func (db *DB) CastVote(ctx context.Context, readerID uuid.UUID, chapterID, choic
 	return &v, nil
 }
 
+// DeleteReader removes a reader by ID. Votes are cascaded via the FK
+// ON DELETE CASCADE constraint, so no explicit vote cleanup is needed.
+func (db *DB) DeleteReader(ctx context.Context, id uuid.UUID) error {
+	tag, err := db.Pool.Exec(ctx, `DELETE FROM readers WHERE reader_id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("delete reader %s: %w", id, err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("reader %s not found", id)
+	}
+	return nil
+}
+
+// DeleteVotesByChapter removes all votes for a chapter.
+func (db *DB) DeleteVotesByChapter(ctx context.Context, chapterID string) error {
+	_, err := db.Pool.Exec(ctx, `DELETE FROM votes WHERE chapter_id = $1`, chapterID)
+	if err != nil {
+		return fmt.Errorf("delete votes for chapter %s: %w", chapterID, err)
+	}
+	return nil
+}
+
 // TallyVotes returns vote totals grouped by choice for a chapter.
 func (db *DB) TallyVotes(ctx context.Context, chapterID string) ([]VoteTally, error) {
 	rows, err := db.Pool.Query(ctx, `
