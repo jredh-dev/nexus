@@ -1,4 +1,4 @@
-// Package database provides PostgreSQL access for the star visual novel engine.
+// Package database provides PostgreSQL access for the vn visual novel engine.
 //
 // It manages connection pooling via pgxpool, schema migrations, and CRUD
 // operations for videos (stored as large objects), significant events,
@@ -20,7 +20,7 @@ type DB struct {
 // New connects to PostgreSQL and runs migrations.
 // connStr is a libpq-style connection string or DSN, e.g.:
 //
-//	"host=/tmp/ctl-pg dbname=star user=jredh"
+//	"host=/tmp/ctl-pg dbname=vn user=jredh"
 func New(ctx context.Context, connStr string) (*DB, error) {
 	pool, err := pgxpool.New(ctx, connStr)
 	if err != nil {

@@ -1,4 +1,4 @@
-// Package video provides FFmpeg-based video processing for the star engine.
+// Package video provides FFmpeg-based video processing for the vn engine.
 //
 // Key operations:
 //   - Palindrome loop generation (forward + reverse concatenation)
@@ -42,7 +42,7 @@ func init() {
 //  2. Concatenate original + reversed via the concat demuxer
 //  3. Clean up temp files
 func GeneratePalindrome(ctx context.Context, inputPath, outPath string) error {
-	dir, err := os.MkdirTemp("", "star-palindrome-*")
+	dir, err := os.MkdirTemp("", "vn-palindrome-*")
 	if err != nil {
 		return fmt.Errorf("create temp dir: %w", err)
 	}

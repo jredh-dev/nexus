@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"github.com/google/uuid"
-	"github.com/jredh-dev/nexus/services/star/internal/database"
+	"github.com/jredh-dev/nexus/services/vn/internal/database"
 )
 
 // StreamHandler returns an http.HandlerFunc that streams video data from

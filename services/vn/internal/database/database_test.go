@@ -1,10 +1,10 @@
-// Package database_test provides integration tests for the star database
+// Package database_test provides integration tests for the vn database
 // layer against a real PostgreSQL instance.
 //
 // These tests require PostgreSQL 16 running at /tmp/ctl-pg.
 // They create and drop a test-specific database for isolation.
 //
-// Run with: go test -tags integration ./services/star/internal/database/
+// Run with: go test -tags integration ./services/vn/internal/database/
 package database_test
 
 import (
@@ -17,7 +17,7 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/jredh-dev/nexus/services/star/internal/database"
+	"github.com/jredh-dev/nexus/services/vn/internal/database"
 )
 
 const (

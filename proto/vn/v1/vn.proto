@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Jared Redh. All rights reserved.
 //
-// Star (The Star, XVII) — visual novel engine service.
+// vn — visual novel / visual narrative engine service.
 //
-// This proto defines the gRPC API for the star backend. Star owns:
+// This proto defines the gRPC API for the vn backend. It owns:
 //   1. PostgreSQL storage — videos (large objects), subtitles, events, readers, votes
 //   2. Git-controlled YAML — story definitions with branch traversal
 //   3. Story engine — chapter state machine, node traversal, hot-reload
@@ -12,9 +12,9 @@
 
 syntax = "proto3";
 
-package star.v1;
+package vn.v1;
 
-option go_package = "github.com/jredh-dev/nexus/gen/star/v1;starv1";
+option go_package = "github.com/jredh-dev/nexus/gen/vn/v1;vnv1";
 
 import "google/protobuf/timestamp.proto";
 

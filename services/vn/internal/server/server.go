@@ -1,4 +1,4 @@
-// Package server provides the HTTP API for the star visual novel engine.
+// Package server provides the HTTP API for the vn visual novel engine.
 //
 // Routes:
 //
@@ -24,9 +24,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
-	"github.com/jredh-dev/nexus/services/star/internal/database"
-	"github.com/jredh-dev/nexus/services/star/internal/engine"
-	"github.com/jredh-dev/nexus/services/star/internal/video"
+	"github.com/jredh-dev/nexus/services/vn/internal/database"
+	"github.com/jredh-dev/nexus/services/vn/internal/engine"
+	"github.com/jredh-dev/nexus/services/vn/internal/video"
 
 	gohttp "github.com/jredh-dev/nexus/services/go-http"
 )
@@ -38,7 +38,7 @@ type Config struct {
 	Loader    *engine.HotLoader // may be nil if not using hot-reload
 }
 
-// New creates a star HTTP server with all routes registered.
+// New creates a vn HTTP server with all routes registered.
 func New(cfg Config) *gohttp.Server {
 	srv := gohttp.New()
 
@@ -88,7 +88,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
-		log.Printf("[star/server] encode response: %v", err)
+		log.Printf("[vn/server] encode response: %v", err)
 	}
 }
 

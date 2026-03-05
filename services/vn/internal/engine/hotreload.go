@@ -87,16 +87,16 @@ func (hl *HotLoader) watch() {
 				continue
 			}
 
-			log.Printf("[star/engine] detected change: %s %s", event.Op, filepath.Base(event.Name))
+			log.Printf("[vn/engine] detected change: %s %s", event.Op, filepath.Base(event.Name))
 
 			story, err := LoadStoryDir(hl.storyDir)
 			if err != nil {
-				log.Printf("[star/engine] reload failed (keeping old story): %v", err)
+				log.Printf("[vn/engine] reload failed (keeping old story): %v", err)
 				continue
 			}
 
 			hl.story.Store(story)
-			log.Printf("[star/engine] story reloaded: %q (%d chapters)",
+			log.Printf("[vn/engine] story reloaded: %q (%d chapters)",
 				story.Title, len(story.Chapters))
 
 			if hl.onReload != nil {
@@ -107,7 +107,7 @@ func (hl *HotLoader) watch() {
 			if !ok {
 				return
 			}
-			log.Printf("[star/engine] watcher error: %v", err)
+			log.Printf("[vn/engine] watcher error: %v", err)
 		}
 	}
 }
