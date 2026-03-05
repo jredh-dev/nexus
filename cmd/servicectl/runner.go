@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -43,10 +44,19 @@ type RunConfig struct {
 // exit code from `go test` (0 on success, non-zero on failure).
 //
 // The function:
-//  1. Builds the environment by merging defaults with any user overrides.
-//  2. Constructs the `go test` command with appropriate flags.
-//  3. Either prints the command (dry-run) or executes it.
+//  1. Finds the repo root (walks up looking for go.mod).
+//  2. Builds the environment by merging defaults with any user overrides.
+//  3. Constructs the `go test` command with appropriate flags.
+//  4. Either prints the command (dry-run) or executes it.
 func Run(cfg RunConfig) int {
+	// Find the nexus repo root so `./tests/integration/...` resolves
+	// regardless of where servicectl is invoked from.
+	repoRoot, err := findRepoRoot()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "servicectl: %v\n", err)
+		return 1
+	}
+
 	// Build the environment for the child process. Start with the
 	// current process environment so things like PATH, GOPATH, HOME
 	// are inherited. Then layer on service-specific defaults, and
@@ -57,14 +67,14 @@ func Run(cfg RunConfig) int {
 	args := buildArgs(cfg)
 
 	if cfg.DryRun {
-		printDryRun(cfg, env, args)
+		printDryRun(cfg, env, args, repoRoot)
 		return 0
 	}
 
 	// Print a header so the user knows what's running.
-	printHeader(cfg, env)
+	printHeader(cfg, env, repoRoot)
 
-	return execute(args, env)
+	return execute(args, env, repoRoot)
 }
 
 // buildEnv constructs the environment variable slice for the child process.
@@ -135,13 +145,15 @@ func buildArgs(cfg RunConfig) []string {
 }
 
 // printHeader outputs a summary of what's about to run, including the
-// service name and resolved environment variables. This helps with
-// debugging connection issues ("oh, I'm pointing at the wrong URL").
-func printHeader(cfg RunConfig, env []string) {
+// service name, repo root, and resolved environment variables. This helps
+// with debugging connection issues ("oh, I'm pointing at the wrong URL")
+// and path issues ("tests ran from the wrong directory").
+func printHeader(cfg RunConfig, env []string, repoRoot string) {
 	fmt.Printf("=== servicectl: testing %s ===\n", cfg.Service.Name)
 	fmt.Printf("  description: %s\n", cfg.Service.Description)
 	fmt.Printf("  test pattern: %s\n", cfg.Service.TestPattern)
 	fmt.Printf("  timeout: %s\n", cfg.Timeout)
+	fmt.Printf("  repo root: %s\n", repoRoot)
 
 	// Show the resolved values of service-specific env vars. We look
 	// them up from the constructed env slice so the user sees exactly
@@ -158,9 +170,11 @@ func printHeader(cfg RunConfig, env []string) {
 }
 
 // printDryRun prints the full command that would be executed, including
-// environment variable assignments, without actually running it.
-func printDryRun(cfg RunConfig, env []string, args []string) {
+// environment variable assignments and working directory, without
+// actually running it.
+func printDryRun(cfg RunConfig, env []string, args []string, repoRoot string) {
 	fmt.Println("# dry-run: would execute:")
+	fmt.Printf("# working directory: %s\n", repoRoot)
 
 	// Print env vars that differ from the parent process. This shows
 	// only the service-specific variables, not the entire inherited env.
@@ -175,9 +189,12 @@ func printDryRun(cfg RunConfig, env []string, args []string) {
 }
 
 // execute runs `go test` with the given args and environment, streaming
-// stdout and stderr to the terminal. Returns the process exit code.
-func execute(args []string, env []string) int {
+// stdout and stderr to the terminal. The command runs from repoRoot so
+// that relative test paths like ./tests/integration/... resolve correctly
+// regardless of where servicectl was invoked.
+func execute(args []string, env []string, repoRoot string) int {
 	cmd := exec.Command("go", args...)
+	cmd.Dir = repoRoot
 	cmd.Env = env
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -208,4 +225,43 @@ func lookupEnv(env []string, name string) string {
 		}
 	}
 	return ""
+}
+
+// findRepoRoot walks up from the current working directory looking for
+// a go.mod that belongs to the nexus module. This lets servicectl work
+// from any directory — it doesn't need to be invoked from the repo root.
+//
+// The search stops at the filesystem root. If no matching go.mod is found,
+// it returns an error with the starting directory for debugging.
+func findRepoRoot() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("cannot determine working directory: %w", err)
+	}
+
+	startDir := dir
+	for {
+		modFile := filepath.Join(dir, "go.mod")
+		data, err := os.ReadFile(modFile)
+		if err == nil {
+			// Check that this is actually the nexus module, not some
+			// other Go project we happen to be inside of.
+			content := string(data)
+			if strings.Contains(content, "module github.com/jredh-dev/nexus") {
+				return dir, nil
+			}
+		}
+
+		// Move up one level.
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// Hit filesystem root without finding nexus go.mod.
+			return "", fmt.Errorf(
+				"nexus repo root not found (searched up from %s); "+
+					"run servicectl from within the nexus repo or a worktree",
+				startDir,
+			)
+		}
+		dir = parent
+	}
 }
