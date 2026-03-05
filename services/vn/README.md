@@ -11,14 +11,17 @@ Visual novel engine for branching narrative with video, subtitles, and community
 
 ```
 services/vn/
+├── cmd/server/             -- server entrypoint (main.go)
 ├── internal/
-│   ├── database/          -- PostgreSQL schema, migrations, CRUD (pgx + large objects)
-│   ├── engine/            -- Story graph traversal, chapter state machine, YAML hot-reload
-│   ├── server/            -- HTTP API handlers (chi router)
-│   ├── subtitle/          -- Toggle-point visibility engine
-│   └── video/             -- FFmpeg palindrome generation, transcoding, HTTP streaming
-├── web/                   -- Mobile-first HTML/CSS/JS client (TODO)
-└── README.md              -- this file
+│   ├── database/           -- PostgreSQL schema, migrations, CRUD (pgx + large objects)
+│   ├── engine/             -- Story graph traversal, chapter state machine, YAML hot-reload
+│   ├── server/             -- HTTP API handlers (chi router, uses shared go-http helpers)
+│   ├── subtitle/           -- Toggle-point visibility engine
+│   └── video/              -- FFmpeg palindrome generation, transcoding, HTTP streaming
+├── stories/                -- YAML story definitions (seed.yaml)
+├── web/                    -- Mobile-first HTML/CSS/JS client (TODO)
+├── Dockerfile              -- Multi-stage build with ffmpeg
+└── README.md               -- this file
 ```
 
 ## Database
@@ -35,6 +38,37 @@ psql -h /tmp/ctl-pg -d vn
 ## Run / Build / Test
 
 ```bash
-# Run tests (requires PostgreSQL at /tmp/ctl-pg)
+# Build server
+go build ./services/vn/cmd/server
+
+# Run locally (requires PostgreSQL at /tmp/ctl-pg with database 'vn')
+DATABASE_URL="host=/tmp/ctl-pg dbname=vn user=jredh" \
+STORY_DIR=services/vn/stories \
+HOT_RELOAD=true \
+go run ./services/vn/cmd/server
+
+# Run unit tests
 go test ./services/vn/...
+
+# Run integration tests (requires running server)
+VN_URL=http://localhost:8082 go test -tags integration ./tests/integration/ -run TestVN
 ```
+
+## Docker
+
+```bash
+# From agentic root (docker-compose.yml lives there)
+docker compose up -d vn        # starts vn + vn-postgres
+docker compose logs -f vn      # tail logs
+```
+
+Port 8082 (host) -> 8080 (container). Uses dedicated `vn-postgres` container with `vn-pgdata` volume.
+
+## Environment
+
+| Var | Default | Description |
+|-----|---------|-------------|
+| `PORT` | `8080` | HTTP listen port |
+| `DATABASE_URL` | (required) | PostgreSQL connection string |
+| `STORY_DIR` | `stories` | Path to YAML story files |
+| `HOT_RELOAD` | `false` | Watch story files with fsnotify |
