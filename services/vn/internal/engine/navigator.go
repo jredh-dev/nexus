@@ -8,8 +8,8 @@ import (
 // ReaderState tracks a single reader's position in the story graph.
 type ReaderState struct {
 	CurrentNode string   `json:"current_node"` // fully qualified: "chapter.node"
-	Visited     []string `json:"visited"`       // history of visited node IDs
-	Completed   []string `json:"completed"`     // chapter IDs completed
+	Visited     []string `json:"visited"`      // history of visited node IDs
+	Completed   []string `json:"completed"`    // chapter IDs completed
 }
 
 // Navigator provides a state machine for traversing the story graph.
