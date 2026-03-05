@@ -1,0 +1,680 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Discord monitoring service with selfbot scanning, keyword watchlists, priority scoring, digests, and activity heatmaps.",
+        "title": "nexus-discord-monitor API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/api/digests": {
+            "get": {
+                "description": "Returns recent digests for a guild. guild_id is required. Default limit is 10.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "digests"
+                ],
+                "summary": "List digests",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Guild ID",
+                        "name": "guild_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Max results (default 10)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_jredh-dev_nexus_services_discord-monitor_internal_database.DigestRecord"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/digests/generate": {
+            "post": {
+                "description": "Triggers digest generation for a guild. Covers the period since the last digest or last 24 hours.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "digests"
+                ],
+                "summary": "Generate digest",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Guild ID",
+                        "name": "guild_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jredh-dev_nexus_services_discord-monitor_internal_monitor.Digest"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/guilds": {
+            "get": {
+                "description": "Returns all tracked Discord guilds. Use ?active=true to filter to active guilds only.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "guilds"
+                ],
+                "summary": "List tracked guilds",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter to active guilds only (true/false)",
+                        "name": "active",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_jredh-dev_nexus_services_discord-monitor_internal_database.Guild"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/heatmap": {
+            "get": {
+                "description": "Returns activity heatmap buckets (day-of-week x hour-of-day) for a channel or guild. Provide channel_id or guild_id (channel takes precedence).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Activity heatmap",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Channel ID (takes precedence over guild_id)",
+                        "name": "channel_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Guild ID",
+                        "name": "guild_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of days to cover (default 7)",
+                        "name": "days",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_jredh-dev_nexus_services_discord-monitor_internal_database.HeatmapBucket"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/keywords": {
+            "get": {
+                "description": "Returns all keyword watchlist patterns. Optionally filter by guild (includes global keywords).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "keywords"
+                ],
+                "summary": "List keyword patterns",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter to keywords for a specific guild",
+                        "name": "guild_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_jredh-dev_nexus_services_discord-monitor_internal_database.Keyword"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Creates a new keyword pattern for the watchlist. Pattern is required. Priority is clamped to 0-100.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "keywords"
+                ],
+                "summary": "Add keyword pattern",
+                "parameters": [
+                    {
+                        "description": "Keyword to add",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_server.addKeywordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "status": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/keywords/{id}": {
+            "delete": {
+                "description": "Removes a keyword pattern by its UUID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "keywords"
+                ],
+                "summary": "Delete keyword",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Keyword UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "status": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/status": {
+            "get": {
+                "description": "Returns uptime, selfbot connection state, and guild counts.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "status"
+                ],
+                "summary": "Service status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "active_guilds": {
+                                    "type": "integer"
+                                },
+                                "selfbot_connected": {
+                                    "type": "boolean"
+                                },
+                                "status": {
+                                    "type": "string"
+                                },
+                                "total_guilds": {
+                                    "type": "integer"
+                                },
+                                "uptime_seconds": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/unread": {
+            "get": {
+                "description": "Returns unread messages across monitored channels, scored and sorted by priority. Optionally filter by guild.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "messages"
+                ],
+                "summary": "Get unread messages with priority scores",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter to a specific guild",
+                        "name": "guild_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_jredh-dev_nexus_services_discord-monitor_internal_monitor.ChannelPriority"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "github_com_jredh-dev_nexus_services_discord-monitor_internal_database.DigestRecord": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "guild_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "period_end": {
+                    "type": "string"
+                },
+                "period_start": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_jredh-dev_nexus_services_discord-monitor_internal_database.Guild": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "guild_id": {
+                    "type": "string"
+                },
+                "icon_hash": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "last_synced_at": {
+                    "type": "string"
+                },
+                "member_count": {
+                    "type": "integer"
+                },
+                "mode": {
+                    "description": "\"bot\" or \"selfbot\"",
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "owner_id": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_jredh-dev_nexus_services_discord-monitor_internal_database.HeatmapBucket": {
+            "type": "object",
+            "properties": {
+                "avg_messages": {
+                    "type": "number"
+                },
+                "day_of_week": {
+                    "description": "0=Sunday, 6=Saturday",
+                    "type": "integer"
+                },
+                "hour_of_day": {
+                    "description": "0-23",
+                    "type": "integer"
+                },
+                "peak_messages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_jredh-dev_nexus_services_discord-monitor_internal_database.Keyword": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "guild_id": {
+                    "description": "empty = global",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_regex": {
+                    "type": "boolean"
+                },
+                "pattern": {
+                    "type": "string"
+                },
+                "priority": {
+                    "description": "0-100, higher = more important",
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_jredh-dev_nexus_services_discord-monitor_internal_monitor.ChannelDigest": {
+            "type": "object",
+            "properties": {
+                "channel_id": {
+                    "type": "string"
+                },
+                "channel_name": {
+                    "type": "string"
+                },
+                "has_keywords": {
+                    "type": "boolean"
+                },
+                "has_mentions": {
+                    "type": "boolean"
+                },
+                "message_count": {
+                    "type": "integer"
+                },
+                "unique_authors": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_jredh-dev_nexus_services_discord-monitor_internal_monitor.ChannelPriority": {
+            "type": "object",
+            "properties": {
+                "channel_id": {
+                    "type": "string"
+                },
+                "channel_name": {
+                    "type": "string"
+                },
+                "guild_id": {
+                    "type": "string"
+                },
+                "guild_name": {
+                    "type": "string"
+                },
+                "reasons": {
+                    "description": "e.g. [\"mention\", \"keyword: deploy\", \"high volume\"]",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "score": {
+                    "type": "integer"
+                },
+                "unread_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_jredh-dev_nexus_services_discord-monitor_internal_monitor.Digest": {
+            "type": "object",
+            "properties": {
+                "channels": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_jredh-dev_nexus_services_discord-monitor_internal_monitor.ChannelDigest"
+                    }
+                },
+                "guild_id": {
+                    "type": "string"
+                },
+                "guild_name": {
+                    "type": "string"
+                },
+                "period_end": {
+                    "type": "string"
+                },
+                "period_start": {
+                    "type": "string"
+                },
+                "total_messages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_server.addKeywordRequest": {
+            "type": "object",
+            "properties": {
+                "guild_id": {
+                    "type": "string"
+                },
+                "is_regex": {
+                    "type": "boolean"
+                },
+                "pattern": {
+                    "type": "string"
+                },
+                "priority": {
+                    "type": "integer"
+                }
+            }
+        }
+    }
+}

@@ -1,8 +1,15 @@
+//	@title          nexus-portal API
+//	@version        1.0
+//	@description    Web portal with authentication, actions registry, and admin tools.
+//	@host           localhost:8090
+//	@BasePath       /
+
 package main
 
 import (
 	"context"
 	cryptoRand "crypto/rand"
+	_ "embed"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -16,6 +23,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jredh-dev/nexus/gen/portal/v1/portalv1connect"
+	gohttp "github.com/jredh-dev/nexus/services/go-http"
 	"github.com/jredh-dev/nexus/services/portal/config"
 	"github.com/jredh-dev/nexus/services/portal/internal/actions"
 	"github.com/jredh-dev/nexus/services/portal/internal/auth"
@@ -23,6 +31,11 @@ import (
 	"github.com/jredh-dev/nexus/services/portal/internal/rpc"
 	"github.com/jredh-dev/nexus/services/portal/internal/web/handlers"
 )
+
+// swaggerSpec embeds the generated swagger.json so the binary is self-contained.
+//
+//go:embed docs/swagger.json
+var swaggerSpec []byte
 
 var (
 	version   = "dev"
@@ -32,6 +45,7 @@ var (
 
 func main() {
 	showVersion := flag.Bool("version", false, "Show version information")
+	enableDocs := flag.Bool("docs", false, "Enable Swagger UI at /docs (local dev only)")
 	flag.Parse()
 
 	if *showVersion {
@@ -114,6 +128,11 @@ func main() {
 		// Admin utilities.
 		r.Post("/admin/magic-link", h.AdminGenerateMagicLink)
 	})
+
+	// Mount Swagger UI if --docs flag is set (local dev only).
+	if *enableDocs {
+		gohttp.EnableDocs(r, swaggerSpec)
+	}
 
 	// Start server.
 	addr := fmt.Sprintf(":%s", cfg.Server.Port)

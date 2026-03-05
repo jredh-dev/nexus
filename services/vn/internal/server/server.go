@@ -128,6 +128,13 @@ func readerID(r *http.Request) string {
 // --- Story handlers ---
 
 // getStory returns story metadata and the reader's current position.
+//
+//	@Summary      Get story metadata
+//	@Description  Returns story title, version, description, chapter list, and start node.
+//	@Tags         story
+//	@Produce      json
+//	@Success      200  {object}  map[string]interface{}
+//	@Router       /api/story [get]
 func (h *handlers) getStory(w http.ResponseWriter, r *http.Request) {
 	story := h.nav.Story()
 
@@ -149,6 +156,14 @@ func (h *handlers) getStory(w http.ResponseWriter, r *http.Request) {
 }
 
 // startStory initializes or resumes a reader's position.
+//
+//	@Summary      Start or resume story
+//	@Description  Initializes a new reader session or resumes an existing one. Uses X-Device-Hash header for identification.
+//	@Tags         story
+//	@Produce      json
+//	@Param        X-Device-Hash  header  string  false  "Anonymous device fingerprint"
+//	@Success      200  {object}  map[string]interface{}
+//	@Router       /api/story/start [post]
 func (h *handlers) startStory(w http.ResponseWriter, r *http.Request) {
 	rid := readerID(r)
 
@@ -173,6 +188,17 @@ func (h *handlers) startStory(w http.ResponseWriter, r *http.Request) {
 }
 
 // advanceStory moves the reader to the next node.
+//
+//	@Summary      Advance story
+//	@Description  Moves the reader to the next node. Optionally pass choice_index for branching decisions.
+//	@Tags         story
+//	@Accept       json
+//	@Produce      json
+//	@Param        X-Device-Hash  header  string  false  "Anonymous device fingerprint"
+//	@Param        body           body    object  false  "Optional: {\"choice_index\": 0}"
+//	@Success      200  {object}  map[string]interface{}
+//	@Failure      400  {object}  map[string]string
+//	@Router       /api/story/advance [post]
 func (h *handlers) advanceStory(w http.ResponseWriter, r *http.Request) {
 	rid := readerID(r)
 
@@ -220,6 +246,14 @@ func (h *handlers) advanceStory(w http.ResponseWriter, r *http.Request) {
 }
 
 // resetStory clears the reader's position.
+//
+//	@Summary      Reset story progress
+//	@Description  Clears the reader's position, allowing them to start over.
+//	@Tags         story
+//	@Produce      json
+//	@Param        X-Device-Hash  header  string  false  "Anonymous device fingerprint"
+//	@Success      200  {object}  map[string]string
+//	@Router       /api/story/reset [post]
 func (h *handlers) resetStory(w http.ResponseWriter, r *http.Request) {
 	rid := readerID(r)
 	h.nav.Reset(rid)
@@ -237,6 +271,14 @@ type chapterSummary struct {
 	NodeCount   int    `json:"node_count"`
 }
 
+// listChapters returns all chapters in order.
+//
+//	@Summary      List chapters
+//	@Description  Returns all chapters sorted by sort_order with summary info.
+//	@Tags         chapters
+//	@Produce      json
+//	@Success      200  {array}  chapterSummary
+//	@Router       /api/chapters [get]
 func (h *handlers) listChapters(w http.ResponseWriter, r *http.Request) {
 	story := h.nav.Story()
 	order := story.ChapterOrder()
@@ -257,6 +299,16 @@ func (h *handlers) listChapters(w http.ResponseWriter, r *http.Request) {
 	gohttp.WriteJSON(w, http.StatusOK, chapters)
 }
 
+// getChapter returns detail for a single chapter including all nodes.
+//
+//	@Summary      Get chapter detail
+//	@Description  Returns a chapter with all its nodes and metadata.
+//	@Tags         chapters
+//	@Produce      json
+//	@Param        id   path      string  true  "Chapter ID"
+//	@Success      200  {object}  map[string]interface{}
+//	@Failure      404  {object}  map[string]string
+//	@Router       /api/chapters/{id} [get]
 func (h *handlers) getChapter(w http.ResponseWriter, r *http.Request) {
 	story := h.nav.Story()
 	id := chi.URLParam(r, "id")
@@ -278,6 +330,15 @@ func (h *handlers) getChapter(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// getChapterVotes returns vote tallies for a chapter.
+//
+//	@Summary      Get chapter vote tallies
+//	@Description  Returns vote tallies for all choices in a chapter.
+//	@Tags         voting
+//	@Produce      json
+//	@Param        id   path      string  true  "Chapter ID"
+//	@Success      200  {array}   map[string]interface{}
+//	@Router       /api/chapters/{id}/votes [get]
 func (h *handlers) getChapterVotes(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
@@ -292,6 +353,18 @@ func (h *handlers) getChapterVotes(w http.ResponseWriter, r *http.Request) {
 
 // --- Vote handler ---
 
+// castVote casts a vote on a chapter choice, spending tokens.
+//
+//	@Summary      Cast a vote
+//	@Description  Spend tokens to vote on a chapter choice. Requires chapter_id, choice, and tokens_spent (>=1).
+//	@Tags         voting
+//	@Accept       json
+//	@Produce      json
+//	@Param        X-Device-Hash  header  string  false  "Anonymous device fingerprint"
+//	@Param        body           body    object  true   "{\"chapter_id\": \"...\", \"choice\": \"...\", \"tokens_spent\": 1}"
+//	@Success      200  {object}  map[string]interface{}
+//	@Failure      400  {object}  map[string]string
+//	@Router       /api/vote [post]
 func (h *handlers) castVote(w http.ResponseWriter, r *http.Request) {
 	rid := readerID(r)
 
@@ -327,6 +400,15 @@ func (h *handlers) castVote(w http.ResponseWriter, r *http.Request) {
 
 // --- Reader handler ---
 
+// getReader returns reader info including tokens, visited nodes, and completed chapters.
+//
+//	@Summary      Get reader info
+//	@Description  Returns reader token balance, current position, visited nodes, and completed chapters.
+//	@Tags         reader
+//	@Produce      json
+//	@Param        X-Device-Hash  header  string  false  "Anonymous device fingerprint"
+//	@Success      200  {object}  map[string]interface{}
+//	@Router       /api/reader [get]
 func (h *handlers) getReader(w http.ResponseWriter, r *http.Request) {
 	rid := readerID(r)
 
@@ -358,6 +440,17 @@ var _ = uuid.UUID{}
 
 // --- Delete handlers ---
 
+// deleteVideo deletes a video and its large object.
+//
+//	@Summary      Delete a video
+//	@Description  Removes a video and its PostgreSQL large object by UUID.
+//	@Tags         admin
+//	@Produce      json
+//	@Param        id   path      string  true  "Video UUID"
+//	@Success      200  {object}  map[string]string
+//	@Failure      400  {object}  map[string]string
+//	@Failure      404  {object}  map[string]string
+//	@Router       /api/videos/{id} [delete]
 func (h *handlers) deleteVideo(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -371,6 +464,17 @@ func (h *handlers) deleteVideo(w http.ResponseWriter, r *http.Request) {
 	gohttp.WriteJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
+// deleteReader deletes a reader and cascades to their votes.
+//
+//	@Summary      Delete a reader
+//	@Description  Removes a reader by UUID, cascading to all their votes.
+//	@Tags         admin
+//	@Produce      json
+//	@Param        id   path      string  true  "Reader UUID"
+//	@Success      200  {object}  map[string]string
+//	@Failure      400  {object}  map[string]string
+//	@Failure      404  {object}  map[string]string
+//	@Router       /api/readers/{id} [delete]
 func (h *handlers) deleteReader(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -384,6 +488,17 @@ func (h *handlers) deleteReader(w http.ResponseWriter, r *http.Request) {
 	gohttp.WriteJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
+// deleteEvent deletes a significant event by UUID.
+//
+//	@Summary      Delete an event
+//	@Description  Removes a significant event by its UUID.
+//	@Tags         admin
+//	@Produce      json
+//	@Param        id   path      string  true  "Event UUID"
+//	@Success      200  {object}  map[string]string
+//	@Failure      400  {object}  map[string]string
+//	@Failure      404  {object}  map[string]string
+//	@Router       /api/events/{id} [delete]
 func (h *handlers) deleteEvent(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -397,6 +512,17 @@ func (h *handlers) deleteEvent(w http.ResponseWriter, r *http.Request) {
 	gohttp.WriteJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
+// deleteSubtitle deletes a subtitle by UUID.
+//
+//	@Summary      Delete a subtitle
+//	@Description  Removes a subtitle by its UUID.
+//	@Tags         admin
+//	@Produce      json
+//	@Param        id   path      string  true  "Subtitle UUID"
+//	@Success      200  {object}  map[string]string
+//	@Failure      400  {object}  map[string]string
+//	@Failure      404  {object}  map[string]string
+//	@Router       /api/subtitles/{id} [delete]
 func (h *handlers) deleteSubtitle(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -410,6 +536,15 @@ func (h *handlers) deleteSubtitle(w http.ResponseWriter, r *http.Request) {
 	gohttp.WriteJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
+// deleteVotesByChapter deletes all votes for a chapter.
+//
+//	@Summary      Delete votes by chapter
+//	@Description  Removes all votes for a given chapter ID.
+//	@Tags         admin
+//	@Produce      json
+//	@Param        id   path      string  true  "Chapter ID"
+//	@Success      200  {object}  map[string]string
+//	@Router       /api/votes/chapter/{id} [delete]
 func (h *handlers) deleteVotesByChapter(w http.ResponseWriter, r *http.Request) {
 	chapterID := chi.URLParam(r, "id")
 	if chapterID == "" {
@@ -427,6 +562,13 @@ func (h *handlers) deleteVotesByChapter(w http.ResponseWriter, r *http.Request) 
 
 // adminReset truncates all data tables and resets navigator state.
 // Only registered when AdminEnabled is true.
+//
+//	@Summary      Reset all data (admin)
+//	@Description  Truncates all tables and resets navigator state. Only available when ADMIN_ENABLED=true.
+//	@Tags         admin
+//	@Produce      json
+//	@Success      200  {object}  map[string]string
+//	@Router       /api/admin/reset [post]
 func (h *handlers) adminReset(w http.ResponseWriter, r *http.Request) {
 	if err := h.db.ResetAll(r.Context()); err != nil {
 		gohttp.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("reset: %v", err))
@@ -443,6 +585,15 @@ func (h *handlers) adminReset(w http.ResponseWriter, r *http.Request) {
 
 // storyHistory returns the git commit log for the story repository.
 // Supports an optional ?limit=N query parameter (default: all commits).
+//
+//	@Summary      Get story commit history
+//	@Description  Returns the git commit log for story YAML files. Optional limit parameter.
+//	@Tags         story-vcs
+//	@Produce      json
+//	@Param        limit  query     int     false  "Max commits to return (0 = all)"
+//	@Success      200    {array}   storyrepo.CommitInfo
+//	@Failure      400    {object}  map[string]string
+//	@Router       /api/story/history [get]
 func (h *handlers) storyHistory(w http.ResponseWriter, r *http.Request) {
 	limit := 0
 	if q := r.URL.Query().Get("limit"); q != "" {
@@ -469,7 +620,17 @@ func (h *handlers) storyHistory(w http.ResponseWriter, r *http.Request) {
 }
 
 // storyCommit stages all YAML files and creates a new commit.
-// Expects a JSON body: {"message": "commit message"}.
+//
+//	@Summary      Commit story changes
+//	@Description  Stages all YAML files and creates a new commit in the story repo
+//	@Tags         story-repo
+//	@Accept       json
+//	@Produce      json
+//	@Param        body  body      object{message=string}  true  "Commit message"
+//	@Success      200   {object}  object{hash=string,message=string}
+//	@Failure      400   {object}  object{error=string}
+//	@Failure      500   {object}  object{error=string}
+//	@Router       /api/story/commit [post]
 func (h *handlers) storyCommit(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Message string `json:"message"`
@@ -497,7 +658,17 @@ func (h *handlers) storyCommit(w http.ResponseWriter, r *http.Request) {
 }
 
 // storyRevert rolls back the story repo to a previous commit.
-// Expects a JSON body: {"hash": "abc123..."}.
+//
+//	@Summary      Revert to a previous commit
+//	@Description  Rolls back the story repo to a previous commit by hash
+//	@Tags         story-repo
+//	@Accept       json
+//	@Produce      json
+//	@Param        body  body      object{hash=string}  true  "Commit hash to revert to"
+//	@Success      200   {object}  object{status=string,reverted_to=string,current_hash=string}
+//	@Failure      400   {object}  object{error=string}
+//	@Failure      500   {object}  object{error=string}
+//	@Router       /api/story/revert [post]
 func (h *handlers) storyRevert(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Hash string `json:"hash"`
@@ -531,9 +702,17 @@ func (h *handlers) storyRevert(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// storyDiff returns the diff between two commits. Supports query parameters:
-//   - ?from=X       — diff from commit X to HEAD
-//   - ?from=X&to=Y  — diff from commit X to commit Y
+// storyDiff returns the diff between two commits.
+//
+//	@Summary      Get diff between commits
+//	@Description  Returns the diff between two commits. Use ?from=X for diff to HEAD, or ?from=X&to=Y for diff between two specific commits.
+//	@Tags         story-repo
+//	@Produce      json
+//	@Param        from  query     string  false  "From commit hash"
+//	@Param        to    query     string  false  "To commit hash (defaults to HEAD)"
+//	@Success      200   {object}  object{diff=string}
+//	@Failure      500   {object}  object{error=string}
+//	@Router       /api/story/diff [get]
 func (h *handlers) storyDiff(w http.ResponseWriter, r *http.Request) {
 	fromHash := r.URL.Query().Get("from")
 	toHash := r.URL.Query().Get("to")

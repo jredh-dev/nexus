@@ -86,7 +86,15 @@ type handlers struct {
 }
 
 // listGuilds returns all tracked guilds as JSON.
-// Query param: ?active=true to filter to active guilds only.
+//
+//	@Summary      List tracked guilds
+//	@Description  Returns all tracked Discord guilds. Use ?active=true to filter to active guilds only.
+//	@Tags         guilds
+//	@Produce      json
+//	@Param        active  query     string  false  "Filter to active guilds only (true/false)"
+//	@Success      200     {array}   database.Guild
+//	@Failure      500     {object}  object{error=string}
+//	@Router       /api/guilds [get]
 func (h *handlers) listGuilds(w http.ResponseWriter, r *http.Request) {
 	activeOnly := r.URL.Query().Get("active") == "true"
 
@@ -107,7 +115,15 @@ func (h *handlers) listGuilds(w http.ResponseWriter, r *http.Request) {
 // getUnread returns unread messages across all monitored channels,
 // scored and sorted by priority. Uses the monitor.ScoreAll engine
 // to compute priority scores based on mentions, keywords, volume, etc.
-// Query param: ?guild_id=X to filter to a specific guild.
+//
+//	@Summary      Get unread messages with priority scores
+//	@Description  Returns unread messages across monitored channels, scored and sorted by priority. Optionally filter by guild.
+//	@Tags         messages
+//	@Produce      json
+//	@Param        guild_id  query     string  false  "Filter to a specific guild"
+//	@Success      200       {array}   monitor.ChannelPriority
+//	@Failure      500       {object}  object{error=string}
+//	@Router       /api/unread [get]
 func (h *handlers) getUnread(w http.ResponseWriter, r *http.Request) {
 	priorities, err := monitor.ScoreAll(r.Context(), h.db, h.userID)
 	if err != nil {
@@ -135,6 +151,14 @@ func (h *handlers) getUnread(w http.ResponseWriter, r *http.Request) {
 }
 
 // getStatus returns service health and operational info.
+//
+//	@Summary      Service status
+//	@Description  Returns uptime, selfbot connection state, and guild counts.
+//	@Tags         status
+//	@Produce      json
+//	@Success      200  {object}  object{status=string,uptime_seconds=int,selfbot_connected=bool,total_guilds=int,active_guilds=int}
+//	@Failure      500  {object}  object{error=string}
+//	@Router       /api/status [get]
 func (h *handlers) getStatus(w http.ResponseWriter, r *http.Request) {
 	guilds, err := h.db.ListGuilds(r.Context(), false)
 	if err != nil {
@@ -159,8 +183,15 @@ func (h *handlers) getStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // listKeywords returns all keyword patterns.
-// Query param: ?guild_id=X to filter to keywords for a specific guild
-// (includes global keywords).
+//
+//	@Summary      List keyword patterns
+//	@Description  Returns all keyword watchlist patterns. Optionally filter by guild (includes global keywords).
+//	@Tags         keywords
+//	@Produce      json
+//	@Param        guild_id  query     string  false  "Filter to keywords for a specific guild"
+//	@Success      200       {array}   database.Keyword
+//	@Failure      500       {object}  object{error=string}
+//	@Router       /api/keywords [get]
 func (h *handlers) listKeywords(w http.ResponseWriter, r *http.Request) {
 	guildID := r.URL.Query().Get("guild_id")
 
@@ -186,7 +217,17 @@ type addKeywordRequest struct {
 }
 
 // addKeyword creates a new keyword pattern.
-// Request body (JSON): {"pattern": "deploy", "is_regex": false, "guild_id": "", "priority": 50}
+//
+//	@Summary      Add keyword pattern
+//	@Description  Creates a new keyword pattern for the watchlist. Pattern is required. Priority is clamped to 0-100.
+//	@Tags         keywords
+//	@Accept       json
+//	@Produce      json
+//	@Param        body  body      addKeywordRequest  true  "Keyword to add"
+//	@Success      201   {object}  object{status=string}
+//	@Failure      400   {object}  object{error=string}
+//	@Failure      500   {object}  object{error=string}
+//	@Router       /api/keywords [post]
 func (h *handlers) addKeyword(w http.ResponseWriter, r *http.Request) {
 	var req addKeywordRequest
 	if err := gohttp.DecodeJSON(r, &req); err != nil {
@@ -219,6 +260,16 @@ func (h *handlers) addKeyword(w http.ResponseWriter, r *http.Request) {
 }
 
 // deleteKeyword removes a keyword by its UUID.
+//
+//	@Summary      Delete keyword
+//	@Description  Removes a keyword pattern by its UUID.
+//	@Tags         keywords
+//	@Produce      json
+//	@Param        id   path      string  true  "Keyword UUID"
+//	@Success      200  {object}  object{status=string}
+//	@Failure      400  {object}  object{error=string}
+//	@Failure      404  {object}  object{error=string}
+//	@Router       /api/keywords/{id} [delete]
 func (h *handlers) deleteKeyword(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
@@ -237,7 +288,17 @@ func (h *handlers) deleteKeyword(w http.ResponseWriter, r *http.Request) {
 }
 
 // listDigests returns recent digests for a guild.
-// Query params: ?guild_id=X (required), ?limit=N (default 10).
+//
+//	@Summary      List digests
+//	@Description  Returns recent digests for a guild. guild_id is required. Default limit is 10.
+//	@Tags         digests
+//	@Produce      json
+//	@Param        guild_id  query     string  true   "Guild ID"
+//	@Param        limit     query     int     false  "Max results (default 10)"
+//	@Success      200       {array}   database.DigestRecord
+//	@Failure      400       {object}  object{error=string}
+//	@Failure      500       {object}  object{error=string}
+//	@Router       /api/digests [get]
 func (h *handlers) listDigests(w http.ResponseWriter, r *http.Request) {
 	guildID := r.URL.Query().Get("guild_id")
 	if guildID == "" {
@@ -266,9 +327,18 @@ func (h *handlers) listDigests(w http.ResponseWriter, r *http.Request) {
 }
 
 // generateDigest triggers digest generation for a guild.
-// Query param: ?guild_id=X (required).
 // The digest covers the period since the last digest (or last 24 hours
 // if no prior digest exists).
+//
+//	@Summary      Generate digest
+//	@Description  Triggers digest generation for a guild. Covers the period since the last digest or last 24 hours.
+//	@Tags         digests
+//	@Produce      json
+//	@Param        guild_id  query     string  true  "Guild ID"
+//	@Success      201       {object}  monitor.Digest
+//	@Failure      400       {object}  object{error=string}
+//	@Failure      500       {object}  object{error=string}
+//	@Router       /api/digests/generate [post]
 func (h *handlers) generateDigest(w http.ResponseWriter, r *http.Request) {
 	guildID := r.URL.Query().Get("guild_id")
 	if guildID == "" {
@@ -311,7 +381,18 @@ func (h *handlers) generateDigest(w http.ResponseWriter, r *http.Request) {
 }
 
 // getHeatmap returns the 7x24 activity heatmap for a channel or guild.
-// Query params: ?channel_id=X or ?guild_id=X (one required), ?days=N (default 7).
+//
+//	@Summary      Activity heatmap
+//	@Description  Returns activity heatmap buckets (day-of-week x hour-of-day) for a channel or guild. Provide channel_id or guild_id (channel takes precedence).
+//	@Tags         analytics
+//	@Produce      json
+//	@Param        channel_id  query     string  false  "Channel ID (takes precedence over guild_id)"
+//	@Param        guild_id    query     string  false  "Guild ID"
+//	@Param        days        query     int     false  "Number of days to cover (default 7)"
+//	@Success      200         {array}   database.HeatmapBucket
+//	@Failure      400         {object}  object{error=string}
+//	@Failure      500         {object}  object{error=string}
+//	@Router       /api/heatmap [get]
 func (h *handlers) getHeatmap(w http.ResponseWriter, r *http.Request) {
 	channelID := r.URL.Query().Get("channel_id")
 	guildID := r.URL.Query().Get("guild_id")

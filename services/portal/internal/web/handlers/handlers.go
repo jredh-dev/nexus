@@ -38,6 +38,16 @@ func (h *Handler) AuthService() *auth.Service {
 }
 
 // Login handles login form submission.
+//
+//	@Summary      Login via form
+//	@Description  Authenticates a user with email and password. Sets a session cookie and redirects to /dashboard.
+//	@Tags         auth
+//	@Accept       application/x-www-form-urlencoded
+//	@Param        email     formData  string  true  "User email"
+//	@Param        password  formData  string  true  "User password"
+//	@Success      303  "Redirect to /dashboard"
+//	@Failure      303  "Redirect to /login with error"
+//	@Router       /login [post]
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		log.Printf("Error parsing login form: %v", err)
@@ -74,6 +84,12 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 // Logout clears the session cookie and deletes the server-side session.
+//
+//	@Summary      Logout
+//	@Description  Clears the session cookie and deletes the server-side session. Redirects to /.
+//	@Tags         auth
+//	@Success      303  "Redirect to /"
+//	@Router       /logout [get]
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	if cookie, err := r.Cookie("session"); err == nil {
 		_ = h.auth.Logout(cookie.Value)
@@ -93,6 +109,19 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 // Signup handles signup form submission.
+//
+//	@Summary      Sign up via form
+//	@Description  Creates a new user account, auto-logs in, and redirects to /dashboard.
+//	@Tags         auth
+//	@Accept       application/x-www-form-urlencoded
+//	@Param        username  formData  string  true   "Username"
+//	@Param        email     formData  string  true   "Email address"
+//	@Param        phone     formData  string  true   "Phone number"
+//	@Param        password  formData  string  true   "Password"
+//	@Param        name      formData  string  false  "Display name"
+//	@Success      303  "Redirect to /dashboard"
+//	@Failure      303  "Redirect to /signup with error"
+//	@Router       /signup [post]
 func (h *Handler) Signup(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		log.Printf("Error parsing signup form: %v", err)
@@ -153,6 +182,15 @@ func (h *Handler) Signup(w http.ResponseWriter, r *http.Request) {
 
 // MagicLogin handles GET /auth/magic?token=X — validates a magic login token,
 // creates a session, and redirects to the dashboard.
+//
+//	@Summary      Magic link login
+//	@Description  Validates a magic login token, creates a session, and redirects to /dashboard.
+//	@Tags         auth
+//	@Param        token  query  string  true  "Magic login token"
+//	@Success      303  "Redirect to /dashboard"
+//	@Failure      400  {string}  string  "Missing token"
+//	@Failure      401  {string}  string  "Invalid or expired token"
+//	@Router       /auth/magic [get]
 func (h *Handler) MagicLogin(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
 	if token == "" {
@@ -186,6 +224,17 @@ func (h *Handler) MagicLogin(w http.ResponseWriter, r *http.Request) {
 
 // AdminGenerateMagicLink handles POST /admin/magic-link — generates a magic
 // login token for a given email and returns it as JSON. Requires admin role.
+//
+//	@Summary      Generate magic login link (admin)
+//	@Description  Generates a magic login URL for a given email. Requires admin role.
+//	@Tags         admin
+//	@Accept       application/x-www-form-urlencoded
+//	@Produce      json
+//	@Param        email  formData  string  true  "User email"
+//	@Success      200    {object}  map[string]string  "Contains 'link' field"
+//	@Failure      400    {string}  string
+//	@Failure      404    {string}  string  "User not found"
+//	@Router       /admin/magic-link [post]
 func (h *Handler) AdminGenerateMagicLink(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form data", http.StatusBadRequest)
@@ -223,6 +272,14 @@ func (h *Handler) AdminGenerateMagicLink(w http.ResponseWriter, r *http.Request)
 // SearchActions returns actions matching the query parameter "q".
 // Results are filtered by auth state — admin actions only for admins,
 // login/signup hidden when logged in, logout/dashboard hidden when logged out.
+//
+//	@Summary      Search available actions
+//	@Description  Returns actions matching the query, filtered by auth state.
+//	@Tags         actions
+//	@Produce      json
+//	@Param        q  query     string  false  "Search query"
+//	@Success      200  {array}  actions.Action
+//	@Router       /api/actions [get]
 func (h *Handler) SearchActions(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("q")
 
