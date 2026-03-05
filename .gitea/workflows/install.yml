@@ -21,7 +21,6 @@ jobs:
           HERMIT_SECRET_PLAIN: ${{ secrets.HERMIT_SECRET_PLAIN }}
           SECRETS_URL_PLAIN: ${{ secrets.SECRETS_URL_PLAIN }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          DISCORD_USER_ID: ${{ secrets.DISCORD_USER_ID }}
         run: |
           export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
           CHANGED=$(git diff --name-only HEAD~1 HEAD)

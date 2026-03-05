@@ -110,16 +110,13 @@ jobs:
         if: always()
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          DISCORD_USER_ID: ${{ secrets.DISCORD_USER_ID }}
           STATUS: ${{ job.status }}
           VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
           COLOR=$([[ "$STATUS" == "success" ]] && echo "3066993" || echo "15158332")
-          MENTION=$([[ "$STATUS" != "success" ]] && echo "<@$DISCORD_USER_ID> " || echo "")
           curl -s -X POST "$DISCORD_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "{
-              \"content\": \"${MENTION}\",
               \"embeds\": [{
                 \"title\": \"Deploy: portal\",
                 \"description\": \"Cloud Run DEV\",
