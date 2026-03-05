@@ -1,0 +1,29 @@
+# Auto-deploy vn service on push to main.
+# Rebuilds the Docker image and restarts the container.
+name: Deploy VN
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/vn/**'
+      - 'services/go-http/**'
+      - 'go.mod'
+      - 'go.sum'
+
+jobs:
+  deploy:
+    runs-on: local
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and restart vn
+        working-directory: /Users/jredh/Development/agentic
+        run: |
+          echo "==> Building vn Docker image"
+          docker compose build vn
+          echo "==> Restarting vn service"
+          docker compose up -d vn
+          echo "==> Waiting for health check"
+          sleep 5
+          docker compose ps vn

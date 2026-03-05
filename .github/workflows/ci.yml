@@ -70,6 +70,9 @@ jobs:
       - name: Build cal server
         run: CGO_ENABLED=1 go build -v ./services/cal/cmd/server
 
+      - name: Build vn server
+        run: go build -v ./services/vn/cmd/server
+
   build-web:
     name: Build Web Frontend
     runs-on: ubuntu-latest
