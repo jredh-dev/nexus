@@ -1,3 +1,5 @@
+//go:build integration
+
 // Package database_test provides integration tests for the vn database
 // layer against a real PostgreSQL instance.
 //
@@ -24,7 +26,7 @@ const (
 	pgHost = "/tmp/ctl-pg"
 	pgUser = "jredh"
 	// Test database gets a unique name per run to allow parallel test runs.
-	testDBPrefix = "star_test_"
+	testDBPrefix = "vn_test_"
 )
 
 // testDB creates a temporary database, runs migrations, and returns a
