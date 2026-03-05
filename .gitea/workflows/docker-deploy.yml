@@ -1,0 +1,59 @@
+# Auto-deploy Docker services on push to main.
+# Detects which services changed and only rebuilds those.
+# Runs docker compose from the agentic workspace root.
+name: Docker Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AGENTIC_ROOT: /Users/jredh/Development/agentic
+
+jobs:
+  deploy:
+    runs-on: local
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changes and deploy
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD)
+
+          # hermit — Rust gRPC server
+          if echo "$CHANGED" | grep -qE '^services/rust-grpc/'; then
+            echo "==> Rebuilding hermit"
+            docker compose -f "$AGENTIC_ROOT/docker-compose.yml" build hermit
+            docker compose -f "$AGENTIC_ROOT/docker-compose.yml" up -d hermit
+          else
+            echo "--- hermit: no changes"
+          fi
+
+          # secrets — HTTP API
+          if echo "$CHANGED" | grep -qE '^(services/secrets/|services/go-http/|go\.(mod|sum)$)'; then
+            echo "==> Rebuilding secrets"
+            docker compose -f "$AGENTIC_ROOT/docker-compose.yml" build secrets
+            docker compose -f "$AGENTIC_ROOT/docker-compose.yml" up -d secrets
+          else
+            echo "--- secrets: no changes"
+          fi
+
+          # portal — Web portal
+          if echo "$CHANGED" | grep -qE '^(services/portal/|internal/|go\.(mod|sum)$)'; then
+            echo "==> Rebuilding portal"
+            docker compose -f "$AGENTIC_ROOT/docker-compose.yml" build portal
+            docker compose -f "$AGENTIC_ROOT/docker-compose.yml" up -d portal
+          else
+            echo "--- portal: no changes"
+          fi
+
+          # web — Web frontend
+          if echo "$CHANGED" | grep -qE '^services/web/'; then
+            echo "==> Rebuilding web"
+            docker compose -f "$AGENTIC_ROOT/docker-compose.yml" build web
+            docker compose -f "$AGENTIC_ROOT/docker-compose.yml" up -d web
+          else
+            echo "--- web: no changes"
+          fi
