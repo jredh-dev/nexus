@@ -6,10 +6,17 @@
 // by the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
+//	@title          nexus-cal API
+//	@version        1.0
+//	@description    iCal calendar subscription and management service.
+//	@host           localhost:8082
+//	@BasePath       /
+
 package main
 
 import (
 	"context"
+	_ "embed"
 	"flag"
 	"fmt"
 	"log"
@@ -22,10 +29,16 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	gohttp "github.com/jredh-dev/nexus/services/go-http"
 	"github.com/jredh-dev/nexus/services/cal/config"
 	"github.com/jredh-dev/nexus/services/cal/internal/database"
 	"github.com/jredh-dev/nexus/services/cal/internal/handlers"
 )
+
+// swaggerSpec embeds the generated swagger.json so the binary is self-contained.
+//
+//go:embed docs/swagger.json
+var swaggerSpec []byte
 
 var (
 	version   = "dev"
@@ -35,6 +48,7 @@ var (
 
 func main() {
 	showVersion := flag.Bool("version", false, "Show version information")
+	enableDocs := flag.Bool("docs", false, "Enable Swagger UI at /docs (local dev only)")
 	flag.Parse()
 
 	if *showVersion {
@@ -81,6 +95,11 @@ func main() {
 		r.Post("/events", h.CreateEvent)
 		r.Delete("/events/{id}", h.DeleteEvent)
 	})
+
+	// Mount Swagger UI if --docs flag is set (local dev only).
+	if *enableDocs {
+		gohttp.EnableDocs(r, swaggerSpec)
+	}
 
 	addr := ":" + cfg.Port
 	srv := &http.Server{

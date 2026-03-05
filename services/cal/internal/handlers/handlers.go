@@ -32,6 +32,15 @@ func New(db *database.DB) *Handler {
 
 // Subscribe serves the iCal feed for a given token.
 // GET /{token}.ics
+//
+//	@Summary      Subscribe to calendar feed
+//	@Description  Returns an iCal feed for the given token. Used by calendar clients (webcal://).
+//	@Tags         subscription
+//	@Produce      text/calendar
+//	@Param        token  path      string  true  "Feed token or slug"
+//	@Success      200    {string}  string  "iCal feed content"
+//	@Failure      404    {string}  string  "Feed not found"
+//	@Router       /{token}.ics [get]
 func (h *Handler) Subscribe(w http.ResponseWriter, r *http.Request) {
 	token := chi.URLParam(r, "token")
 	if token == "" {
@@ -100,6 +109,17 @@ type createFeedResp struct {
 
 // CreateFeed creates a new calendar feed.
 // POST /api/feeds
+//
+//	@Summary      Create a calendar feed
+//	@Description  Creates a new calendar feed with an optional URL slug.
+//	@Tags         feeds
+//	@Accept       json
+//	@Produce      json
+//	@Param        body  body      createFeedReq   true  "Feed creation request"
+//	@Success      201   {object}  createFeedResp
+//	@Failure      400   {object}  map[string]string
+//	@Failure      409   {object}  map[string]string  "Slug already in use"
+//	@Router       /api/feeds [post]
 func (h *Handler) CreateFeed(w http.ResponseWriter, r *http.Request) {
 	var req createFeedReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -151,6 +171,13 @@ func (h *Handler) CreateFeed(w http.ResponseWriter, r *http.Request) {
 
 // ListFeeds returns all feeds.
 // GET /api/feeds
+//
+//	@Summary      List all calendar feeds
+//	@Description  Returns all calendar feeds.
+//	@Tags         feeds
+//	@Produce      json
+//	@Success      200  {array}  database.Feed
+//	@Router       /api/feeds [get]
 func (h *Handler) ListFeeds(w http.ResponseWriter, r *http.Request) {
 	feeds, err := h.db.ListFeeds()
 	if err != nil {
@@ -166,6 +193,14 @@ func (h *Handler) ListFeeds(w http.ResponseWriter, r *http.Request) {
 
 // DeleteFeed removes a feed and all its events.
 // DELETE /api/feeds/{id}
+//
+//	@Summary      Delete a calendar feed
+//	@Description  Removes a feed and all its associated events.
+//	@Tags         feeds
+//	@Param        id   path  string  true  "Feed ID"
+//	@Success      204  "No Content"
+//	@Failure      500  {object}  map[string]string
+//	@Router       /api/feeds/{id} [delete]
 func (h *Handler) DeleteFeed(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := h.db.DeleteFeed(id); err != nil {
@@ -192,6 +227,16 @@ type createEventReq struct {
 
 // CreateEvent adds an event to a feed.
 // POST /api/events
+//
+//	@Summary      Create a calendar event
+//	@Description  Adds a new event to a calendar feed. Dates must be RFC 3339 format.
+//	@Tags         events
+//	@Accept       json
+//	@Produce      json
+//	@Param        body  body      createEventReq  true  "Event creation request"
+//	@Success      201   {object}  database.Event
+//	@Failure      400   {object}  map[string]string
+//	@Router       /api/events [post]
 func (h *Handler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	var req createEventReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -263,6 +308,14 @@ func (h *Handler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 
 // ListEvents returns all events for a feed.
 // GET /api/feeds/{id}/events
+//
+//	@Summary      List events for a feed
+//	@Description  Returns all events belonging to a calendar feed.
+//	@Tags         events
+//	@Produce      json
+//	@Param        id   path      string  true  "Feed ID"
+//	@Success      200  {array}   database.Event
+//	@Router       /api/feeds/{id}/events [get]
 func (h *Handler) ListEvents(w http.ResponseWriter, r *http.Request) {
 	feedID := chi.URLParam(r, "id")
 	events, err := h.db.EventsByFeed(feedID)
@@ -279,6 +332,14 @@ func (h *Handler) ListEvents(w http.ResponseWriter, r *http.Request) {
 
 // DeleteEvent removes a single event.
 // DELETE /api/events/{id}
+//
+//	@Summary      Delete a calendar event
+//	@Description  Removes a single event by its ID.
+//	@Tags         events
+//	@Param        id   path  string  true  "Event ID"
+//	@Success      204  "No Content"
+//	@Failure      500  {object}  map[string]string
+//	@Router       /api/events/{id} [delete]
 func (h *Handler) DeleteEvent(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := h.db.DeleteEvent(id); err != nil {
