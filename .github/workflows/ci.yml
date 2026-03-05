@@ -121,3 +121,32 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
         # Don't fail the build if Codecov upload fails
         continue-on-error: true
+
+  # Notify Discord on CI failure (main branch only).
+  notify:
+    name: Notify Discord
+    runs-on: ubuntu-latest
+    needs: [lint, build, build-web, test]
+    if: failure() && github.ref == 'refs/heads/main'
+    steps:
+      - name: Notify Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_USER_ID: ${{ secrets.DISCORD_USER_ID }}
+        run: |
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"content\": \"<@$DISCORD_USER_ID>\",
+              \"embeds\": [{
+                \"title\": \"CI Failed: nexus\",
+                \"description\": \"Push to main\",
+                \"color\": 15158332,
+                \"fields\": [
+                  {\"name\": \"Branch\", \"value\": \"\`main\`\", \"inline\": true},
+                  {\"name\": \"Commit\", \"value\": \"\`${GITHUB_SHA::7}\`\", \"inline\": true},
+                  {\"name\": \"Status\", \"value\": \"failure\", \"inline\": true}
+                ],
+                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+              }]
+            }"
