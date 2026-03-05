@@ -11,7 +11,7 @@ type Channel struct {
 	ChannelID    string     `json:"channel_id"`
 	GuildID      string     `json:"guild_id"`
 	Name         string     `json:"name"`
-	Type         int        `json:"type"` // Discord channel type: 0=text, 2=voice, etc.
+	Type         int        `json:"type"`                // Discord channel type: 0=text, 2=voice, etc.
 	ParentID     *string    `json:"parent_id,omitempty"` // category channel ID
 	Position     int        `json:"position"`
 	IsMonitored  bool       `json:"is_monitored"`

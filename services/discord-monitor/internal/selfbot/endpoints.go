@@ -25,12 +25,12 @@ type User struct {
 
 // Guild represents a Discord server the user is a member of.
 type Guild struct {
-	ID                string `json:"id"`
-	Name              string `json:"name"`
-	Icon              string `json:"icon"`
-	Owner             bool   `json:"owner"`
-	OwnerID           string `json:"owner_id"`
-	ApproximateMemberCount int `json:"approximate_member_count"`
+	ID                     string `json:"id"`
+	Name                   string `json:"name"`
+	Icon                   string `json:"icon"`
+	Owner                  bool   `json:"owner"`
+	OwnerID                string `json:"owner_id"`
+	ApproximateMemberCount int    `json:"approximate_member_count"`
 }
 
 // Channel represents a text or voice channel within a guild.
@@ -38,22 +38,22 @@ type Channel struct {
 	ID       string  `json:"id"`
 	GuildID  string  `json:"guild_id"`
 	Name     string  `json:"name"`
-	Type     int     `json:"type"`     // 0=text, 2=voice, 4=category, etc.
+	Type     int     `json:"type"`      // 0=text, 2=voice, 4=category, etc.
 	ParentID *string `json:"parent_id"` // category ID, null for top-level
 	Position int     `json:"position"`
 }
 
 // Message represents a Discord message.
 type Message struct {
-	ID        string    `json:"id"`
-	ChannelID string    `json:"channel_id"`
-	Author    Author    `json:"author"`
-	Content   string    `json:"content"`
-	Timestamp time.Time `json:"timestamp"`
-	Embeds    []json.RawMessage `json:"embeds"`    // we only check length
-	Attachments []json.RawMessage `json:"attachments"` // we only check length
-	Mentions    []Author          `json:"mentions"`     // users mentioned
-	MentionRoles []string         `json:"mention_roles"` // role IDs mentioned
+	ID           string            `json:"id"`
+	ChannelID    string            `json:"channel_id"`
+	Author       Author            `json:"author"`
+	Content      string            `json:"content"`
+	Timestamp    time.Time         `json:"timestamp"`
+	Embeds       []json.RawMessage `json:"embeds"`        // we only check length
+	Attachments  []json.RawMessage `json:"attachments"`   // we only check length
+	Mentions     []Author          `json:"mentions"`      // users mentioned
+	MentionRoles []string          `json:"mention_roles"` // role IDs mentioned
 }
 
 // Author is the user who sent a message.
