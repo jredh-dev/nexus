@@ -1,8 +1,8 @@
 // Command server runs the discord-monitor HTTP server.
 //
 // It connects to PostgreSQL (running migrations on startup), optionally
-// initializes a selfbot client for Discord user API access, and serves
-// the monitoring HTTP API.
+// initializes a selfbot client and scanner for Discord user API access,
+// and serves the monitoring HTTP API.
 //
 // Environment variables:
 //
@@ -24,9 +24,10 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/jredh-dev/nexus/services/discord-monitor/internal/database"
@@ -66,44 +67,67 @@ func run() int {
 	log.Printf("[discord-monitor] starting: port=%s db_configured=true selfbot=%v scan_interval=%s",
 		port, selfbotToken != "", scanInterval)
 
-	// Connect to PostgreSQL and run migrations.
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	// Create a root context that is cancelled on SIGINT/SIGTERM.
+	// This context is used by the scanner goroutine for graceful shutdown.
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	db, err := database.New(ctx, dbURL)
+	// Connect to PostgreSQL and run migrations.
+	dbCtx, dbCancel := context.WithTimeout(ctx, 15*time.Second)
+	defer dbCancel()
+
+	db, err := database.New(dbCtx, dbURL)
 	if err != nil {
 		log.Fatalf("[discord-monitor] database: %v", err)
 	}
 	defer db.Close()
 	log.Println("[discord-monitor] database connected, migrations applied")
 
-	// Optionally initialize selfbot client and verify token.
+	// Track selfbot state for the server config.
 	selfbotConnected := false
+	userID := ""
+
+	// Optionally initialize selfbot client, verify token, and start scanner.
 	if selfbotToken != "" {
 		client := selfbot.New(selfbotToken)
-		user, err := client.GetMe(ctx)
+
+		// Validate the token by calling GetMe. This also gives us the
+		// user ID which we need for priority scoring (mention detection).
+		verifyCtx, verifyCancel := context.WithTimeout(ctx, 10*time.Second)
+		user, err := client.GetMe(verifyCtx)
+		verifyCancel()
+
 		if err != nil {
 			log.Printf("[discord-monitor] selfbot token validation failed: %v", err)
 			log.Println("[discord-monitor] continuing without selfbot — API-only mode")
 		} else {
 			selfbotConnected = true
+			userID = user.ID
 			log.Printf("[discord-monitor] selfbot authenticated as %s#%s (%s)",
 				user.Username, user.Discriminator, user.ID)
-			// The scan loop will be added in a future phase — for now we
-			// just validate the token and log success.
-			_ = client
-			_ = scanInterval
+
+			// Start the scanner goroutine. It will run until ctx is cancelled
+			// (SIGINT/SIGTERM). The scanner performs periodic guild/channel/message
+			// sync from Discord.
+			scanner := selfbot.NewScanner(client, db, scanInterval)
+			go scanner.Start(ctx)
+			log.Printf("[discord-monitor] scanner started, interval=%s", scanInterval)
 		}
 	}
 
-	// Build and start the HTTP server.
+	// Build and start the HTTP server. The server gets the userID for
+	// priority scoring in the /api/unread endpoint.
 	srv := server.New(server.Config{
 		DB:               db,
 		SelfbotConnected: selfbotConnected,
+		UserID:           userID,
 	})
 
 	srv.OnStop(func() {
-		log.Println("[discord-monitor] shutting down database connection")
+		log.Println("[discord-monitor] shutting down...")
+		// Cancel the root context to stop the scanner goroutine.
+		cancel()
+		log.Println("[discord-monitor] closing database connection")
 		db.Close()
 	})
 
@@ -139,6 +163,3 @@ func parseDuration(s string, fallback time.Duration) time.Duration {
 	}
 	return d
 }
-
-// Ensure fmt is used (for future expansion).
-var _ = fmt.Sprintf
