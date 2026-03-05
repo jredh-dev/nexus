@@ -18,9 +18,8 @@
 //     and their own process isolation.
 //   - Environment variables are set on the child process only — we never
 //     mutate the parent's environment.
-//   - The runner finds the repo root by walking up from the executable's
-//     working directory looking for go.mod. This means servicectl works
-//     from any directory within the nexus repo.
+//   - The runner uses $WORK_SOURCE to find the nexus repo root, so
+//     servicectl works from any directory.
 package main
 
 import (
@@ -227,53 +226,25 @@ func lookupEnv(env []string, name string) string {
 	return ""
 }
 
-// findRepoRoot locates the nexus repo root. It tries three strategies
-// in order:
-//  1. Walk up from cwd looking for go.mod (works inside the repo or a worktree).
-//  2. Check $WORK/work/source/jredh-dev/nexus (the canonical source checkout).
-//  3. Give up with a helpful error.
-//
-// This means `servicectl test vn` works from anywhere — inside the repo,
-// inside a worktree, or from ~ with $WORK set.
+// findRepoRoot returns the nexus repo root using $WORK_SOURCE.
+// $WORK_SOURCE should point to the source checkout directory
+// (e.g. ~/Development/agentic/work/source), and nexus lives at
+// $WORK_SOURCE/jredh-dev/nexus.
 func findRepoRoot() (string, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("cannot determine working directory: %w", err)
+	workSource := os.Getenv("WORK_SOURCE")
+	if workSource == "" {
+		return "", fmt.Errorf(
+			"$WORK_SOURCE not set; add 'export WORK_SOURCE=\"$WORK/work/source\"' to ~/.zshrc",
+		)
 	}
 
-	// Strategy 1: walk up from cwd.
-	if root, ok := walkUpForGoMod(dir); ok {
-		return root, nil
+	root := filepath.Join(workSource, "jredh-dev", "nexus")
+	if !isNexusRoot(root) {
+		return "", fmt.Errorf(
+			"nexus repo not found at %s; ensure the repo is cloned there", root,
+		)
 	}
-
-	// Strategy 2: check $WORK/work/source/jredh-dev/nexus.
-	if work := os.Getenv("WORK"); work != "" {
-		candidate := filepath.Join(work, "work", "source", "jredh-dev", "nexus")
-		if isNexusRoot(candidate) {
-			return candidate, nil
-		}
-	}
-
-	return "", fmt.Errorf(
-		"nexus repo root not found (searched up from %s, WORK=%s); "+
-			"run from within the nexus repo, or set $WORK to the agentic root",
-		dir, os.Getenv("WORK"),
-	)
-}
-
-// walkUpForGoMod walks from dir toward the filesystem root looking for
-// a go.mod containing the nexus module declaration.
-func walkUpForGoMod(dir string) (string, bool) {
-	for {
-		if isNexusRoot(dir) {
-			return dir, true
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", false
-		}
-		dir = parent
-	}
+	return root, nil
 }
 
 // isNexusRoot returns true if dir contains a go.mod with the nexus module.
