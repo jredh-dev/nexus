@@ -55,6 +55,18 @@ type Service struct {
 	// the one that --url / --addr overrides. For HTTP services this is
 	// typically something like VN_URL; for gRPC it's HERMIT_ADDR.
 	URLEnvVar string
+
+	// DockerService is the docker-compose service name. Empty means
+	// Docker mode is not supported for this service.
+	DockerService string
+
+	// HealthEndpoint is the URL to poll for readiness when using --docker.
+	// Empty means skip health polling (e.g., gRPC services).
+	HealthEndpoint string
+
+	// ComposeFile is the path to the docker-compose.yml file.
+	// Defaults to ~/Development/agentic/docker-compose.yml.
+	ComposeFile string
 }
 
 // services is the canonical registry of all nexus services that have
@@ -79,7 +91,9 @@ var services = map[string]Service{
 			{Name: "HERMIT_INSECURE", DefaultValue: "true", Description: "disable TLS (true for local dev)"},
 			{Name: "HERMIT_BEARER_TOKEN", DefaultValue: "", Description: "IAM bearer token (Cloud Run auth)"},
 		},
-		URLEnvVar: "HERMIT_ADDR",
+		URLEnvVar:      "HERMIT_ADDR",
+		DockerService:  "hermit",
+		HealthEndpoint: "", // gRPC — no HTTP health endpoint
 	},
 
 	"secrets": {
@@ -90,7 +104,9 @@ var services = map[string]Service{
 		EnvVars: []EnvVar{
 			{Name: "SECRETS_URL", DefaultValue: "http://localhost:8082", Description: "HTTP base URL"},
 		},
-		URLEnvVar: "SECRETS_URL",
+		URLEnvVar:      "SECRETS_URL",
+		DockerService:  "secrets",
+		HealthEndpoint: "http://localhost:8081/health",
 	},
 
 	"vn": {
@@ -101,7 +117,9 @@ var services = map[string]Service{
 		EnvVars: []EnvVar{
 			{Name: "VN_URL", DefaultValue: "http://localhost:8082", Description: "HTTP base URL"},
 		},
-		URLEnvVar: "VN_URL",
+		URLEnvVar:      "VN_URL",
+		DockerService:  "vn",
+		HealthEndpoint: "http://localhost:8082/health",
 	},
 }
 

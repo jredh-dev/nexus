@@ -37,6 +37,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 )
 
 func main() {
@@ -82,6 +83,7 @@ func cmdTest(args []string) int {
 
 	timeout := fs.String("timeout", "30s", "test timeout (passed to go test -timeout)")
 	dryRun := fs.Bool("dry-run", false, "print the go test command without running it")
+	docker := fs.Bool("docker", false, "start/stop Docker containers for the service")
 
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: servicectl test <service> [flags]\n\n")
@@ -109,7 +111,7 @@ func cmdTest(args []string) int {
 	// failure, but we don't stop on the first failure because you want
 	// to see results for all services.
 	if serviceName == "all" {
-		return runAll(url, *verbose, *timeout, *dryRun)
+		return runAll(url, *verbose, *timeout, *dryRun, *docker)
 	}
 
 	// Look up the service in the registry.
@@ -118,6 +120,18 @@ func cmdTest(args []string) int {
 		fmt.Fprintf(os.Stderr, "servicectl: unknown service %q\n", serviceName)
 		fmt.Fprintf(os.Stderr, "available: %s\n", strings.Join(serviceNames(), ", "))
 		return 1
+	}
+
+	// When --docker is set, manage the container lifecycle around the
+	// test run: start containers, wait for health, run tests, tear down.
+	if *docker {
+		return runWithDocker(svc, RunConfig{
+			Service: svc,
+			URL:     url,
+			Verbose: *verbose,
+			Timeout: *timeout,
+			DryRun:  *dryRun,
+		})
 	}
 
 	return Run(RunConfig{
@@ -129,9 +143,60 @@ func cmdTest(args []string) int {
 	})
 }
 
+// runWithDocker wraps a test run with Docker container lifecycle:
+// start containers, poll health, run tests, tear down.
+func runWithDocker(svc Service, cfg RunConfig) int {
+	// Verify docker is available before attempting anything.
+	if err := checkDockerAvailable(); err != nil {
+		fmt.Fprintf(os.Stderr, "servicectl: %v\n", err)
+		return 1
+	}
+
+	// Ensure the service supports Docker mode.
+	if svc.DockerService == "" {
+		fmt.Fprintf(os.Stderr, "servicectl: service %q does not support --docker (no DockerService defined)\n", svc.Name)
+		return 1
+	}
+
+	// Resolve the compose file path. Service-specific override wins,
+	// otherwise fall back to the default agentic workspace compose file.
+	composeFile := svc.ComposeFile
+	if composeFile == "" {
+		composeFile = defaultComposeFile
+	}
+
+	dockerCfg := DockerConfig{
+		ComposeFile:    composeFile,
+		ServiceName:    svc.DockerService,
+		HealthEndpoint: svc.HealthEndpoint,
+		Timeout:        30 * time.Second,
+	}
+
+	// Start containers.
+	if err := DockerUp(dockerCfg); err != nil {
+		fmt.Fprintf(os.Stderr, "servicectl: %v\n", err)
+		return 1
+	}
+
+	// Ensure teardown happens even if tests panic or fail.
+	defer func() {
+		if err := DockerDown(dockerCfg); err != nil {
+			fmt.Fprintf(os.Stderr, "servicectl: warning: %v\n", err)
+		}
+	}()
+
+	// Wait for the service to be ready before running tests.
+	if err := WaitForHealth(dockerCfg.HealthEndpoint, dockerCfg.Timeout); err != nil {
+		fmt.Fprintf(os.Stderr, "servicectl: %v\n", err)
+		return 1
+	}
+
+	return Run(cfg)
+}
+
 // runAll runs integration tests for every registered service in
 // alphabetical order. Returns the highest exit code seen.
-func runAll(url string, verbose bool, timeout string, dryRun bool) int {
+func runAll(url string, verbose bool, timeout string, dryRun bool, docker bool) int {
 	worst := 0
 	for _, name := range serviceNames() {
 		svc := services[name]
@@ -149,13 +214,20 @@ func runAll(url string, verbose bool, timeout string, dryRun bool) int {
 			effectiveURL = ""
 		}
 
-		code := Run(RunConfig{
+		rcfg := RunConfig{
 			Service: svc,
 			URL:     effectiveURL,
 			Verbose: verbose,
 			Timeout: timeout,
 			DryRun:  dryRun,
-		})
+		}
+
+		var code int
+		if docker {
+			code = runWithDocker(svc, rcfg)
+		} else {
+			code = Run(rcfg)
+		}
 
 		if code > worst {
 			worst = code
