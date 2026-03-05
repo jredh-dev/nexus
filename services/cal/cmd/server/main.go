@@ -29,10 +29,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	gohttp "github.com/jredh-dev/nexus/services/go-http"
 	"github.com/jredh-dev/nexus/services/cal/config"
 	"github.com/jredh-dev/nexus/services/cal/internal/database"
 	"github.com/jredh-dev/nexus/services/cal/internal/handlers"
+	gohttp "github.com/jredh-dev/nexus/services/go-http"
 )
 
 // swaggerSpec embeds the generated swagger.json so the binary is self-contained.

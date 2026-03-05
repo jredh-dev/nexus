@@ -39,10 +39,10 @@ import (
 	"syscall"
 	"time"
 
-	gohttp "github.com/jredh-dev/nexus/services/go-http"
 	"github.com/jredh-dev/nexus/services/discord-monitor/internal/database"
 	"github.com/jredh-dev/nexus/services/discord-monitor/internal/selfbot"
 	"github.com/jredh-dev/nexus/services/discord-monitor/internal/server"
+	gohttp "github.com/jredh-dev/nexus/services/go-http"
 )
 
 // swaggerSpec embeds the generated swagger.json so the binary is self-contained.
