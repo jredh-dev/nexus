@@ -38,7 +38,23 @@ func EnableDocs(r chi.Router, swaggerJSON []byte) {
 	// Redirect /docs to /docs/index.html for convenience.
 	r.Get("/docs", http.RedirectHandler("/docs/index.html", http.StatusMovedPermanently).ServeHTTP)
 
+	// Serve the aggregator index at /docs-all linking to all nexus
+	// services. Useful for local dev where each service runs on a
+	// different port.
+	r.Get("/docs-all", DocsIndex(NexusServices))
+
 	log.Println("[gohttp] Swagger UI enabled at /docs")
+	log.Println("[gohttp] All-services index at /docs-all")
+}
+
+// NexusServices lists all nexus HTTP services and their local dev
+// Swagger UI URLs. Used by the /docs-all aggregator page.
+var NexusServices = []ServiceLink{
+	{Name: "secrets", URL: "http://localhost:8081/docs", Description: "Count-based secret admission service"},
+	{Name: "cal", URL: "http://localhost:8082/docs", Description: "Calendar/iCal service"},
+	{Name: "portal", URL: "http://localhost:8090/docs", Description: "Web portal (auth, admin, dashboard)"},
+	{Name: "vn", URL: "http://localhost:8080/docs", Description: "Visual novel engine"},
+	{Name: "discord-monitor", URL: "http://localhost:8080/docs", Description: "Discord monitoring service"},
 }
 
 // DocsIndexPage returns an HTML page listing all nexus services with
