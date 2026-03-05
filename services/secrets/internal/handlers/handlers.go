@@ -31,6 +31,18 @@ type submitReq struct {
 }
 
 // Submit handles POST /api/secrets
+//
+//	@Summary      Submit a secret
+//	@Description  Submit a value to be checked for equivalence. If no matching
+//	              secret exists, it becomes a new secret (count=1). If an
+//	              equivalent secret exists, its count increments.
+//	@Tags         secrets
+//	@Accept       json
+//	@Produce      json
+//	@Param        body  body      submitReq  true  "Secret submission"
+//	@Success      200   {object}  store.SubmitResult
+//	@Failure      400   {object}  map[string]string
+//	@Router       /api/secrets [post]
 func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 	var req submitReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -54,6 +66,15 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request) {
 }
 
 // Get handles GET /api/secrets/{id}
+//
+//	@Summary      Get a secret by ID
+//	@Description  Returns a single secret by its ID.
+//	@Tags         secrets
+//	@Produce      json
+//	@Param        id   path      string  true  "Secret ID"
+//	@Success      200  {object}  store.Secret
+//	@Failure      404  {object}  map[string]string
+//	@Router       /api/secrets/{id} [get]
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	sec, ok := h.store.Get(id)
@@ -65,6 +86,13 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 // List handles GET /api/secrets — returns secrets in randomized order.
+//
+//	@Summary      List all secrets
+//	@Description  Returns all secrets in randomized order.
+//	@Tags         secrets
+//	@Produce      json
+//	@Success      200  {array}  store.Secret
+//	@Router       /api/secrets [get]
 func (h *Handler) List(w http.ResponseWriter, _ *http.Request) {
 	secrets := h.store.List()
 	if secrets == nil {
@@ -74,11 +102,25 @@ func (h *Handler) List(w http.ResponseWriter, _ *http.Request) {
 }
 
 // Stats handles GET /api/stats
+//
+//	@Summary      Get aggregate stats
+//	@Description  Returns counts of total secrets, still-secret entries, exposed entries, and lens count.
+//	@Tags         secrets
+//	@Produce      json
+//	@Success      200  {object}  store.Stats
+//	@Router       /api/stats [get]
 func (h *Handler) Stats(w http.ResponseWriter, _ *http.Request) {
 	jsonOK(w, http.StatusOK, h.store.Stats())
 }
 
 // Riddle handles GET /api/riddle — the entry point.
+//
+//	@Summary      Get the riddle
+//	@Description  Returns the riddle that explains the secrets game, along with current stats.
+//	@Tags         secrets
+//	@Produce      json
+//	@Success      200  {object}  map[string]interface{}
+//	@Router       /api/riddle [get]
 func (h *Handler) Riddle(w http.ResponseWriter, _ *http.Request) {
 	riddle := map[string]interface{}{
 		"riddle": "A secret admitted once remains a secret. " +
@@ -98,6 +140,16 @@ func (h *Handler) Riddle(w http.ResponseWriter, _ *http.Request) {
 }
 
 // Exposed handles GET /api/exposed — rotating page of no-longer-secret entries.
+//
+//	@Summary      Get exposed secrets
+//	@Description  Returns a rotating plain-text page of secrets that have been admitted more than once.
+//	@Tags         secrets
+//	@Produce      plain
+//	@Success      200  {string}  string  "Plain text wall of exposed secrets"
+//	@Header       200  {int}     X-Exposed-Total  "Total number of exposed secrets"
+//	@Header       200  {int}     X-Exposed-Page   "Current page index"
+//	@Header       200  {int}     X-Exposed-Pages  "Total number of pages"
+//	@Router       /api/exposed [get]
 func (h *Handler) Exposed(w http.ResponseWriter, _ *http.Request) {
 	text, pageIdx, totalPages, totalExposed := h.wall.Page()
 
