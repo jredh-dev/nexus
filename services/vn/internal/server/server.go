@@ -7,6 +7,10 @@
 //	POST /api/story/start           — start/resume reading (returns current node)
 //	POST /api/story/advance         — advance to next node or make a choice
 //	POST /api/story/reset           — reset reader state
+//	GET  /api/story/history         — commit log for story YAML files
+//	POST /api/story/commit          — commit current YAML files
+//	POST /api/story/revert          — revert to a previous commit
+//	GET  /api/story/diff            — diff between commits
 //	GET  /api/chapters              — list chapters in order
 //	GET  /api/chapters/{id}         — chapter detail with nodes
 //	GET  /api/chapters/{id}/votes   — vote tallies for a chapter
@@ -18,6 +22,7 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -25,6 +30,7 @@ import (
 	gohttp "github.com/jredh-dev/nexus/services/go-http"
 	"github.com/jredh-dev/nexus/services/vn/internal/database"
 	"github.com/jredh-dev/nexus/services/vn/internal/engine"
+	"github.com/jredh-dev/nexus/services/vn/internal/storyrepo"
 	"github.com/jredh-dev/nexus/services/vn/internal/video"
 )
 
@@ -32,7 +38,8 @@ import (
 type Config struct {
 	DB        *database.DB
 	Navigator *engine.Navigator
-	Loader    *engine.HotLoader // may be nil if not using hot-reload
+	Loader    *engine.HotLoader  // may be nil if not using hot-reload
+	StoryRepo *storyrepo.Repo    // may be nil if story version control is disabled
 }
 
 // New creates a vn HTTP server with all routes registered.
@@ -45,8 +52,9 @@ func New(cfg Config) *gohttp.Server {
 	}
 
 	h := &handlers{
-		db:  cfg.DB,
-		nav: cfg.Navigator,
+		db:        cfg.DB,
+		nav:       cfg.Navigator,
+		storyRepo: cfg.StoryRepo,
 	}
 
 	srv.Router.Route("/api", func(r chi.Router) {
@@ -55,6 +63,15 @@ func New(cfg Config) *gohttp.Server {
 		r.Post("/story/start", h.startStory)
 		r.Post("/story/advance", h.advanceStory)
 		r.Post("/story/reset", h.resetStory)
+
+		// Story version control (git-backed YAML management).
+		// These endpoints are only registered if a StoryRepo is configured.
+		if cfg.StoryRepo != nil {
+			r.Get("/story/history", h.storyHistory)
+			r.Post("/story/commit", h.storyCommit)
+			r.Post("/story/revert", h.storyRevert)
+			r.Get("/story/diff", h.storyDiff)
+		}
 
 		// Chapters.
 		r.Get("/chapters", h.listChapters)
@@ -75,8 +92,9 @@ func New(cfg Config) *gohttp.Server {
 }
 
 type handlers struct {
-	db  *database.DB
-	nav *engine.Navigator
+	db        *database.DB
+	nav       *engine.Navigator
+	storyRepo *storyrepo.Repo // nil if story version control is disabled
 }
 
 // readerID extracts the reader identifier from the request. Uses the
@@ -318,3 +336,116 @@ func (h *handlers) getReader(w http.ResponseWriter, r *http.Request) {
 
 // --- unused but kept for compile ---
 var _ = uuid.UUID{}
+
+// --- Story version control handlers ---
+//
+// These handlers expose the storyrepo package over HTTP, allowing external
+// tools (editors, CI, admin dashboards) to manage story YAML versions.
+
+// storyHistory returns the git commit log for the story repository.
+// Supports an optional ?limit=N query parameter (default: all commits).
+func (h *handlers) storyHistory(w http.ResponseWriter, r *http.Request) {
+	limit := 0
+	if q := r.URL.Query().Get("limit"); q != "" {
+		n, err := strconv.Atoi(q)
+		if err != nil || n < 0 {
+			gohttp.WriteError(w, http.StatusBadRequest, "limit must be a non-negative integer")
+			return
+		}
+		limit = n
+	}
+
+	commits, err := h.storyRepo.Log(limit)
+	if err != nil {
+		gohttp.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("story log: %v", err))
+		return
+	}
+
+	// Return empty array instead of null when there are no commits.
+	if commits == nil {
+		commits = []storyrepo.CommitInfo{}
+	}
+
+	gohttp.WriteJSON(w, http.StatusOK, commits)
+}
+
+// storyCommit stages all YAML files and creates a new commit.
+// Expects a JSON body: {"message": "commit message"}.
+func (h *handlers) storyCommit(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Message string `json:"message"`
+	}
+	if err := gohttp.DecodeJSON(r, &req); err != nil {
+		gohttp.WriteError(w, http.StatusBadRequest, fmt.Sprintf("decode body: %v", err))
+		return
+	}
+
+	if req.Message == "" {
+		gohttp.WriteError(w, http.StatusBadRequest, "message is required")
+		return
+	}
+
+	hash, err := h.storyRepo.Commit(req.Message)
+	if err != nil {
+		gohttp.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("commit: %v", err))
+		return
+	}
+
+	gohttp.WriteJSON(w, http.StatusOK, map[string]string{
+		"hash":    hash,
+		"message": req.Message,
+	})
+}
+
+// storyRevert rolls back the story repo to a previous commit.
+// Expects a JSON body: {"hash": "abc123..."}.
+func (h *handlers) storyRevert(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Hash string `json:"hash"`
+	}
+	if err := gohttp.DecodeJSON(r, &req); err != nil {
+		gohttp.WriteError(w, http.StatusBadRequest, fmt.Sprintf("decode body: %v", err))
+		return
+	}
+
+	if req.Hash == "" {
+		gohttp.WriteError(w, http.StatusBadRequest, "hash is required")
+		return
+	}
+
+	if err := h.storyRepo.Revert(req.Hash); err != nil {
+		gohttp.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("revert: %v", err))
+		return
+	}
+
+	// Return the new HEAD hash after the revert commit.
+	newHash, err := h.storyRepo.CurrentHash()
+	if err != nil {
+		gohttp.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("get hash after revert: %v", err))
+		return
+	}
+
+	gohttp.WriteJSON(w, http.StatusOK, map[string]string{
+		"status":       "reverted",
+		"reverted_to":  req.Hash,
+		"current_hash": newHash,
+	})
+}
+
+// storyDiff returns the diff between two commits. Supports query parameters:
+//   - ?from=X       — diff from commit X to HEAD
+//   - ?from=X&to=Y  — diff from commit X to commit Y
+func (h *handlers) storyDiff(w http.ResponseWriter, r *http.Request) {
+	fromHash := r.URL.Query().Get("from")
+	toHash := r.URL.Query().Get("to")
+
+	diff, err := h.storyRepo.Diff(fromHash, toHash)
+	if err != nil {
+		gohttp.WriteError(w, http.StatusInternalServerError, fmt.Sprintf("diff: %v", err))
+		return
+	}
+
+	gohttp.WriteJSON(w, http.StatusOK, map[string]string{
+		"diff": diff,
+	})
+}
