@@ -1,9 +1,12 @@
-package character
+package character_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/jredh-dev/nexus/services/vn/internal/character"
+	"github.com/jredh-dev/nexus/services/vn/internal/state"
 )
 
 func writeFile(t *testing.T, dir, name, content string) {
@@ -27,7 +30,7 @@ traits:
 notes: "Has a scar on the left hand."
 `)
 
-	c, err := Load(filepath.Join(dir, "hero.yaml"))
+	c, err := state.Load[character.Character](filepath.Join(dir, "hero.yaml"))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -57,7 +60,7 @@ func TestLoad_MissingID(t *testing.T) {
 	writeFile(t, dir, "bad.yaml", `
 name: "No ID"
 `)
-	_, err := Load(filepath.Join(dir, "bad.yaml"))
+	_, err := state.Load[character.Character](filepath.Join(dir, "bad.yaml"))
 	if err == nil {
 		t.Fatal("expected error for missing id")
 	}
@@ -68,7 +71,7 @@ func TestLoad_MissingName(t *testing.T) {
 	writeFile(t, dir, "bad.yaml", `
 id: nameless
 `)
-	_, err := Load(filepath.Join(dir, "bad.yaml"))
+	_, err := state.Load[character.Character](filepath.Join(dir, "bad.yaml"))
 	if err == nil {
 		t.Fatal("expected error for missing name")
 	}
@@ -88,7 +91,7 @@ traits:
   - loyal
 `)
 
-	chars, err := LoadDir(dir)
+	chars, err := state.LoadDir[character.Character](dir)
 	if err != nil {
 		t.Fatalf("LoadDir: %v", err)
 	}
@@ -118,7 +121,7 @@ id: same
 name: "Second"
 `)
 
-	_, err := LoadDir(dir)
+	_, err := state.LoadDir[character.Character](dir)
 	if err == nil {
 		t.Fatal("expected error for duplicate id")
 	}
@@ -126,7 +129,7 @@ name: "Second"
 
 func TestLoadDir_Empty(t *testing.T) {
 	dir := t.TempDir()
-	_, err := LoadDir(dir)
+	_, err := state.LoadDir[character.Character](dir)
 	if err == nil {
 		t.Fatal("expected error for empty directory")
 	}
@@ -140,7 +143,7 @@ id: only
 name: "Only One"
 `)
 
-	chars, err := LoadDir(dir)
+	chars, err := state.LoadDir[character.Character](dir)
 	if err != nil {
 		t.Fatalf("LoadDir: %v", err)
 	}
