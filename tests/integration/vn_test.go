@@ -52,6 +52,20 @@ func vnPostJSON(t *testing.T, path, body string) *http.Response {
 	return resp
 }
 
+// vnDelete is a helper that sends a DELETE request and fails on error.
+func vnDelete(t *testing.T, path string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodDelete, vnURL(t)+path, nil)
+	if err != nil {
+		t.Fatalf("new DELETE %s: %v", path, err)
+	}
+	resp, err := vnClient().Do(req)
+	if err != nil {
+		t.Fatalf("DELETE %s: %v", path, err)
+	}
+	return resp
+}
+
 // vnDecodeJSON decodes a response body into v and fails on error.
 func vnDecodeJSON(t *testing.T, resp *http.Response, v any) {
 	t.Helper()
@@ -69,6 +83,59 @@ func TestVNHealth(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("health: got %d, want 200", resp.StatusCode)
 	}
+}
+
+// --- Admin ---
+
+// TestVNAdminReset verifies the admin reset endpoint truncates all tables
+// and that the service still works afterwards. Requires ADMIN_ENABLED=true.
+func TestVNAdminReset(t *testing.T) {
+	// Create some state first: start a story to create a reader.
+	vnPostJSON(t, "/api/story/start", "").Body.Close()
+
+	// Reset everything.
+	resp := vnPostJSON(t, "/api/admin/reset", "")
+	if resp.StatusCode != http.StatusOK {
+		defer resp.Body.Close()
+		// If 404, admin is not enabled — skip.
+		if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusMethodNotAllowed {
+			t.Skip("admin endpoints not enabled (ADMIN_ENABLED != true)")
+		}
+		t.Fatalf("POST /api/admin/reset: got %d, want 200", resp.StatusCode)
+	}
+
+	var resetResp struct {
+		Status string `json:"status"`
+	}
+	vnDecodeJSON(t, resp, &resetResp)
+	if resetResp.Status != "reset" {
+		t.Errorf("expected status \"reset\", got %q", resetResp.Status)
+	}
+
+	// Verify the service still works: start a fresh story.
+	resp = vnPostJSON(t, "/api/story/start", "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("POST /api/story/start after reset: got %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	// Vote tallies should be empty for any chapter.
+	chResp := vnGet(t, "/api/chapters")
+	var chapters []struct {
+		ID string `json:"id"`
+	}
+	vnDecodeJSON(t, chResp, &chapters)
+	if len(chapters) > 0 {
+		voteResp := vnGet(t, "/api/chapters/"+chapters[0].ID+"/votes")
+		var tallies []any
+		vnDecodeJSON(t, voteResp, &tallies)
+		if len(tallies) != 0 {
+			t.Errorf("expected 0 vote tallies after reset, got %d", len(tallies))
+		}
+	}
+
+	// Clean up: reset navigator state so subsequent tests start fresh.
+	vnPostJSON(t, "/api/story/reset", "").Body.Close()
 }
 
 // --- Story ---
@@ -310,7 +377,7 @@ func TestVNCastVote(t *testing.T) {
 	resp := vnPostJSON(t, "/api/story/advance", `{}`)
 	resp.Body.Close()
 
-	// Reset for next test.
+	// Reset navigator for next test.
 	vnPostJSON(t, "/api/story/reset", "").Body.Close()
 
 	// Get chapter list for voting.
@@ -323,9 +390,11 @@ func TestVNCastVote(t *testing.T) {
 		t.Skip("no chapters")
 	}
 
+	chID := chapters[0].ID
+
 	// Cast a vote. May fail if reader has no tokens — that's acceptable
 	// since token granting depends on chapter completion detection.
-	body := `{"chapter_id":"` + chapters[0].ID + `","choice":"left","tokens_spent":1}`
+	body := `{"chapter_id":"` + chID + `","choice":"left","tokens_spent":1}`
 	resp = vnPostJSON(t, "/api/vote", body)
 	defer resp.Body.Close()
 
@@ -333,6 +402,10 @@ func TestVNCastVote(t *testing.T) {
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("POST /api/vote: expected 200 or 400, got %d", resp.StatusCode)
 	}
+
+	// Clean up: remove votes for this chapter so other tests aren't affected.
+	cleanResp := vnDelete(t, "/api/votes/chapter/"+chID)
+	cleanResp.Body.Close()
 }
 
 // --- Full Story Completion ---
