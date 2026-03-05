@@ -27,3 +27,12 @@ jobs:
           echo "==> Waiting for health check"
           sleep 5
           docker compose ps vn
+
+      - name: Notify Discord
+        if: always()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_USER_ID: ${{ secrets.DISCORD_USER_ID }}
+        run: |
+          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
+          ctl notify discord --event deploy --service vn --env local --status "${{ job.status }}" 2>/dev/null || true
