@@ -33,15 +33,14 @@ struct Args {
     /// Path to TLS private key (PEM). Auto-generates self-signed if absent.
     #[arg(long)]
     tls_key: Option<String>,
+
+    /// Disable TLS (serve plaintext h2c). Required for Cloud Run.
+    #[arg(long, default_value_t = false)]
+    no_tls: bool,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Install ring as the default crypto provider for rustls
-    rustls::crypto::ring::default_provider()
-        .install_default()
-        .expect("failed to install rustls crypto provider");
-
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -61,12 +60,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         grpc_port: args.grpc_port,
     });
 
-    // Resolve TLS config (load from files or generate self-signed)
-    let tls_cfg = tls::resolve_tls_config(args.tls_cert.as_deref(), args.tls_key.as_deref())?;
+    // Resolve TLS config unless --no-tls is set
+    let tls_cfg = if args.no_tls {
+        info!("TLS disabled (--no-tls), serving plaintext h2c");
+        None
+    } else {
+        // Install ring as the default crypto provider for rustls
+        rustls::crypto::ring::default_provider()
+            .install_default()
+            .expect("failed to install rustls crypto provider");
+        Some(tls::resolve_tls_config(args.tls_cert.as_deref(), args.tls_key.as_deref())?)
+    };
 
     info!(
         grpc_port = args.grpc_port,
         region = %args.region,
+        tls = tls_cfg.is_some(),
         "hermit-server starting"
     );
 
