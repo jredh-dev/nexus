@@ -2,14 +2,22 @@ name: Integration Tests (DEV)
 
 # Run integration tests against deployed Cloud Run dev services.
 # Triggers:
-#   - After hermit or secrets deploy completes
+#   - After ANY deploy-dev workflow completes successfully
 #   - Manual dispatch for ad-hoc verification
+#
+# Includes a polling step that waits for the new Cloud Run revision
+# to be serving before running tests.
 
 on:
   workflow_run:
     workflows:
       - "Deploy Hermit to Cloud Run (DEV)"
       - "Deploy go-http to Cloud Run (DEV)"
+      - "Deploy Cal to Cloud Run (DEV)"
+      - "Deploy Portal to Cloud Run (DEV)"
+      - "Deploy Web Frontend to Cloud Run (DEV)"
+      # vn is currently disabled — add here when re-enabled:
+      # - "Deploy vn to Cloud Run (DEV)"
     types:
       - completed
     branches:
@@ -48,6 +56,52 @@ jobs:
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
+
+      - name: Wait for new revision to be serving
+        run: |
+          # After a deploy, Cloud Run may take a few seconds to route
+          # traffic to the new revision. Poll health endpoints until
+          # they respond, with a 5-minute timeout.
+          SERVICES=(
+            "nexus-hermit-dev"
+            "nexus-secrets-dev"
+            "nexus-portal-dev"
+            "nexus-web-dev"
+            "nexus-cal-dev"
+          )
+
+          echo "Waiting for Cloud Run services to be ready..."
+          for SVC in "${SERVICES[@]}"; do
+            URL=$(gcloud run services describe "$SVC" \
+              --region ${{ env.GCP_REGION }} \
+              --format 'value(status.url)' 2>/dev/null) || continue
+
+            # Skip services that don't exist yet
+            if [ -z "$URL" ]; then
+              echo "  $SVC: not found, skipping"
+              continue
+            fi
+
+            echo -n "  $SVC: polling $URL "
+            for i in $(seq 1 30); do
+              # Use /health if available, fall back to root
+              HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$URL/health" 2>/dev/null || echo "000")
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo " ready (attempt $i)"
+                break
+              fi
+              # Try root path for services without /health
+              HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$URL/" 2>/dev/null || echo "000")
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo " ready (attempt $i)"
+                break
+              fi
+              if [ "$i" -eq 30 ]; then
+                echo " timeout after 5 minutes (HTTP $HTTP_CODE)"
+              fi
+              sleep 10
+            done
+          done
 
       - name: Get service URLs and IAM token
         id: services
@@ -90,7 +144,7 @@ jobs:
         run: |
           echo "Testing hermit at: $HERMIT_ADDR"
           echo "Testing secrets at: $SECRETS_URL"
-          go test -tags integration -v -count=1 -timeout 60s ./tests/integration/...
+          go test -tags integration -v -count=1 -timeout 120s ./tests/integration/...
 
       - name: Summary
         if: always()
@@ -110,6 +164,7 @@ jobs:
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           STATUS: ${{ job.status }}
+          SOURCE_WORKFLOW: ${{ github.event.workflow_run.name || 'manual' }}
         run: |
           COLOR=$([[ "$STATUS" == "success" ]] && echo "3066993" || echo "15158332")
           curl -s -X POST "$DISCORD_WEBHOOK_URL" \
@@ -117,7 +172,7 @@ jobs:
             -d "{
               \"embeds\": [{
                 \"title\": \"Test: integration\",
-                \"description\": \"Cloud Run DEV\",
+                \"description\": \"Cloud Run DEV (triggered by: $SOURCE_WORKFLOW)\",
                 \"color\": $COLOR,
                 \"fields\": [
                   {\"name\": \"Environment\", \"value\": \"\`dev\`\", \"inline\": true},
