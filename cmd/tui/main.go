@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Jared Redh. All rights reserved.
 
+// tui is the Go TUI client (The Fool). Talks to hermit (gRPC) and secrets (HTTP).
 package main
 
 import (
