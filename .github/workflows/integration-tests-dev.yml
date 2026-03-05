@@ -1,0 +1,106 @@
+name: Integration Tests (DEV)
+
+# Run integration tests against deployed Cloud Run dev services.
+# Triggers:
+#   - After hermit or secrets deploy completes
+#   - Manual dispatch for ad-hoc verification
+
+on:
+  workflow_run:
+    workflows:
+      - "Deploy Hermit to Cloud Run (DEV)"
+      - "Deploy go-http to Cloud Run (DEV)"
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  GCP_PROJECT_ID: dea-noctua
+  GCP_REGION: us-central1
+
+jobs:
+  integration-tests:
+    name: Run Integration Tests
+    runs-on: ubuntu-latest
+    # Only run if the triggering workflow succeeded (or manual dispatch)
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Get service URLs and IAM token
+        id: services
+        run: |
+          # Get hermit gRPC URL (strip https:// prefix, add :443 for gRPC)
+          HERMIT_URL=$(gcloud run services describe nexus-hermit-dev \
+            --region ${{ env.GCP_REGION }} \
+            --format 'value(status.url)')
+          HERMIT_HOST=$(echo "$HERMIT_URL" | sed 's|https://||')
+          echo "hermit_addr=${HERMIT_HOST}:443" >> $GITHUB_OUTPUT
+
+          # Get secrets HTTP URL
+          SECRETS_URL=$(gcloud run services describe nexus-secrets-dev \
+            --region ${{ env.GCP_REGION }} \
+            --format 'value(status.url)')
+          echo "secrets_url=${SECRETS_URL}" >> $GITHUB_OUTPUT
+
+          # Get IAM identity token for Cloud Run auth
+          TOKEN=$(gcloud auth print-identity-token \
+            --audiences="$HERMIT_URL" \
+            --impersonate-service-account=${{ secrets.WIF_SERVICE_ACCOUNT }})
+          echo "::add-mask::$TOKEN"
+          echo "bearer_token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Get hermit secret from Secret Manager
+        id: hermit-secret
+        run: |
+          SECRET=$(gcloud secrets versions access latest \
+            --secret=hermit-secret-dev \
+            --project=${{ env.GCP_PROJECT_ID }})
+          echo "::add-mask::$SECRET"
+          echo "value=$SECRET" >> $GITHUB_OUTPUT
+
+      - name: Run integration tests
+        env:
+          HERMIT_ADDR: ${{ steps.services.outputs.hermit_addr }}
+          HERMIT_SECRET: ${{ steps.hermit-secret.outputs.value }}
+          HERMIT_BEARER_TOKEN: ${{ steps.services.outputs.bearer_token }}
+          SECRETS_URL: ${{ steps.services.outputs.secrets_url }}
+        run: |
+          echo "Testing hermit at: $HERMIT_ADDR"
+          echo "Testing secrets at: $SECRETS_URL"
+          go test -tags integration -v -count=1 -timeout 60s ./tests/integration/...
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Integration Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Hermit**: nexus-hermit-dev" >> $GITHUB_STEP_SUMMARY
+          echo "- **Secrets**: nexus-secrets-dev" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "- **Source workflow**: ${{ github.event.workflow_run.name }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Source conclusion**: ${{ github.event.workflow_run.conclusion }}" >> $GITHUB_STEP_SUMMARY
+          fi

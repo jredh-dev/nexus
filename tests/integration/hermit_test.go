@@ -35,7 +35,9 @@ func hermitClient(t *testing.T) pb.HermitClient {
 	if os.Getenv("HERMIT_INSECURE") == "true" {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	} else {
-		tlsCfg := &tls.Config{InsecureSkipVerify: true} // Self-signed OK for dev/test
+		// Use system CA pool (Cloud Run has valid certs from Google).
+		// Set InsecureSkipVerify only for local dev with self-signed certs.
+		tlsCfg := &tls.Config{}
 		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(tlsCfg)))
 	}
 
@@ -51,9 +53,17 @@ func hermitClient(t *testing.T) pb.HermitClient {
 func hermitCtx(t *testing.T, timeout time.Duration) (context.Context, context.CancelFunc) {
 	t.Helper()
 	ctx := context.Background()
+
+	// App-level auth: x-hermit-secret
 	if secret := os.Getenv("HERMIT_SECRET"); secret != "" {
 		ctx = metadata.AppendToOutgoingContext(ctx, "x-hermit-secret", secret)
 	}
+
+	// Cloud Run IAM auth: bearer token from WIF / gcloud
+	if token := os.Getenv("HERMIT_BEARER_TOKEN"); token != "" {
+		ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+token)
+	}
+
 	return context.WithTimeout(ctx, timeout)
 }
 
