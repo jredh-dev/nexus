@@ -38,8 +38,8 @@ import (
 type Config struct {
 	DB        *database.DB
 	Navigator *engine.Navigator
-	Loader    *engine.HotLoader  // may be nil if not using hot-reload
-	StoryRepo *storyrepo.Repo    // may be nil if story version control is disabled
+	Loader    *engine.HotLoader // may be nil if not using hot-reload
+	StoryRepo *storyrepo.Repo   // may be nil if story version control is disabled
 }
 
 // New creates a vn HTTP server with all routes registered.
