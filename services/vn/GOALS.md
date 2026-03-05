@@ -20,8 +20,9 @@ public release when it's ready.
 
 ## State Management
 
-- Generic YAML state loader (`state.Load[T]` / `state.LoadDir[T]`) for any entity type
-- `State` interface: `StateID() + Validate()` — characters, items, locations, factions, etc.
+- Schema-free YAML persistence: JSON in → YAML on disk → JSON out
+- Only requirement is an `id` field — the engine preserves whatever state it receives
+- No concrete entity structs in the engine; schemas are defined by creative content
 - YAML is for versioned entity state, not branching narrative scripts
 - Git-backed version control for all state definitions
 - Content is hand-written, never AI-generated
@@ -82,7 +83,7 @@ public release when it's ready.
 Phased implementation, backend-first:
 
 1. **Database + engine + story** — schema, migrations, story graph, hot-reload, voting ✅
-2. **State management** — generic YAML loader, character schema, State interface ✅
+2. **State management** — schema-free YAML persistence, JSON↔YAML round-trip ✅
 3. **Video processing** — FFmpeg palindrome loop generation, adaptive transcoding, HTTP streaming
 4. **Subtitle visibility engine** — toggle-point model implementation, client sync
 5. **Web client** — mobile-first HTML/CSS/JS, video player, subtitle renderer
