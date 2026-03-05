@@ -12,4 +12,5 @@
 //	HERMIT_INSECURE     set to "true" to disable TLS (default: TLS with system CAs)
 //	HERMIT_BEARER_TOKEN OAuth2/IAM bearer token for Cloud Run auth (optional)
 //	SECRETS_URL         HTTP base URL (default: http://localhost:8082)
+//	VN_URL              HTTP base URL for vn service (default: http://localhost:8082)
 package integration

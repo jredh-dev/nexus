@@ -82,3 +82,16 @@ jobs:
           else
             echo "--- web: no changes"
           fi
+
+          # vn — Visual novel engine
+          if echo "$CHANGED" | grep -qE '^(services/vn/|services/go-http/|go\.(mod|sum)$)'; then
+            echo "==> Rebuilding vn"
+            if docker compose -f "$AGENTIC_ROOT/docker-compose.yml" build vn && \
+               docker compose -f "$AGENTIC_ROOT/docker-compose.yml" up -d vn; then
+              notify vn success
+            else
+              notify vn failure
+            fi
+          else
+            echo "--- vn: no changes"
+          fi

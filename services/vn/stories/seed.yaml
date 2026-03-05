@@ -1,0 +1,36 @@
+# Seed story for development and integration testing.
+# This minimal story validates that the engine can load and serve
+# a branching narrative. Replace with real content for production.
+version: 1
+title: "Seed Story"
+description: "A minimal story for testing the vn engine."
+start_node: "prologue.intro"
+
+chapters:
+  prologue:
+    title: "Prologue"
+    description: "The beginning."
+    sort_order: 1
+    token_reward: 10
+    start_node: "intro"
+    nodes:
+      intro:
+        video_ref: "placeholder"
+        text: "You stand at the threshold. Two paths diverge."
+        choices:
+          - label: "Take the left path"
+            target: "left"
+          - label: "Take the right path"
+            target: "right"
+      left:
+        video_ref: "placeholder"
+        text: "The left path leads to a clearing."
+        next_node: "ending"
+      right:
+        video_ref: "placeholder"
+        text: "The right path winds through shadow."
+        next_node: "ending"
+      ending:
+        video_ref: "placeholder"
+        text: "Both paths converge. The prologue ends."
+        is_end: true
