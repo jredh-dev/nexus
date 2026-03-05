@@ -20,21 +20,37 @@ jobs:
           HERMIT_ADDR_PLAIN: ${{ secrets.HERMIT_ADDR_PLAIN }}
           HERMIT_SECRET_PLAIN: ${{ secrets.HERMIT_SECRET_PLAIN }}
           SECRETS_URL_PLAIN: ${{ secrets.SECRETS_URL_PLAIN }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_USER_ID: ${{ secrets.DISCORD_USER_ID }}
         run: |
+          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
           CHANGED=$(git diff --name-only HEAD~1 HEAD)
+
+          notify() {
+            local service=$1 status=$2
+            ctl notify discord --event install --service "$service" --env local --status "$status" 2>/dev/null || true
+          }
 
           # tui — Go TUI client (with obfuscated prod values if secrets are set)
           if echo "$CHANGED" | grep -qE '^(cmd/tui/|go\.(mod|sum)$)'; then
             if [ -n "$OBF_PASSPHRASE" ] && [ -n "$HERMIT_ADDR_PLAIN" ] && [ -n "$HERMIT_SECRET_PLAIN" ]; then
               echo "==> Installing tui (prod build with obf values)"
-              make install-prod \
+              if make install-prod \
                 PASSPHRASE="$OBF_PASSPHRASE" \
                 HERMIT_ADDR_PLAIN="$HERMIT_ADDR_PLAIN" \
                 HERMIT_SECRET_PLAIN="$HERMIT_SECRET_PLAIN" \
-                SECRETS_URL_PLAIN="$SECRETS_URL_PLAIN"
+                SECRETS_URL_PLAIN="$SECRETS_URL_PLAIN"; then
+                notify tui success
+              else
+                notify tui failure
+              fi
             else
               echo "==> Installing tui (dev build, no obf secrets)"
-              go install ./cmd/tui
+              if go install ./cmd/tui; then
+                notify tui success
+              else
+                notify tui failure
+              fi
             fi
           else
             echo "--- tui: no changes"
@@ -43,7 +59,11 @@ jobs:
           # server — root server
           if echo "$CHANGED" | grep -qE '^(cmd/server/|internal/|go\.(mod|sum)$)'; then
             echo "==> Installing server"
-            go install ./cmd/server
+            if go install ./cmd/server; then
+              notify server success
+            else
+              notify server failure
+            fi
           else
             echo "--- server: no changes"
           fi
