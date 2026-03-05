@@ -53,7 +53,7 @@ func main() {
 		os.Exit(cmdTest(os.Args[2:]))
 	case "list":
 		cmdList()
-	case "help", "--help", "-h":
+	case "help", "--help", "-h", "-?":
 		printUsage()
 	default:
 		fmt.Fprintf(os.Stderr, "servicectl: unknown command %q\n\n", os.Args[1])
@@ -100,8 +100,13 @@ func cmdTest(args []string) int {
 	}
 
 	// Extract service name before parsing flags. The service name is
-	// always the first positional argument.
+	// always the first positional argument. Handle --help/-h here so
+	// "servicectl test --help" shows flag help instead of "unknown service".
 	serviceName := args[0]
+	if serviceName == "--help" || serviceName == "-h" || serviceName == "-?" || serviceName == "help" {
+		fs.Usage()
+		return 0
+	}
 	if err := fs.Parse(args[1:]); err != nil {
 		return 1
 	}
