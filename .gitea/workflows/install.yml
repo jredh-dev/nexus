@@ -15,13 +15,27 @@ jobs:
           fetch-depth: 2
 
       - name: Detect changes and install
+        env:
+          OBF_PASSPHRASE: ${{ secrets.OBF_PASSPHRASE }}
+          HERMIT_ADDR_PLAIN: ${{ secrets.HERMIT_ADDR_PLAIN }}
+          HERMIT_SECRET_PLAIN: ${{ secrets.HERMIT_SECRET_PLAIN }}
+          SECRETS_URL_PLAIN: ${{ secrets.SECRETS_URL_PLAIN }}
         run: |
           CHANGED=$(git diff --name-only HEAD~1 HEAD)
 
-          # tui — Go TUI client
+          # tui — Go TUI client (with obfuscated prod values if secrets are set)
           if echo "$CHANGED" | grep -qE '^(cmd/tui/|go\.(mod|sum)$)'; then
-            echo "==> Installing tui"
-            go install ./cmd/tui
+            if [ -n "$OBF_PASSPHRASE" ] && [ -n "$HERMIT_ADDR_PLAIN" ] && [ -n "$HERMIT_SECRET_PLAIN" ]; then
+              echo "==> Installing tui (prod build with obf values)"
+              make install-prod \
+                PASSPHRASE="$OBF_PASSPHRASE" \
+                HERMIT_ADDR_PLAIN="$HERMIT_ADDR_PLAIN" \
+                HERMIT_SECRET_PLAIN="$HERMIT_SECRET_PLAIN" \
+                SECRETS_URL_PLAIN="$SECRETS_URL_PLAIN"
+            else
+              echo "==> Installing tui (dev build, no obf secrets)"
+              go install ./cmd/tui
+            fi
           else
             echo "--- tui: no changes"
           fi
