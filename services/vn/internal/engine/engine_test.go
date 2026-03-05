@@ -308,8 +308,8 @@ func TestNavigator_StartIdempotent(t *testing.T) {
 	story := buildTestStory(t)
 	nav := NewNavigator(story)
 
-	nav.Start("r1")
-	nav.Advance("r1", -1) // move to fork
+	_, _, _ = nav.Start("r1")
+	_, _, _, _ = nav.Advance("r1", -1) // move to fork
 
 	state, _, _ := nav.Start("r1") // should NOT reset
 	if state.CurrentNode != "ch1.fork" {
@@ -320,7 +320,7 @@ func TestNavigator_StartIdempotent(t *testing.T) {
 func TestNavigator_LinearAdvance(t *testing.T) {
 	story := buildTestStory(t)
 	nav := NewNavigator(story)
-	nav.Start("r1")
+	_, _, _ = nav.Start("r1")
 
 	state, node, completed, err := nav.Advance("r1", -1)
 	if err != nil {
@@ -344,8 +344,8 @@ func TestNavigator_LinearAdvance(t *testing.T) {
 func TestNavigator_ChoiceAdvance_CrossChapter(t *testing.T) {
 	story := buildTestStory(t)
 	nav := NewNavigator(story)
-	nav.Start("r1")
-	nav.Advance("r1", -1) // intro → fork
+	_, _, _ = nav.Start("r1")
+	_, _, _, _ = nav.Advance("r1", -1) // intro → fork
 
 	// Choose "Path A" (index 0) → ch2.scene_a
 	state, node, completed, err := nav.Advance("r1", 0)
@@ -370,9 +370,9 @@ func TestNavigator_ChoiceAdvance_CrossChapter(t *testing.T) {
 func TestNavigator_AdvanceFromEnd(t *testing.T) {
 	story := buildTestStory(t)
 	nav := NewNavigator(story)
-	nav.Start("r1")
-	nav.Advance("r1", -1) // intro → fork
-	nav.Advance("r1", 1)  // fork → ch2.scene_b
+	_, _, _ = nav.Start("r1")
+	_, _, _, _ = nav.Advance("r1", -1) // intro → fork
+	_, _, _, _ = nav.Advance("r1", 1)  // fork → ch2.scene_b
 
 	_, _, _, err := nav.Advance("r1", -1)
 	if err == nil {
@@ -383,8 +383,8 @@ func TestNavigator_AdvanceFromEnd(t *testing.T) {
 func TestNavigator_InvalidChoiceIndex(t *testing.T) {
 	story := buildTestStory(t)
 	nav := NewNavigator(story)
-	nav.Start("r1")
-	nav.Advance("r1", -1) // → fork
+	_, _, _ = nav.Start("r1")
+	_, _, _, _ = nav.Advance("r1", -1) // → fork
 
 	_, _, _, err := nav.Advance("r1", 5)
 	if err == nil {
@@ -395,7 +395,7 @@ func TestNavigator_InvalidChoiceIndex(t *testing.T) {
 func TestNavigator_ChoiceOnLinearNode(t *testing.T) {
 	story := buildTestStory(t)
 	nav := NewNavigator(story)
-	nav.Start("r1")
+	_, _, _ = nav.Start("r1")
 
 	// intro is a linear node (next_node), passing choiceIdx should error.
 	_, _, _, err := nav.Advance("r1", 0)
@@ -407,8 +407,8 @@ func TestNavigator_ChoiceOnLinearNode(t *testing.T) {
 func TestNavigator_Reset(t *testing.T) {
 	story := buildTestStory(t)
 	nav := NewNavigator(story)
-	nav.Start("r1")
-	nav.Advance("r1", -1)
+	_, _, _ = nav.Start("r1")
+	_, _, _, _ = nav.Advance("r1", -1)
 
 	nav.Reset("r1")
 
@@ -430,7 +430,7 @@ func TestNavigator_Reset(t *testing.T) {
 func TestNavigator_SetStory(t *testing.T) {
 	story := buildTestStory(t)
 	nav := NewNavigator(story)
-	nav.Start("r1")
+	_, _, _ = nav.Start("r1")
 
 	// Replace the story.
 	newStory := buildTestStory(t)
