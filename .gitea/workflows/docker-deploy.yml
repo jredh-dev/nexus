@@ -19,14 +19,27 @@ jobs:
           fetch-depth: 2
 
       - name: Detect changes and deploy
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_USER_ID: ${{ secrets.DISCORD_USER_ID }}
         run: |
+          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
           CHANGED=$(git diff --name-only HEAD~1 HEAD)
+
+          notify() {
+            local service=$1 status=$2
+            ctl notify discord --event deploy --service "$service" --env local --status "$status" 2>/dev/null || true
+          }
 
           # hermit — Rust gRPC server
           if echo "$CHANGED" | grep -qE '^services/rust-grpc/'; then
             echo "==> Rebuilding hermit"
-            docker compose -f "$AGENTIC_ROOT/docker-compose.yml" build hermit
-            docker compose -f "$AGENTIC_ROOT/docker-compose.yml" up -d hermit
+            if docker compose -f "$AGENTIC_ROOT/docker-compose.yml" build hermit && \
+               docker compose -f "$AGENTIC_ROOT/docker-compose.yml" up -d hermit; then
+              notify hermit success
+            else
+              notify hermit failure
+            fi
           else
             echo "--- hermit: no changes"
           fi
@@ -34,8 +47,12 @@ jobs:
           # secrets — HTTP API
           if echo "$CHANGED" | grep -qE '^(services/secrets/|services/go-http/|go\.(mod|sum)$)'; then
             echo "==> Rebuilding secrets"
-            docker compose -f "$AGENTIC_ROOT/docker-compose.yml" build secrets
-            docker compose -f "$AGENTIC_ROOT/docker-compose.yml" up -d secrets
+            if docker compose -f "$AGENTIC_ROOT/docker-compose.yml" build secrets && \
+               docker compose -f "$AGENTIC_ROOT/docker-compose.yml" up -d secrets; then
+              notify secrets success
+            else
+              notify secrets failure
+            fi
           else
             echo "--- secrets: no changes"
           fi
@@ -43,8 +60,12 @@ jobs:
           # portal — Web portal
           if echo "$CHANGED" | grep -qE '^(services/portal/|internal/|go\.(mod|sum)$)'; then
             echo "==> Rebuilding portal"
-            docker compose -f "$AGENTIC_ROOT/docker-compose.yml" build portal
-            docker compose -f "$AGENTIC_ROOT/docker-compose.yml" up -d portal
+            if docker compose -f "$AGENTIC_ROOT/docker-compose.yml" build portal && \
+               docker compose -f "$AGENTIC_ROOT/docker-compose.yml" up -d portal; then
+              notify portal success
+            else
+              notify portal failure
+            fi
           else
             echo "--- portal: no changes"
           fi
@@ -52,8 +73,12 @@ jobs:
           # web — Web frontend
           if echo "$CHANGED" | grep -qE '^services/web/'; then
             echo "==> Rebuilding web"
-            docker compose -f "$AGENTIC_ROOT/docker-compose.yml" build web
-            docker compose -f "$AGENTIC_ROOT/docker-compose.yml" up -d web
+            if docker compose -f "$AGENTIC_ROOT/docker-compose.yml" build web && \
+               docker compose -f "$AGENTIC_ROOT/docker-compose.yml" up -d web; then
+              notify web success
+            else
+              notify web failure
+            fi
           else
             echo "--- web: no changes"
           fi
