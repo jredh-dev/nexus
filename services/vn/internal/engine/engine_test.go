@@ -403,7 +403,7 @@ chapters:
 	_, _, _ = nav.Start("r1")
 
 	// start → middle (no completion)
-	state, _, completed, err := nav.Advance("r1", -1)
+	_, _, completed, err := nav.Advance("r1", -1)
 	if err != nil {
 		t.Fatalf("Advance to middle: %v", err)
 	}
@@ -412,7 +412,7 @@ chapters:
 	}
 
 	// middle → end (should complete ch1)
-	state, _, completed, err = nav.Advance("r1", -1)
+	state, _, completed, err := nav.Advance("r1", -1)
 	if err != nil {
 		t.Fatalf("Advance to end: %v", err)
 	}
