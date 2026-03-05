@@ -1,1 +1,845 @@
-{}
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Visual novel engine with branching narrative, chapter-based progression, voting, and video streaming.",
+        "title": "nexus-vn API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/api/admin/reset": {
+            "post": {
+                "description": "Truncates all tables and resets navigator state. Only available when ADMIN_ENABLED=true.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Reset all data (admin)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/chapters": {
+            "get": {
+                "description": "Returns all chapters sorted by sort_order with summary info.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "chapters"
+                ],
+                "summary": "List chapters",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/internal_server.chapterSummary"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/chapters/{id}": {
+            "get": {
+                "description": "Returns a chapter with all its nodes and metadata.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "chapters"
+                ],
+                "summary": "Get chapter detail",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chapter ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/chapters/{id}/votes": {
+            "get": {
+                "description": "Returns vote tallies for all choices in a chapter.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "voting"
+                ],
+                "summary": "Get chapter vote tallies",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chapter ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/events/{id}": {
+            "delete": {
+                "description": "Removes a significant event by its UUID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Delete an event",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Event UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/reader": {
+            "get": {
+                "description": "Returns reader token balance, current position, visited nodes, and completed chapters.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "reader"
+                ],
+                "summary": "Get reader info",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Anonymous device fingerprint",
+                        "name": "X-Device-Hash",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/readers/{id}": {
+            "delete": {
+                "description": "Removes a reader by UUID, cascading to all their votes.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Delete a reader",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Reader UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/story": {
+            "get": {
+                "description": "Returns story title, version, description, chapter list, and start node.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "story"
+                ],
+                "summary": "Get story metadata",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/story/advance": {
+            "post": {
+                "description": "Moves the reader to the next node. Optionally pass choice_index for branching decisions.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "story"
+                ],
+                "summary": "Advance story",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Anonymous device fingerprint",
+                        "name": "X-Device-Hash",
+                        "in": "header"
+                    },
+                    {
+                        "description": "Optional: {\\",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/story/commit": {
+            "post": {
+                "description": "Stages all YAML files and creates a new commit in the story repo",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "story-repo"
+                ],
+                "summary": "Commit story changes",
+                "parameters": [
+                    {
+                        "description": "Commit message",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "hash": {
+                                    "type": "string"
+                                },
+                                "message": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/story/diff": {
+            "get": {
+                "description": "Returns the diff between two commits. Use ?from=X for diff to HEAD, or ?from=X\u0026to=Y for diff between two specific commits.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "story-repo"
+                ],
+                "summary": "Get diff between commits",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "From commit hash",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "To commit hash (defaults to HEAD)",
+                        "name": "to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "diff": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/story/history": {
+            "get": {
+                "description": "Returns the git commit log for story YAML files. Optional limit parameter.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "story-vcs"
+                ],
+                "summary": "Get story commit history",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Max commits to return (0 = all)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_jredh-dev_nexus_services_vn_internal_storyrepo.CommitInfo"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/story/reset": {
+            "post": {
+                "description": "Clears the reader's position, allowing them to start over.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "story"
+                ],
+                "summary": "Reset story progress",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Anonymous device fingerprint",
+                        "name": "X-Device-Hash",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/story/revert": {
+            "post": {
+                "description": "Rolls back the story repo to a previous commit by hash",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "story-repo"
+                ],
+                "summary": "Revert to a previous commit",
+                "parameters": [
+                    {
+                        "description": "Commit hash to revert to",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "hash": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "current_hash": {
+                                    "type": "string"
+                                },
+                                "reverted_to": {
+                                    "type": "string"
+                                },
+                                "status": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/story/start": {
+            "post": {
+                "description": "Initializes a new reader session or resumes an existing one. Uses X-Device-Hash header for identification.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "story"
+                ],
+                "summary": "Start or resume story",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Anonymous device fingerprint",
+                        "name": "X-Device-Hash",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/subtitles/{id}": {
+            "delete": {
+                "description": "Removes a subtitle by its UUID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Delete a subtitle",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Subtitle UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/videos/{id}": {
+            "delete": {
+                "description": "Removes a video and its PostgreSQL large object by UUID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Delete a video",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Video UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/vote": {
+            "post": {
+                "description": "Spend tokens to vote on a chapter choice. Requires chapter_id, choice, and tokens_spent (\u003e=1).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "voting"
+                ],
+                "summary": "Cast a vote",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Anonymous device fingerprint",
+                        "name": "X-Device-Hash",
+                        "in": "header"
+                    },
+                    {
+                        "description": "{\\",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/votes/chapter/{id}": {
+            "delete": {
+                "description": "Removes all votes for a given chapter ID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Delete votes by chapter",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chapter ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "github_com_jredh-dev_nexus_services_vn_internal_storyrepo.CommitInfo": {
+            "type": "object",
+            "properties": {
+                "author": {
+                    "type": "string"
+                },
+                "hash": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_server.chapterSummary": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "node_count": {
+                    "type": "integer"
+                },
+                "sort_order": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "token_reward": {
+                    "type": "integer"
+                }
+            }
+        }
+    }
+}

@@ -1,1 +1,266 @@
-{}
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Web portal with authentication, actions registry, and admin tools.",
+        "title": "nexus-portal API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8090",
+    "basePath": "/",
+    "paths": {
+        "/admin/magic-link": {
+            "post": {
+                "description": "Generates a magic login URL for a given email. Requires admin role.",
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Generate magic login link (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User email",
+                        "name": "email",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Contains 'link' field",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/actions": {
+            "get": {
+                "description": "Returns actions matching the query, filtered by auth state.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "actions"
+                ],
+                "summary": "Search available actions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search query",
+                        "name": "q",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_jredh-dev_nexus_services_portal_internal_actions.Action"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/magic": {
+            "get": {
+                "description": "Validates a magic login token, creates a session, and redirects to /dashboard.",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Magic link login",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Magic login token",
+                        "name": "token",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "303": {
+                        "description": "Redirect to /dashboard"
+                    },
+                    "400": {
+                        "description": "Missing token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or expired token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/login": {
+            "post": {
+                "description": "Authenticates a user with email and password. Sets a session cookie and redirects to /dashboard.",
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Login via form",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User email",
+                        "name": "email",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "User password",
+                        "name": "password",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "303": {
+                        "description": "Redirect to /login with error"
+                    }
+                }
+            }
+        },
+        "/logout": {
+            "get": {
+                "description": "Clears the session cookie and deletes the server-side session. Redirects to /.",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Logout",
+                "responses": {
+                    "303": {
+                        "description": "Redirect to /"
+                    }
+                }
+            }
+        },
+        "/signup": {
+            "post": {
+                "description": "Creates a new user account, auto-logs in, and redirects to /dashboard.",
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Sign up via form",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "username",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Email address",
+                        "name": "email",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Phone number",
+                        "name": "phone",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Password",
+                        "name": "password",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Display name",
+                        "name": "name",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "303": {
+                        "description": "Redirect to /signup with error"
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "github_com_jredh-dev_nexus_services_portal_internal_actions.Action": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "keywords": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "target": {
+                    "description": "For navigation actions: the URL to navigate to.\nFor function actions: a client-side function identifier.",
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "$ref": "#/definitions/github_com_jredh-dev_nexus_services_portal_internal_actions.ActionType"
+                }
+            }
+        },
+        "github_com_jredh-dev_nexus_services_portal_internal_actions.ActionType": {
+            "type": "string",
+            "enum": [
+                "navigation",
+                "function"
+            ],
+            "x-enum-varnames": [
+                "TypeNavigation",
+                "TypeFunction"
+            ]
+        }
+    }
+}
