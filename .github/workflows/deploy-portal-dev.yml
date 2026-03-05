@@ -105,3 +105,30 @@ jobs:
           echo "- **Commit**: ${{ steps.version.outputs.COMMIT }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Service URL**: ${{ steps.service-url.outputs.url }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Image**: ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify Discord
+        if: always()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_USER_ID: ${{ secrets.DISCORD_USER_ID }}
+          STATUS: ${{ job.status }}
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          COLOR=$([[ "$STATUS" == "success" ]] && echo "3066993" || echo "15158332")
+          MENTION=$([[ "$STATUS" != "success" ]] && echo "<@$DISCORD_USER_ID> " || echo "")
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"content\": \"${MENTION}\",
+              \"embeds\": [{
+                \"title\": \"Deploy: portal\",
+                \"description\": \"Cloud Run DEV\",
+                \"color\": $COLOR,
+                \"fields\": [
+                  {\"name\": \"Environment\", \"value\": \"\`dev\`\", \"inline\": true},
+                  {\"name\": \"Version\", \"value\": \"\`${VERSION}\`\", \"inline\": true},
+                  {\"name\": \"Status\", \"value\": \"$STATUS\", \"inline\": true}
+                ],
+                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+              }]
+            }"
