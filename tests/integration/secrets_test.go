@@ -79,8 +79,8 @@ func TestSecretsStats(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&stats); err != nil {
 		t.Fatalf("stats decode: %v", err)
 	}
-	// Verify expected fields exist
-	for _, field := range []string{"total", "truths", "lies"} {
+	// Verify expected fields exist (matches store.Stats JSON tags).
+	for _, field := range []string{"total", "secrets", "not_secrets", "lenses"} {
 		if _, ok := stats[field]; !ok {
 			t.Errorf("stats: missing field %q", field)
 		}

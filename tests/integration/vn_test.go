@@ -11,13 +11,14 @@ import (
 	"time"
 )
 
-// vnURL returns the base URL for the vn service. Defaults to the
-// docker-compose mapped port (8082).
+// vnURL returns the base URL for the vn service. Skips the test if
+// VN_URL is not set — vn is not deployed to Cloud Run yet, so these
+// tests only run when explicitly configured (e.g. local docker-compose).
 func vnURL(t *testing.T) string {
 	t.Helper()
 	u := os.Getenv("VN_URL")
 	if u == "" {
-		u = "http://localhost:8082"
+		t.Skip("VN_URL not set — vn service not available, skipping")
 	}
 	return strings.TrimRight(u, "/")
 }
