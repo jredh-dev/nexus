@@ -41,6 +41,7 @@ func FetchGitHubWorkflow(ctx context.Context, owner, repo, workflowFile, token s
 	var raw struct {
 		Runs []struct {
 			Name       string `json:"name"`
+			RunNumber  int    `json:"run_number"`
 			Conclusion string `json:"conclusion"`
 			HTMLURL    string `json:"html_url"`
 			UpdatedAt  string `json:"updated_at"`
@@ -59,6 +60,7 @@ func FetchGitHubWorkflow(ctx context.Context, owner, repo, workflowFile, token s
 		Status:    conclusionToCIStatus(r.Conclusion),
 		URL:       r.HTMLURL,
 		UpdatedAt: r.UpdatedAt,
+		RunNumber: r.RunNumber,
 	}, nil
 }
 

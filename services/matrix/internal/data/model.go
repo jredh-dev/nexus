@@ -33,7 +33,8 @@ type WorkflowRun struct {
 	Name      string
 	Status    CIStatus
 	URL       string
-	UpdatedAt string
+	UpdatedAt string // RFC3339 timestamp of last update/completion
+	RunNumber int    // provider run number (e.g. GitHub run_number, Gitea id)
 }
 
 // PageData is the full dataset rendered into the dashboard template.

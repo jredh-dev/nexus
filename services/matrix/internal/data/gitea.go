@@ -40,11 +40,12 @@ func FetchGiteaWorkflows(ctx context.Context, baseURL, owner, repo, token string
 
 	var raw struct {
 		Runs []struct {
+			ID         int    `json:"id"`   // Gitea's run ID, used as run number
 			Path       string `json:"path"` // e.g. "docker-deploy.yml@refs/heads/main"
 			Status     string `json:"status"`
 			Conclusion string `json:"conclusion"`
 			HTMLURL    string `json:"html_url"`
-			UpdatedAt  string `json:"completed_at"`
+			UpdatedAt  string `json:"updated_at"` // present on all runs (completed_at is only set on done runs)
 		} `json:"workflow_runs"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
@@ -64,6 +65,7 @@ func FetchGiteaWorkflows(ctx context.Context, baseURL, owner, repo, token string
 			Status:    giteaRunStatus(run.Status, run.Conclusion),
 			URL:       run.HTMLURL,
 			UpdatedAt: run.UpdatedAt,
+			RunNumber: run.ID,
 		}
 	}
 
