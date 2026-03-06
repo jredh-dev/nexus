@@ -3,6 +3,7 @@ package page
 
 import (
 	_ "embed"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -66,6 +67,37 @@ var tmpl = template.Must(template.New("matrix").Funcs(template.FuncMap{
 			return "?"
 		}
 	},
+	// timeAgo formats an RFC3339 timestamp as a human-friendly "Xm ago" string.
+	// Returns an empty string if the timestamp is zero or unparseable.
+	"timeAgo": func(ts string) string {
+		if ts == "" {
+			return ""
+		}
+		t, err := time.Parse(time.RFC3339, ts)
+		if err != nil {
+			// Try without sub-seconds
+			t, err = time.Parse("2006-01-02T15:04:05Z", ts)
+			if err != nil {
+				return ""
+			}
+		}
+		d := time.Since(t).Round(time.Minute)
+		switch {
+		case d < time.Minute:
+			return "just now"
+		case d < time.Hour:
+			return fmt.Sprintf("%dm ago", int(d.Minutes()))
+		case d < 24*time.Hour:
+			h := int(d.Hours())
+			m := int(d.Minutes()) % 60
+			if m == 0 {
+				return fmt.Sprintf("%dh ago", h)
+			}
+			return fmt.Sprintf("%dh%dm ago", h, m)
+		default:
+			return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+		}
+	},
 }).Parse(templateSource))
 
 // Config holds runtime configuration for the page handler.
@@ -116,11 +148,14 @@ func Handler(cfg Config) http.HandlerFunc {
 		"deploy-vn-dev.yml",
 		"integration-tests-dev.yml",
 	}
-	// ctl repo workflows.
-	ctlWorkflows := []string{"ci.yml"}
+	// ctl repo GitHub workflows.
+	ctlGHWorkflows := []string{"ci.yml"}
 
-	// Gitea workflows to track (nexus repo only).
-	giteaWorkflows := []string{"docker-deploy.yml", "install.yml"}
+	// Gitea workflows to track (nexus repo).
+	nexusGiteaWorkflows := []string{"docker-deploy.yml", "install.yml"}
+
+	// Gitea workflows to track (ctl repo).
+	ctlGiteaWorkflows := []string{"install.yml"}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -138,14 +173,15 @@ func Handler(cfg Config) http.HandlerFunc {
 
 		// Fetch all data sources in parallel.
 		var (
-			gatusData map[string]data.GatusResult
-			ghNexus   map[string]data.WorkflowRun
-			ghCtl     map[string]data.WorkflowRun
-			giteaData map[string]data.WorkflowRun
+			gatusData  map[string]data.GatusResult
+			ghNexus    map[string]data.WorkflowRun
+			ghCtl      map[string]data.WorkflowRun
+			giteaNexus map[string]data.WorkflowRun
+			giteaCtl   map[string]data.WorkflowRun
 		)
 
 		var wg sync.WaitGroup
-		wg.Add(4)
+		wg.Add(5)
 
 		go func() {
 			defer wg.Done()
@@ -164,18 +200,24 @@ func Handler(cfg Config) http.HandlerFunc {
 
 		go func() {
 			defer wg.Done()
-			ghCtl = data.FetchGitHubWorkflows(ctx, cfg.GitHubOwner, "ctl", cfg.GitHubToken, ctlWorkflows)
+			ghCtl = data.FetchGitHubWorkflows(ctx, cfg.GitHubOwner, "ctl", cfg.GitHubToken, ctlGHWorkflows)
 		}()
 
 		go func() {
 			defer wg.Done()
-			giteaData = data.FetchGiteaWorkflows(ctx, cfg.GiteaURL, cfg.GiteaOwner, cfg.GiteaRepo, cfg.GiteaToken, giteaWorkflows)
+			giteaNexus = data.FetchGiteaWorkflows(ctx, cfg.GiteaURL, cfg.GiteaOwner, cfg.GiteaRepo, cfg.GiteaToken, nexusGiteaWorkflows)
+		}()
+
+		go func() {
+			defer wg.Done()
+			// ctl lives in the jredhbot Gitea org under repo "ctl"
+			giteaCtl = data.FetchGiteaWorkflows(ctx, cfg.GiteaURL, cfg.GiteaOwner, "ctl", cfg.GiteaToken, ctlGiteaWorkflows)
 		}()
 
 		wg.Wait()
 		log.Printf("matrix: data fetched in %s", time.Since(start).Round(time.Millisecond))
 
-		pd := buildPageData(gatusData, ghNexus, ghCtl, giteaData, errors)
+		pd := buildPageData(gatusData, ghNexus, ghCtl, giteaNexus, giteaCtl, errors)
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		// Short cache — stale for 10s is fine, data changes slowly.
@@ -223,9 +265,11 @@ type ServiceEnv struct {
 
 // WorkflowRow holds a single CI/deploy pipeline status + link.
 type WorkflowRow struct {
-	Label  string // display name (workflow filename without .yml)
-	Status data.CIStatus
-	URL    string
+	Label     string // display name (workflow filename without .yml)
+	Status    data.CIStatus
+	URL       string
+	UpdatedAt string // RFC3339 timestamp, formatted by the timeAgo template func
+	RunNumber int    // provider run number; 0 means unknown
 }
 
 // RepoGroup is a repo with its Gitea/GitHub links and all associated pipelines.
@@ -248,7 +292,8 @@ func buildPageData(
 	gatus map[string]data.GatusResult,
 	ghNexus map[string]data.WorkflowRun,
 	ghCtl map[string]data.WorkflowRun,
-	gitea map[string]data.WorkflowRun,
+	giteaNexus map[string]data.WorkflowRun,
+	giteaCtl map[string]data.WorkflowRun,
 	errors []string,
 ) TemplateData {
 	// gs looks up a Gatus health status by endpoint key.
@@ -259,22 +304,33 @@ func buildPageData(
 		return data.StatusUnknown
 	}
 
+	// toRow converts a WorkflowRun to a WorkflowRow with a given display label.
+	toRow := func(file string, r data.WorkflowRun) WorkflowRow {
+		return WorkflowRow{
+			Label:     trimYML(file),
+			Status:    r.Status,
+			URL:       r.URL,
+			UpdatedAt: r.UpdatedAt,
+			RunNumber: r.RunNumber,
+		}
+	}
+
 	// ghRow builds a WorkflowRow from a GitHub Actions map.
 	ghRow := func(m map[string]data.WorkflowRun, file string) WorkflowRow {
 		r, ok := m[file]
 		if !ok {
 			return WorkflowRow{Label: trimYML(file), Status: data.CIUnknown}
 		}
-		return WorkflowRow{Label: trimYML(file), Status: r.Status, URL: r.URL}
+		return toRow(file, r)
 	}
 
-	// giteaRow builds a WorkflowRow from the Gitea runs map.
-	giteaRow := func(file string) WorkflowRow {
-		r, ok := gitea[file]
+	// giteaRow builds a WorkflowRow from a Gitea runs map.
+	giteaRow := func(m map[string]data.WorkflowRun, file string) WorkflowRow {
+		r, ok := m[file]
 		if !ok {
 			return WorkflowRow{Label: trimYML(file), Status: data.CIUnknown}
 		}
-		return WorkflowRow{Label: trimYML(file), Status: r.Status, URL: r.URL}
+		return toRow(file, r)
 	}
 
 	// ghRows builds multiple WorkflowRows from a GitHub Actions map.
@@ -286,11 +342,11 @@ func buildPageData(
 		return rows
 	}
 
-	// giteaRows builds multiple WorkflowRows from the Gitea runs map.
-	giteaRows := func(files ...string) []WorkflowRow {
+	// giteaRows builds multiple WorkflowRows from a Gitea runs map.
+	giteaRows := func(m map[string]data.WorkflowRun, files ...string) []WorkflowRow {
 		rows := make([]WorkflowRow, 0, len(files))
 		for _, f := range files {
-			rows = append(rows, giteaRow(f))
+			rows = append(rows, giteaRow(m, f))
 		}
 		return rows
 	}
@@ -304,7 +360,7 @@ func buildPageData(
 				GatusKey:    "local_hermit-(local)",
 				GatusStatus: gs("local_hermit-(local)"),
 				// docker-deploy rebuilds all containers; install keeps tui binary fresh
-				Pipelines: giteaRows("docker-deploy.yml", "install.yml"),
+				Pipelines: giteaRows(giteaNexus, "docker-deploy.yml", "install.yml"),
 			},
 			Cloud: &ServiceEnv{
 				URLs: []ServiceURL{
@@ -322,7 +378,7 @@ func buildPageData(
 				URLs:        []ServiceURL{u(":8081", "http://localhost:8081")},
 				GatusKey:    "local_secrets-(local)",
 				GatusStatus: gs("local_secrets-(local)"),
-				Pipelines:   giteaRows("docker-deploy.yml"),
+				Pipelines:   giteaRows(giteaNexus, "docker-deploy.yml"),
 			},
 			Cloud: &ServiceEnv{
 				// secrets.jredh.com has a failed cert mapping — show it but note it
@@ -343,7 +399,7 @@ func buildPageData(
 				URLs:        []ServiceURL{u(":8090", "http://localhost:8090/login")},
 				GatusKey:    "local_portal-(local)",
 				GatusStatus: gs("local_portal-(local)"),
-				Pipelines:   giteaRows("docker-deploy.yml"),
+				Pipelines:   giteaRows(giteaNexus, "docker-deploy.yml"),
 			},
 			Cloud: &ServiceEnv{
 				URLs: []ServiceURL{
@@ -361,7 +417,7 @@ func buildPageData(
 				URLs:        []ServiceURL{u(":8083", "http://localhost:8083")},
 				GatusKey:    "local_web-(local)",
 				GatusStatus: gs("local_web-(local)"),
-				Pipelines:   giteaRows("docker-deploy.yml"),
+				Pipelines:   giteaRows(giteaNexus, "docker-deploy.yml"),
 			},
 			Cloud: &ServiceEnv{
 				// portal.jredh.com is mapped to nexus-web-dev (the Astro frontend)
@@ -381,7 +437,7 @@ func buildPageData(
 				URLs:        []ServiceURL{u(":8082", "http://localhost:8082/health")},
 				GatusKey:    "local_vn-(local)",
 				GatusStatus: gs("local_vn-(local)"),
-				Pipelines:   giteaRows("docker-deploy.yml"),
+				Pipelines:   giteaRows(giteaNexus, "docker-deploy.yml"),
 			},
 			Cloud: &ServiceEnv{
 				URLs: []ServiceURL{
@@ -410,7 +466,7 @@ func buildPageData(
 			Description: "this page",
 			Local: &ServiceEnv{
 				URLs:      []ServiceURL{u(":8085", "http://localhost:8085")},
-				Pipelines: giteaRows("docker-deploy.yml"),
+				Pipelines: giteaRows(giteaNexus, "docker-deploy.yml"),
 			},
 		},
 		{
@@ -442,14 +498,18 @@ func buildPageData(
 					"ci.yml",
 					"integration-tests-dev.yml",
 				),
-				giteaRows("docker-deploy.yml", "install.yml")...,
+				giteaRows(giteaNexus, "docker-deploy.yml", "install.yml")...,
 			),
 		},
 		{
 			Name:      "ctl",
 			GitHubURL: "https://github.com/jredh-dev/ctl",
 			GiteaURL:  "http://localhost:3000/jredhbot/ctl",
-			Pipelines: ghRows(ghCtl, "ci.yml"),
+			// GitHub ci.yml + Gitea install.yml (auto-installs binary on merge)
+			Pipelines: append(
+				ghRows(ghCtl, "ci.yml"),
+				giteaRows(giteaCtl, "install.yml")...,
+			),
 		},
 	}
 
