@@ -6,11 +6,9 @@
 // by the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-// matrix serves a single static HTML page that acts as a local dev hub:
-// links to all local services, Cloud Run deployments, GitHub CI badges,
-// deploy workflow badges, repos, and external tooling.
-//
-// No database, no auth, no JS. Pure HTML/CSS embedded in the binary.
+// matrix serves a live dev hub dashboard: service health from Gatus,
+// CI/deploy status from GitHub Actions and Gitea Actions, all grouped
+// by service. No JS — server-side rendered on every request.
 package main
 
 import (
@@ -42,15 +40,18 @@ func main() {
 	}
 
 	cfg := config.Load()
+	pageCfg := page.ConfigFromEnv()
 
 	srv := gohttp.New()
 
-	// Single route: serve the embedded dashboard page.
-	srv.Router.Get("/", page.Handler)
+	// Single route: render the live dashboard.
+	srv.Router.Get("/", page.Handler(pageCfg))
 
 	addr := ":" + cfg.Port
 	log.Printf("nexus-matrix starting on %s", addr)
 	log.Printf("  Dashboard: http://localhost%s/", addr)
+	log.Printf("  Gatus:     %s", pageCfg.GatusURL)
+	log.Printf("  Gitea:     %s", pageCfg.GiteaURL)
 
 	if err := srv.ListenAndServe(addr); err != nil {
 		log.Fatalf("Server error: %v", err)
