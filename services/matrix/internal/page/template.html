@@ -99,16 +99,20 @@
       flex-shrink: 0;
       padding-top: 2px;
     }
-    .env-port {
-      color: var(--text);
+    /* env-urls: wrapping list of service URL links */
+    .env-urls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 8px;
       min-width: 76px;
       flex-shrink: 0;
     }
-    .env-port a {
-      color: inherit;
+    .env-urls a {
+      color: var(--text);
       text-decoration: none;
+      font-size: 11px;
     }
-    .env-port a:hover { color: var(--accent); }
+    .env-urls a:hover { color: var(--accent); }
 
     /* ---- pipelines list (wraps naturally) ---- */
     .pipelines {
@@ -209,7 +213,9 @@
       <div class="env-row">
         <span class="env-label">local</span>
         <span class="dot {{statusClass .Local.GatusStatus}}" title="{{statusText .Local.GatusStatus}}"></span>
-        <span class="env-port"><a href="{{.Local.URL}}" target="_blank">{{.Local.Port}}</a></span>
+        <div class="env-urls">
+          {{range .Local.URLs}}<a href="{{.Href}}" target="_blank">{{.Label}}</a>{{end}}
+        </div>
         {{if .Local.Pipelines}}
         <div class="pipelines">
           {{range .Local.Pipelines}}
@@ -228,7 +234,9 @@
       <div class="env-row">
         <span class="env-label">cloud</span>
         <span class="dot {{statusClass .Cloud.GatusStatus}}" title="{{statusText .Cloud.GatusStatus}}"></span>
-        <span class="env-port"><a href="{{.Cloud.URL}}" target="_blank">{{.Cloud.Port}}</a></span>
+        <div class="env-urls">
+          {{range .Cloud.URLs}}<a href="{{.Href}}" target="_blank">{{.Label}}</a>{{end}}
+        </div>
         {{if .Cloud.Pipelines}}
         <div class="pipelines">
           {{range .Cloud.Pipelines}}

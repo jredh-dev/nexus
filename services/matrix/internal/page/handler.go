@@ -203,10 +203,17 @@ type ServiceGroup struct {
 	Cloud       *ServiceEnv // nil if no cloud deployment
 }
 
+// ServiceURL is a labelled link to a running instance of a service.
+// Multiple URLs per env allow showing both the cloud run URL and any
+// custom domain mappings side by side.
+type ServiceURL struct {
+	Label string // short display text, e.g. ":8081", "cloud run", "secrets.jredh.com"
+	Href  string // full URL
+}
+
 // ServiceEnv holds the runtime info for one environment (local or cloud).
 type ServiceEnv struct {
-	URL         string
-	Port        string
+	URLs        []ServiceURL // ordered list of links: primary first, custom domains after
 	GatusKey    string
 	GatusStatus data.Status
 	// Pipelines is the ordered list of CI/deploy workflows for this env.
@@ -233,6 +240,9 @@ type RepoGroup struct {
 func trimYML(s string) string {
 	return strings.TrimSuffix(s, ".yml")
 }
+
+// u is a convenience constructor for ServiceURL.
+func u(label, href string) ServiceURL { return ServiceURL{Label: label, Href: href} }
 
 func buildPageData(
 	gatus map[string]data.GatusResult,
@@ -290,16 +300,16 @@ func buildPageData(
 			Name:        "hermit",
 			Description: "rust grpc server",
 			Local: &ServiceEnv{
-				URL:         "http://localhost:9090",
-				Port:        ":9090",
+				URLs:        []ServiceURL{u(":9090", "http://localhost:9090")},
 				GatusKey:    "local_hermit-(local)",
 				GatusStatus: gs("local_hermit-(local)"),
 				// docker-deploy rebuilds all containers; install keeps tui binary fresh
 				Pipelines: giteaRows("docker-deploy.yml", "install.yml"),
 			},
 			Cloud: &ServiceEnv{
-				URL:         "https://nexus-hermit-dev-2tvic4xjjq-uc.a.run.app",
-				Port:        "cloud run",
+				URLs: []ServiceURL{
+					u("cloud run", "https://nexus-hermit-dev-2tvic4xjjq-uc.a.run.app"),
+				},
 				GatusKey:    "cloud-run_hermit-(cloud)",
 				GatusStatus: gs("cloud-run_hermit-(cloud)"),
 				Pipelines:   ghRows(ghNexus, "deploy-hermit-dev.yml"),
@@ -309,15 +319,17 @@ func buildPageData(
 			Name:        "secrets",
 			Description: "confessions api",
 			Local: &ServiceEnv{
-				URL:         "http://localhost:8081",
-				Port:        ":8081",
+				URLs:        []ServiceURL{u(":8081", "http://localhost:8081")},
 				GatusKey:    "local_secrets-(local)",
 				GatusStatus: gs("local_secrets-(local)"),
 				Pipelines:   giteaRows("docker-deploy.yml"),
 			},
 			Cloud: &ServiceEnv{
-				URL:         "https://nexus-secrets-dev-2tvic4xjjq-uc.a.run.app/health",
-				Port:        "cloud run",
+				// secrets.jredh.com has a failed cert mapping — show it but note it
+				URLs: []ServiceURL{
+					u("cloud run", "https://nexus-secrets-dev-2tvic4xjjq-uc.a.run.app/health"),
+					u("secrets.jredh.com", "https://secrets.jredh.com"),
+				},
 				GatusKey:    "cloud-run_secrets-(cloud)",
 				GatusStatus: gs("cloud-run_secrets-(cloud)"),
 				// secrets is deployed via deploy-go-http-dev.yml (shared go-http workflow)
@@ -328,15 +340,15 @@ func buildPageData(
 			Name:        "portal",
 			Description: "web portal / admin",
 			Local: &ServiceEnv{
-				URL:         "http://localhost:8090/login",
-				Port:        ":8090",
+				URLs:        []ServiceURL{u(":8090", "http://localhost:8090/login")},
 				GatusKey:    "local_portal-(local)",
 				GatusStatus: gs("local_portal-(local)"),
 				Pipelines:   giteaRows("docker-deploy.yml"),
 			},
 			Cloud: &ServiceEnv{
-				URL:         "https://nexus-portal-dev-2tvic4xjjq-uc.a.run.app",
-				Port:        "cloud run",
+				URLs: []ServiceURL{
+					u("cloud run", "https://nexus-portal-dev-2tvic4xjjq-uc.a.run.app"),
+				},
 				GatusKey:    "cloud-run_portal-(cloud)",
 				GatusStatus: gs("cloud-run_portal-(cloud)"),
 				Pipelines:   ghRows(ghNexus, "deploy-portal-dev.yml"),
@@ -346,15 +358,17 @@ func buildPageData(
 			Name:        "web",
 			Description: "astro frontend",
 			Local: &ServiceEnv{
-				URL:         "http://localhost:8083",
-				Port:        ":8083",
+				URLs:        []ServiceURL{u(":8083", "http://localhost:8083")},
 				GatusKey:    "local_web-(local)",
 				GatusStatus: gs("local_web-(local)"),
 				Pipelines:   giteaRows("docker-deploy.yml"),
 			},
 			Cloud: &ServiceEnv{
-				URL:         "https://nexus-web-dev-2tvic4xjjq-uc.a.run.app",
-				Port:        "cloud run",
+				// portal.jredh.com is mapped to nexus-web-dev (the Astro frontend)
+				URLs: []ServiceURL{
+					u("cloud run", "https://nexus-web-dev-2tvic4xjjq-uc.a.run.app"),
+					u("portal.jredh.com", "https://portal.jredh.com"),
+				},
 				GatusKey:    "cloud-run_web-(cloud)",
 				GatusStatus: gs("cloud-run_web-(cloud)"),
 				Pipelines:   ghRows(ghNexus, "deploy-web-dev.yml"),
@@ -364,15 +378,15 @@ func buildPageData(
 			Name:        "vn",
 			Description: "visual novel engine",
 			Local: &ServiceEnv{
-				URL:         "http://localhost:8082/health",
-				Port:        ":8082",
+				URLs:        []ServiceURL{u(":8082", "http://localhost:8082/health")},
 				GatusKey:    "local_vn-(local)",
 				GatusStatus: gs("local_vn-(local)"),
 				Pipelines:   giteaRows("docker-deploy.yml"),
 			},
 			Cloud: &ServiceEnv{
-				URL:         "https://nexus-vn-dev-2tvic4xjjq-uc.a.run.app/health",
-				Port:        "cloud run",
+				URLs: []ServiceURL{
+					u("cloud run", "https://nexus-vn-dev-2tvic4xjjq-uc.a.run.app/health"),
+				},
 				GatusKey:    "cloud-run_vn-(cloud)",
 				GatusStatus: gs("cloud-run_vn-(cloud)"),
 				Pipelines:   ghRows(ghNexus, "deploy-vn-dev.yml"),
@@ -382,8 +396,10 @@ func buildPageData(
 			Name:        "cal",
 			Description: "calendar / ical service",
 			Cloud: &ServiceEnv{
-				URL:         "https://nexus-cal-dev-2tvic4xjjq-uc.a.run.app/health",
-				Port:        "cloud run",
+				URLs: []ServiceURL{
+					u("cloud run", "https://nexus-cal-dev-2tvic4xjjq-uc.a.run.app/health"),
+					u("cal.jredh.com", "https://cal.jredh.com"),
+				},
 				GatusKey:    "cloud-run_cal-(cloud)",
 				GatusStatus: gs("cloud-run_cal-(cloud)"),
 				Pipelines:   ghRows(ghNexus, "deploy-cal-dev.yml"),
@@ -393,8 +409,7 @@ func buildPageData(
 			Name:        "matrix",
 			Description: "this page",
 			Local: &ServiceEnv{
-				URL:       "http://localhost:8085",
-				Port:      ":8085",
+				URLs:      []ServiceURL{u(":8085", "http://localhost:8085")},
 				Pipelines: giteaRows("docker-deploy.yml"),
 			},
 		},
@@ -402,16 +417,14 @@ func buildPageData(
 			Name:        "gatus",
 			Description: "health monitor",
 			Local: &ServiceEnv{
-				URL:  "http://localhost:8084",
-				Port: ":8084",
+				URLs: []ServiceURL{u(":8084", "http://localhost:8084")},
 			},
 		},
 		{
 			Name:        "gitea",
 			Description: "local git + ci",
 			Local: &ServiceEnv{
-				URL:         "http://localhost:3000",
-				Port:        ":3000",
+				URLs:        []ServiceURL{u(":3000", "http://localhost:3000")},
 				GatusKey:    "local_gitea",
 				GatusStatus: gs("local_gitea"),
 			},
