@@ -53,7 +53,7 @@
     /* ---- service grid ---- */
     .service-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
       gap: var(--gap);
     }
 
@@ -86,7 +86,7 @@
     /* ---- env rows (local / cloud) ---- */
     .env-row {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 8px;
       font-size: 12px;
     }
@@ -97,10 +97,12 @@
       letter-spacing: 0.08em;
       width: 40px;
       flex-shrink: 0;
+      padding-top: 2px;
     }
     .env-port {
       color: var(--text);
-      min-width: 80px;
+      min-width: 76px;
+      flex-shrink: 0;
     }
     .env-port a {
       color: inherit;
@@ -108,12 +110,21 @@
     }
     .env-port a:hover { color: var(--accent); }
 
+    /* ---- pipelines list (wraps naturally) ---- */
+    .pipelines {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+    }
+
     /* ---- status dot ---- */
     .dot {
       display: inline-block;
       width: 8px; height: 8px;
       border-radius: 50%;
       flex-shrink: 0;
+      margin-top: 4px;
     }
     .dot-up      { background: var(--green); }
     .dot-down    { background: var(--red); box-shadow: 0 0 4px var(--red); }
@@ -130,6 +141,7 @@
       font-weight: 600;
       text-decoration: none;
       border: 1px solid transparent;
+      white-space: nowrap;
     }
     .ci-success { background: rgba(63,185,80,0.15); color: var(--green); border-color: rgba(63,185,80,0.3); }
     .ci-failure { background: rgba(248,81,73,0.15); color: var(--red);   border-color: rgba(248,81,73,0.3); }
@@ -139,7 +151,7 @@
     /* ---- repo grid ---- */
     .repo-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
       gap: var(--gap);
     }
     .repo-card {
@@ -149,15 +161,12 @@
       padding: 12px 14px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 8px;
     }
     .repo-name {
       font-weight: 600;
       font-size: 13px;
       color: var(--accent);
-      display: flex;
-      align-items: center;
-      gap: 8px;
     }
     .repo-links { display: flex; gap: 10px; }
     .repo-links a { color: var(--muted); font-size: 11px; text-decoration: none; }
@@ -201,12 +210,16 @@
         <span class="env-label">local</span>
         <span class="dot {{statusClass .Local.GatusStatus}}" title="{{statusText .Local.GatusStatus}}"></span>
         <span class="env-port"><a href="{{.Local.URL}}" target="_blank">{{.Local.Port}}</a></span>
-        {{if .Local.Deploy}}
-          {{if .Local.Deploy.URL}}
-          <a class="ci-pill {{ciClass .Local.Deploy.Status}}" href="{{.Local.Deploy.URL}}" target="_blank" title="gitea deploy">{{ciText .Local.Deploy.Status}} deploy</a>
-          {{else}}
-          <span class="ci-pill {{ciClass .Local.Deploy.Status}}" title="gitea deploy">{{ciText .Local.Deploy.Status}} deploy</span>
+        {{if .Local.Pipelines}}
+        <div class="pipelines">
+          {{range .Local.Pipelines}}
+            {{if .URL}}
+            <a class="ci-pill {{ciClass .Status}}" href="{{.URL}}" target="_blank">{{ciText .Status}} {{.Label}}</a>
+            {{else}}
+            <span class="ci-pill {{ciClass .Status}}">{{ciText .Status}} {{.Label}}</span>
+            {{end}}
           {{end}}
+        </div>
         {{end}}
       </div>
       {{end}}
@@ -216,12 +229,16 @@
         <span class="env-label">cloud</span>
         <span class="dot {{statusClass .Cloud.GatusStatus}}" title="{{statusText .Cloud.GatusStatus}}"></span>
         <span class="env-port"><a href="{{.Cloud.URL}}" target="_blank">{{.Cloud.Port}}</a></span>
-        {{if .Cloud.Deploy}}
-          {{if .Cloud.Deploy.URL}}
-          <a class="ci-pill {{ciClass .Cloud.Deploy.Status}}" href="{{.Cloud.Deploy.URL}}" target="_blank" title="github deploy">{{ciText .Cloud.Deploy.Status}} deploy</a>
-          {{else}}
-          <span class="ci-pill {{ciClass .Cloud.Deploy.Status}}" title="github deploy">{{ciText .Cloud.Deploy.Status}} deploy</span>
+        {{if .Cloud.Pipelines}}
+        <div class="pipelines">
+          {{range .Cloud.Pipelines}}
+            {{if .URL}}
+            <a class="ci-pill {{ciClass .Status}}" href="{{.URL}}" target="_blank">{{ciText .Status}} {{.Label}}</a>
+            {{else}}
+            <span class="ci-pill {{ciClass .Status}}">{{ciText .Status}} {{.Label}}</span>
+            {{end}}
           {{end}}
+        </div>
         {{end}}
       </div>
       {{end}}
@@ -238,22 +255,26 @@
   <div class="repo-grid">
     {{range .Repos}}
     <div class="repo-card">
-      <div class="repo-name">
-        {{.Name}}
-        {{if .CIURL}}
-        <a class="ci-pill {{ciClass .CIStatus}}" href="{{.CIURL}}" target="_blank">{{ciText .CIStatus}} ci</a>
-        {{else}}
-        <span class="ci-pill {{ciClass .CIStatus}}">{{ciText .CIStatus}} ci</span>
+      <div class="repo-name">{{.Name}}</div>
+      <div class="repo-links">
+        {{if .GitHubURL}}<a href="{{.GitHubURL}}" target="_blank">github</a>{{end}}
+        {{if .GiteaURL}}<a href="{{.GiteaURL}}" target="_blank">gitea</a>{{end}}
+      </div>
+      {{if .Pipelines}}
+      <div class="pipelines">
+        {{range .Pipelines}}
+          {{if .URL}}
+          <a class="ci-pill {{ciClass .Status}}" href="{{.URL}}" target="_blank">{{ciText .Status}} {{.Label}}</a>
+          {{else}}
+          <span class="ci-pill {{ciClass .Status}}">{{ciText .Status}} {{.Label}}</span>
+          {{end}}
         {{end}}
       </div>
-      <div class="repo-links">
-        <a href="{{.GitHubURL}}" target="_blank">github</a>
-        <a href="{{.GiteaURL}}" target="_blank">gitea</a>
-      </div>
+      {{end}}
     </div>
     {{end}}
 
-    <!-- agentic workspace (gitea only) -->
+    <!-- agentic workspace (gitea only, no pipelines tracked) -->
     <div class="repo-card">
       <div class="repo-name">agentic</div>
       <div class="repo-links">

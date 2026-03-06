@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -104,7 +105,7 @@ func envOr(key, def string) string {
 // Data is fetched live on each request (with a short timeout).
 // Slow or unavailable sources show "?" rather than blocking the page.
 func Handler(cfg Config) http.HandlerFunc {
-	// GitHub workflows to track (filename → display label)
+	// All GitHub Actions workflows to fetch for nexus.
 	ghWorkflows := []string{
 		"ci.yml",
 		"deploy-hermit-dev.yml",
@@ -115,10 +116,10 @@ func Handler(cfg Config) http.HandlerFunc {
 		"deploy-vn-dev.yml",
 		"integration-tests-dev.yml",
 	}
-	// ctl repo workflows
+	// ctl repo workflows.
 	ctlWorkflows := []string{"ci.yml"}
 
-	// Gitea workflows to track
+	// Gitea workflows to track (nexus repo only).
 	giteaWorkflows := []string{"docker-deploy.yml", "install.yml"}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -135,7 +136,7 @@ func Handler(cfg Config) http.HandlerFunc {
 			mu.Unlock()
 		}
 
-		// Fetch all data sources in parallel
+		// Fetch all data sources in parallel.
 		var (
 			gatusData map[string]data.GatusResult
 			ghNexus   map[string]data.WorkflowRun
@@ -177,7 +178,7 @@ func Handler(cfg Config) http.HandlerFunc {
 		pd := buildPageData(gatusData, ghNexus, ghCtl, giteaData, errors)
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		// Short cache — stale for 10s is fine, data changes slowly
+		// Short cache — stale for 10s is fine, data changes slowly.
 		w.Header().Set("Cache-Control", "public, max-age=10")
 		if err := tmpl.Execute(w, pd); err != nil {
 			log.Printf("matrix: template error: %v", err)
@@ -194,13 +195,12 @@ type TemplateData struct {
 }
 
 // ServiceGroup is one named service (hermit, secrets, portal, etc.)
-// with its local status, cloud status, and associated CI/deploy workflows.
+// with its local and cloud environments.
 type ServiceGroup struct {
 	Name        string
 	Description string
-	Local       *ServiceEnv  // nil if no local deployment
-	Cloud       *ServiceEnv  // nil if no cloud deployment
-	CIWorkflow  *WorkflowRow // GitHub CI (only on nexus/ctl top level)
+	Local       *ServiceEnv // nil if no local deployment
+	Cloud       *ServiceEnv // nil if no cloud deployment
 }
 
 // ServiceEnv holds the runtime info for one environment (local or cloud).
@@ -209,23 +209,29 @@ type ServiceEnv struct {
 	Port        string
 	GatusKey    string
 	GatusStatus data.Status
-	Deploy      *WorkflowRow // deploy workflow for this env
+	// Pipelines is the ordered list of CI/deploy workflows for this env.
+	// Each entry is displayed as an individual named pill.
+	Pipelines []WorkflowRow
 }
 
-// WorkflowRow holds a CI/deploy workflow status + link.
+// WorkflowRow holds a single CI/deploy pipeline status + link.
 type WorkflowRow struct {
-	Label  string
+	Label  string // display name (workflow filename without .yml)
 	Status data.CIStatus
 	URL    string
 }
 
-// RepoGroup is a repo and its Gitea/GitHub links.
+// RepoGroup is a repo with its Gitea/GitHub links and all associated pipelines.
 type RepoGroup struct {
 	Name      string
 	GitHubURL string
 	GiteaURL  string
-	CIURL     string
-	CIStatus  data.CIStatus
+	Pipelines []WorkflowRow // all named pipelines for this repo
+}
+
+// trimYML strips the ".yml" suffix for display labels.
+func trimYML(s string) string {
+	return strings.TrimSuffix(s, ".yml")
 }
 
 func buildPageData(
@@ -235,25 +241,48 @@ func buildPageData(
 	gitea map[string]data.WorkflowRun,
 	errors []string,
 ) TemplateData {
+	// gs looks up a Gatus health status by endpoint key.
 	gs := func(key string) data.Status {
 		if r, ok := gatus[key]; ok {
 			return r.Status
 		}
 		return data.StatusUnknown
 	}
-	ghRun := func(m map[string]data.WorkflowRun, file string) *WorkflowRow {
+
+	// ghRow builds a WorkflowRow from a GitHub Actions map.
+	ghRow := func(m map[string]data.WorkflowRun, file string) WorkflowRow {
 		r, ok := m[file]
 		if !ok {
-			return &WorkflowRow{Label: file, Status: data.CIUnknown}
+			return WorkflowRow{Label: trimYML(file), Status: data.CIUnknown}
 		}
-		return &WorkflowRow{Label: file, Status: r.Status, URL: r.URL}
+		return WorkflowRow{Label: trimYML(file), Status: r.Status, URL: r.URL}
 	}
-	giteaRun := func(file string) *WorkflowRow {
+
+	// giteaRow builds a WorkflowRow from the Gitea runs map.
+	giteaRow := func(file string) WorkflowRow {
 		r, ok := gitea[file]
 		if !ok {
-			return &WorkflowRow{Label: file, Status: data.CIUnknown}
+			return WorkflowRow{Label: trimYML(file), Status: data.CIUnknown}
 		}
-		return &WorkflowRow{Label: file, Status: r.Status, URL: r.URL}
+		return WorkflowRow{Label: trimYML(file), Status: r.Status, URL: r.URL}
+	}
+
+	// ghRows builds multiple WorkflowRows from a GitHub Actions map.
+	ghRows := func(m map[string]data.WorkflowRun, files ...string) []WorkflowRow {
+		rows := make([]WorkflowRow, 0, len(files))
+		for _, f := range files {
+			rows = append(rows, ghRow(m, f))
+		}
+		return rows
+	}
+
+	// giteaRows builds multiple WorkflowRows from the Gitea runs map.
+	giteaRows := func(files ...string) []WorkflowRow {
+		rows := make([]WorkflowRow, 0, len(files))
+		for _, f := range files {
+			rows = append(rows, giteaRow(f))
+		}
+		return rows
 	}
 
 	services := []ServiceGroup{
@@ -265,14 +294,15 @@ func buildPageData(
 				Port:        ":9090",
 				GatusKey:    "local_hermit-(local)",
 				GatusStatus: gs("local_hermit-(local)"),
-				Deploy:      giteaRun("docker-deploy.yml"),
+				// docker-deploy rebuilds all containers; install keeps tui binary fresh
+				Pipelines: giteaRows("docker-deploy.yml", "install.yml"),
 			},
 			Cloud: &ServiceEnv{
 				URL:         "https://nexus-hermit-dev-2tvic4xjjq-uc.a.run.app",
 				Port:        "cloud run",
 				GatusKey:    "cloud-run_hermit-(cloud)",
 				GatusStatus: gs("cloud-run_hermit-(cloud)"),
-				Deploy:      ghRun(ghNexus, "deploy-hermit-dev.yml"),
+				Pipelines:   ghRows(ghNexus, "deploy-hermit-dev.yml"),
 			},
 		},
 		{
@@ -283,14 +313,15 @@ func buildPageData(
 				Port:        ":8081",
 				GatusKey:    "local_secrets-(local)",
 				GatusStatus: gs("local_secrets-(local)"),
-				Deploy:      giteaRun("docker-deploy.yml"),
+				Pipelines:   giteaRows("docker-deploy.yml"),
 			},
 			Cloud: &ServiceEnv{
 				URL:         "https://nexus-secrets-dev-2tvic4xjjq-uc.a.run.app/health",
 				Port:        "cloud run",
 				GatusKey:    "cloud-run_secrets-(cloud)",
 				GatusStatus: gs("cloud-run_secrets-(cloud)"),
-				Deploy:      ghRun(ghNexus, "deploy-go-http-dev.yml"),
+				// secrets is deployed via deploy-go-http-dev.yml (shared go-http workflow)
+				Pipelines: ghRows(ghNexus, "deploy-go-http-dev.yml"),
 			},
 		},
 		{
@@ -301,14 +332,14 @@ func buildPageData(
 				Port:        ":8090",
 				GatusKey:    "local_portal-(local)",
 				GatusStatus: gs("local_portal-(local)"),
-				Deploy:      giteaRun("docker-deploy.yml"),
+				Pipelines:   giteaRows("docker-deploy.yml"),
 			},
 			Cloud: &ServiceEnv{
 				URL:         "https://nexus-portal-dev-2tvic4xjjq-uc.a.run.app",
 				Port:        "cloud run",
 				GatusKey:    "cloud-run_portal-(cloud)",
 				GatusStatus: gs("cloud-run_portal-(cloud)"),
-				Deploy:      ghRun(ghNexus, "deploy-portal-dev.yml"),
+				Pipelines:   ghRows(ghNexus, "deploy-portal-dev.yml"),
 			},
 		},
 		{
@@ -319,14 +350,14 @@ func buildPageData(
 				Port:        ":8083",
 				GatusKey:    "local_web-(local)",
 				GatusStatus: gs("local_web-(local)"),
-				Deploy:      giteaRun("docker-deploy.yml"),
+				Pipelines:   giteaRows("docker-deploy.yml"),
 			},
 			Cloud: &ServiceEnv{
 				URL:         "https://nexus-web-dev-2tvic4xjjq-uc.a.run.app",
 				Port:        "cloud run",
 				GatusKey:    "cloud-run_web-(cloud)",
 				GatusStatus: gs("cloud-run_web-(cloud)"),
-				Deploy:      ghRun(ghNexus, "deploy-web-dev.yml"),
+				Pipelines:   ghRows(ghNexus, "deploy-web-dev.yml"),
 			},
 		},
 		{
@@ -337,14 +368,14 @@ func buildPageData(
 				Port:        ":8082",
 				GatusKey:    "local_vn-(local)",
 				GatusStatus: gs("local_vn-(local)"),
-				Deploy:      giteaRun("docker-deploy.yml"),
+				Pipelines:   giteaRows("docker-deploy.yml"),
 			},
 			Cloud: &ServiceEnv{
 				URL:         "https://nexus-vn-dev-2tvic4xjjq-uc.a.run.app/health",
 				Port:        "cloud run",
 				GatusKey:    "cloud-run_vn-(cloud)",
 				GatusStatus: gs("cloud-run_vn-(cloud)"),
-				Deploy:      ghRun(ghNexus, "deploy-vn-dev.yml"),
+				Pipelines:   ghRows(ghNexus, "deploy-vn-dev.yml"),
 			},
 		},
 		{
@@ -355,16 +386,16 @@ func buildPageData(
 				Port:        "cloud run",
 				GatusKey:    "cloud-run_cal-(cloud)",
 				GatusStatus: gs("cloud-run_cal-(cloud)"),
-				Deploy:      ghRun(ghNexus, "deploy-cal-dev.yml"),
+				Pipelines:   ghRows(ghNexus, "deploy-cal-dev.yml"),
 			},
 		},
 		{
 			Name:        "matrix",
 			Description: "this page",
 			Local: &ServiceEnv{
-				URL:    "http://localhost:8085",
-				Port:   ":8085",
-				Deploy: giteaRun("docker-deploy.yml"),
+				URL:       "http://localhost:8085",
+				Port:      ":8085",
+				Pipelines: giteaRows("docker-deploy.yml"),
 			},
 		},
 		{
@@ -387,29 +418,27 @@ func buildPageData(
 		},
 	}
 
-	// nexus CI row (top-level, not per-service)
-	nexusCIRun := ghRun(ghNexus, "ci.yml")
-	nexusIntRun := ghRun(ghNexus, "integration-tests-dev.yml")
-	ctlCIRun := ghRun(ghCtl, "ci.yml")
-
+	// Repos section: each repo shows all its named pipelines.
 	repos := []RepoGroup{
 		{
 			Name:      "nexus",
 			GitHubURL: "https://github.com/jredh-dev/nexus",
 			GiteaURL:  "http://localhost:3000/jredhbot/nexus",
-			CIURL:     nexusCIRun.URL,
-			CIStatus:  nexusCIRun.Status,
+			Pipelines: append(
+				ghRows(ghNexus,
+					"ci.yml",
+					"integration-tests-dev.yml",
+				),
+				giteaRows("docker-deploy.yml", "install.yml")...,
+			),
 		},
 		{
 			Name:      "ctl",
 			GitHubURL: "https://github.com/jredh-dev/ctl",
 			GiteaURL:  "http://localhost:3000/jredhbot/ctl",
-			CIURL:     ctlCIRun.URL,
-			CIStatus:  ctlCIRun.Status,
+			Pipelines: ghRows(ghCtl, "ci.yml"),
 		},
 	}
-
-	_ = nexusIntRun // available for template if needed
 
 	return TemplateData{
 		Services:  services,
