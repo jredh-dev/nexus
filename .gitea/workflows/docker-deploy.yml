@@ -94,3 +94,16 @@ jobs:
           else
             echo "--- vn: no changes"
           fi
+
+          # matrix — Dev hub dashboard
+          if echo "$CHANGED" | grep -qE '^(services/matrix/|services/go-http/|go\.(mod|sum)$)'; then
+            echo "==> Rebuilding matrix"
+            if docker compose -f "$AGENTIC_ROOT/docker-compose.yml" build matrix && \
+               docker compose -f "$AGENTIC_ROOT/docker-compose.yml" up -d matrix; then
+              notify matrix success
+            else
+              notify matrix failure
+            fi
+          else
+            echo "--- matrix: no changes"
+          fi

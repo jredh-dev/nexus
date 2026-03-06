@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>matrix</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0d0f14;
+      --surface: #161b22;
+      --border:  #30363d;
+      --text:    #c9d1d9;
+      --muted:   #8b949e;
+      --accent:  #58a6ff;
+      --green:   #3fb950;
+      --red:     #f85149;
+      --yellow:  #d29922;
+      --radius:  6px;
+      --gap:     14px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      padding: 24px;
+      max-width: 1200px;
+    }
+
+    /* ---- header ---- */
+    header {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    h1 { font-size: 18px; font-weight: 600; color: var(--accent); letter-spacing: 0.05em; }
+    .fetched-at { color: var(--muted); font-size: 11px; }
+
+    /* ---- section ---- */
+    section { margin-bottom: 28px; }
+    h2 {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px; margin-bottom: 12px;
+    }
+
+    /* ---- service grid ---- */
+    .service-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: var(--gap);
+    }
+
+    /* ---- service card ---- */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .card-name {
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--accent);
+    }
+    .card-desc {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    /* ---- env rows (local / cloud) ---- */
+    .env-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .env-label {
+      color: var(--muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      width: 40px;
+      flex-shrink: 0;
+    }
+    .env-port {
+      color: var(--text);
+      min-width: 80px;
+    }
+    .env-port a {
+      color: inherit;
+      text-decoration: none;
+    }
+    .env-port a:hover { color: var(--accent); }
+
+    /* ---- status dot ---- */
+    .dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot-up      { background: var(--green); }
+    .dot-down    { background: var(--red); box-shadow: 0 0 4px var(--red); }
+    .dot-unknown { background: var(--border); }
+
+    /* ---- ci pill ---- */
+    .ci-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 1px 6px;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: 600;
+      text-decoration: none;
+      border: 1px solid transparent;
+    }
+    .ci-success { background: rgba(63,185,80,0.15); color: var(--green); border-color: rgba(63,185,80,0.3); }
+    .ci-failure { background: rgba(248,81,73,0.15); color: var(--red);   border-color: rgba(248,81,73,0.3); }
+    .ci-pending { background: rgba(210,153,34,0.15); color: var(--yellow); border-color: rgba(210,153,34,0.3); }
+    .ci-unknown { background: transparent; color: var(--muted); border-color: var(--border); }
+
+    /* ---- repo grid ---- */
+    .repo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: var(--gap);
+    }
+    .repo-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .repo-name {
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .repo-links { display: flex; gap: 10px; }
+    .repo-links a { color: var(--muted); font-size: 11px; text-decoration: none; }
+    .repo-links a:hover { color: var(--accent); }
+
+    /* ---- errors ---- */
+    .errors {
+      margin-top: 24px;
+      padding: 10px 14px;
+      background: rgba(248,81,73,0.08);
+      border: 1px solid rgba(248,81,73,0.3);
+      border-radius: var(--radius);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .errors p { margin-bottom: 2px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>matrix</h1>
+  <span class="fetched-at">fetched {{.FetchedAt}}</span>
+</header>
+
+<!-- ================================================================ -->
+<!-- SERVICES                                                           -->
+<!-- ================================================================ -->
+<section>
+  <h2>services</h2>
+  <div class="service-grid">
+    {{range .Services}}
+    <div class="card">
+      <div class="card-header">
+        <span class="card-name">{{.Name}}</span>
+        <span class="card-desc">{{.Description}}</span>
+      </div>
+
+      {{if .Local}}
+      <div class="env-row">
+        <span class="env-label">local</span>
+        <span class="dot {{statusClass .Local.GatusStatus}}" title="{{statusText .Local.GatusStatus}}"></span>
+        <span class="env-port"><a href="{{.Local.URL}}" target="_blank">{{.Local.Port}}</a></span>
+        {{if .Local.Deploy}}
+          {{if .Local.Deploy.URL}}
+          <a class="ci-pill {{ciClass .Local.Deploy.Status}}" href="{{.Local.Deploy.URL}}" target="_blank" title="gitea deploy">{{ciText .Local.Deploy.Status}} deploy</a>
+          {{else}}
+          <span class="ci-pill {{ciClass .Local.Deploy.Status}}" title="gitea deploy">{{ciText .Local.Deploy.Status}} deploy</span>
+          {{end}}
+        {{end}}
+      </div>
+      {{end}}
+
+      {{if .Cloud}}
+      <div class="env-row">
+        <span class="env-label">cloud</span>
+        <span class="dot {{statusClass .Cloud.GatusStatus}}" title="{{statusText .Cloud.GatusStatus}}"></span>
+        <span class="env-port"><a href="{{.Cloud.URL}}" target="_blank">{{.Cloud.Port}}</a></span>
+        {{if .Cloud.Deploy}}
+          {{if .Cloud.Deploy.URL}}
+          <a class="ci-pill {{ciClass .Cloud.Deploy.Status}}" href="{{.Cloud.Deploy.URL}}" target="_blank" title="github deploy">{{ciText .Cloud.Deploy.Status}} deploy</a>
+          {{else}}
+          <span class="ci-pill {{ciClass .Cloud.Deploy.Status}}" title="github deploy">{{ciText .Cloud.Deploy.Status}} deploy</span>
+          {{end}}
+        {{end}}
+      </div>
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+</section>
+
+<!-- ================================================================ -->
+<!-- REPOS                                                              -->
+<!-- ================================================================ -->
+<section>
+  <h2>repos</h2>
+  <div class="repo-grid">
+    {{range .Repos}}
+    <div class="repo-card">
+      <div class="repo-name">
+        {{.Name}}
+        {{if .CIURL}}
+        <a class="ci-pill {{ciClass .CIStatus}}" href="{{.CIURL}}" target="_blank">{{ciText .CIStatus}} ci</a>
+        {{else}}
+        <span class="ci-pill {{ciClass .CIStatus}}">{{ciText .CIStatus}} ci</span>
+        {{end}}
+      </div>
+      <div class="repo-links">
+        <a href="{{.GitHubURL}}" target="_blank">github</a>
+        <a href="{{.GiteaURL}}" target="_blank">gitea</a>
+      </div>
+    </div>
+    {{end}}
+
+    <!-- agentic workspace (gitea only) -->
+    <div class="repo-card">
+      <div class="repo-name">agentic</div>
+      <div class="repo-links">
+        <a href="http://localhost:3000/jredhbot/agentic" target="_blank">gitea</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+{{if .Errors}}
+<div class="errors">
+  {{range .Errors}}<p>⚠ {{.}}</p>{{end}}
+</div>
+{{end}}
+
+</body>
+</html>
