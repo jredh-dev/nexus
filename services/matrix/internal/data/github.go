@@ -96,3 +96,27 @@ func conclusionToCIStatus(c string) CIStatus {
 		return CIUnknown
 	}
 }
+
+// giteaRunStatus maps a Gitea run to a CIStatus.
+//
+// Gitea sets conclusion only after a run completes; in-flight runs have an
+// empty conclusion and carry their live state in the status field instead.
+// We check conclusion first (terminal state), then fall back to status.
+func giteaRunStatus(status, conclusion string) CIStatus {
+	if conclusion != "" {
+		return conclusionToCIStatus(conclusion)
+	}
+	// Run is still in progress — map status directly.
+	switch status {
+	case "waiting", "queued":
+		return CIPending
+	case "in_progress", "running":
+		return CIPending
+	case "success":
+		return CISuccess
+	case "failure", "cancelled":
+		return CIFailure
+	default:
+		return CIUnknown
+	}
+}

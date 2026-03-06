@@ -61,7 +61,7 @@ func FetchGiteaWorkflows(ctx context.Context, baseURL, owner, repo, token string
 		}
 		out[file] = WorkflowRun{
 			Name:      file,
-			Status:    conclusionToCIStatus(run.Conclusion),
+			Status:    giteaRunStatus(run.Status, run.Conclusion),
 			URL:       run.HTMLURL,
 			UpdatedAt: run.UpdatedAt,
 		}
