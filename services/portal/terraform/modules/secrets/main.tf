@@ -37,6 +37,12 @@ variable "session_secret" {
   sensitive   = true
 }
 
+variable "jwt_signing_key" {
+  description = "HMAC-SHA256 key shared across all nexus services for JWT validation"
+  type        = string
+  sensitive   = true
+}
+
 # Firebase credentials secret
 resource "google_secret_manager_secret" "firebase_credentials" {
   project   = var.project_id
@@ -93,6 +99,34 @@ resource "google_secret_manager_secret_iam_member" "session_secret_access" {
   member    = "serviceAccount:${var.service_account_email}"
 }
 
+# JWT signing key (shared across portal, secrets, cal, web)
+resource "google_secret_manager_secret" "jwt_signing_key" {
+  project   = var.project_id
+  secret_id = "jwt-signing-key-${var.environment}"
+
+  labels = {
+    app         = "nexus"
+    environment = var.environment
+    managed_by  = "terraform"
+  }
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "jwt_signing_key" {
+  secret      = google_secret_manager_secret.jwt_signing_key.id
+  secret_data = var.jwt_signing_key
+}
+
+resource "google_secret_manager_secret_iam_member" "jwt_signing_key_access" {
+  project   = var.project_id
+  secret_id = google_secret_manager_secret.jwt_signing_key.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${var.service_account_email}"
+}
+
 # Outputs
 output "firebase_credentials_secret_id" {
   description = "Firebase credentials secret ID"
@@ -112,4 +146,9 @@ output "firebase_credentials_name" {
 output "session_secret_name" {
   description = "Session secret full resource name"
   value       = google_secret_manager_secret.session_secret.name
+}
+
+output "jwt_signing_key_secret_id" {
+  description = "JWT signing key secret ID"
+  value       = google_secret_manager_secret.jwt_signing_key.secret_id
 }

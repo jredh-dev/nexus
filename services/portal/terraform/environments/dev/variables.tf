@@ -29,3 +29,9 @@ variable "session_secret" {
   type        = string
   sensitive   = true
 }
+
+variable "jwt_signing_key" {
+  description = "HMAC-SHA256 key shared across all nexus services for cross-service JWT auth (base64 encoded, 32+ bytes)"
+  type        = string
+  sensitive   = true
+}

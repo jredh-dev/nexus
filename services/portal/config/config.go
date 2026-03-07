@@ -10,6 +10,7 @@ type Config struct {
 	Server  ServerConfig
 	DB      DBConfig
 	Session SessionConfig
+	JWT     JWTConfig
 }
 
 // ServerConfig holds HTTP server settings.
@@ -29,6 +30,19 @@ type SessionConfig struct {
 	MaxAge int    // session duration in seconds (default: 7 days)
 }
 
+// JWTConfig holds settings for cross-service JWT tokens.
+type JWTConfig struct {
+	// SigningKey is the HMAC-SHA256 secret shared across all nexus services.
+	// Loaded from JWT_SIGNING_KEY env var (GCP secret: jwt-signing-key-dev).
+	// Empty in development — portal still mints tokens but Domain= is omitted.
+	SigningKey string
+
+	// CookieDomain is the domain attribute set on the "token" cookie.
+	// In production this should be "jredh.com" so all *.jredh.com subdomains
+	// receive the cookie. Empty in development (cookie is host-scoped).
+	CookieDomain string
+}
+
 // Load returns application configuration from environment variables.
 func Load() *Config {
 	return &Config{
@@ -42,6 +56,10 @@ func Load() *Config {
 		Session: SessionConfig{
 			Secret: getEnv("SESSION_SECRET", ""),
 			MaxAge: getEnvInt("SESSION_MAX_AGE", 604800), // 7 days
+		},
+		JWT: JWTConfig{
+			SigningKey:   getEnv("JWT_SIGNING_KEY", ""),
+			CookieDomain: getEnv("JWT_COOKIE_DOMAIN", ""),
 		},
 	}
 }

@@ -57,6 +57,7 @@ module "secrets" {
   service_account_email = module.iam.service_account_email
   firebase_credentials  = var.firebase_credentials
   session_secret        = var.session_secret
+  jwt_signing_key       = var.jwt_signing_key
 
   depends_on = [module.project, module.iam]
 }
@@ -80,13 +81,15 @@ module "cloud_run" {
   service_account_email = module.iam.service_account_email
 
   environment_variables = {
-    ENVIRONMENT    = local.environment
-    GCP_PROJECT_ID = var.project_id
+    GCP_PROJECT_ID    = var.project_id
+    ENV               = "production"
+    JWT_COOKIE_DOMAIN = "jredh.com"
   }
 
   secrets = {
     FIREBASE_CREDENTIALS = "${module.secrets.firebase_credentials_secret_id}:latest"
     SESSION_SECRET       = "${module.secrets.session_secret_secret_id}:latest"
+    JWT_SIGNING_KEY      = "${module.secrets.jwt_signing_key_secret_id}:latest"
   }
 
   memory                = "512Mi"
@@ -94,6 +97,7 @@ module "cloud_run" {
   min_instances         = 0
   max_instances         = 10
   allow_unauthenticated = true
+  custom_domain         = "auth.jredh.com"
 
   labels = local.common_labels
 

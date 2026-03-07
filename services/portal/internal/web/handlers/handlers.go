@@ -7,11 +7,14 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/jredh-dev/nexus/internal/authmw"
 	"github.com/jredh-dev/nexus/services/portal/config"
 	"github.com/jredh-dev/nexus/services/portal/internal/actions"
 	"github.com/jredh-dev/nexus/services/portal/internal/auth"
 	"github.com/jredh-dev/nexus/services/portal/internal/database"
+	"github.com/jredh-dev/nexus/services/portal/pkg/models"
 )
 
 // Handler holds dependencies for HTTP handlers.
@@ -80,6 +83,11 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 	})
 
+	// Mint cross-service JWT so *.jredh.com subdomains share auth.
+	if user, _, err := h.auth.ValidateSession(sessionID); err == nil && user != nil {
+		h.setJWTCookie(w, user)
+	}
+
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
@@ -99,6 +107,18 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		Name:     "session",
 		Value:    "",
 		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   h.cfg.Server.Env == "production",
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	// Clear the cross-service JWT cookie too.
+	http.SetCookie(w, &http.Cookie{
+		Name:     "token",
+		Value:    "",
+		Path:     "/",
+		Domain:   h.cfg.JWT.CookieDomain,
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   h.cfg.Server.Env == "production",
@@ -177,6 +197,11 @@ func (h *Handler) Signup(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 	})
 
+	// Mint cross-service JWT so *.jredh.com subdomains share auth.
+	if user, _, err := h.auth.ValidateSession(sessionID); err == nil && user != nil {
+		h.setJWTCookie(w, user)
+	}
+
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
@@ -218,6 +243,11 @@ func (h *Handler) MagicLogin(w http.ResponseWriter, r *http.Request) {
 		Secure:   h.cfg.Server.Env == "production",
 		SameSite: http.SameSiteLaxMode,
 	})
+
+	// Mint cross-service JWT so *.jredh.com subdomains share auth.
+	if user, _, err := h.auth.ValidateSession(sessionID); err == nil && user != nil {
+		h.setJWTCookie(w, user)
+	}
 
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
@@ -313,4 +343,42 @@ func (h *Handler) jsonError(w http.ResponseWriter, msg string, status int) {
 func (h *Handler) redirectWithError(w http.ResponseWriter, r *http.Request, path, msg string) {
 	target := path + "?error=" + strings.ReplaceAll(msg, " ", "+")
 	http.Redirect(w, r, target, http.StatusSeeOther)
+}
+
+// setJWTCookie mints a cross-service JWT for the given user and sets it as the
+// "token" cookie. The cookie uses Domain=cfg.JWT.CookieDomain so all
+// *.jredh.com subdomains receive it in production. In development the key may
+// be empty — in that case the cookie is still set (for portal-internal use)
+// but will be an unsigned placeholder that other services ignore (they use the
+// dev bypass instead).
+func (h *Handler) setJWTCookie(w http.ResponseWriter, user *models.User) {
+	if h.cfg.JWT.SigningKey == "" {
+		// Dev: no signing key configured — skip JWT (other services use dev bypass).
+		return
+	}
+
+	claims := &authmw.Claims{
+		Sub:   user.ID,
+		Email: user.Email,
+		Name:  user.Name,
+		Role:  user.Role,
+		Exp:   time.Now().Add(time.Duration(h.cfg.Session.MaxAge) * time.Second).Unix(),
+	}
+
+	token, err := authmw.MintToken(claims, h.cfg.JWT.SigningKey)
+	if err != nil {
+		log.Printf("setJWTCookie: mint token for user %s: %v", user.ID, err)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "token",
+		Value:    token,
+		Path:     "/",
+		Domain:   h.cfg.JWT.CookieDomain, // "jredh.com" in prod, "" locally
+		MaxAge:   h.cfg.Session.MaxAge,
+		HttpOnly: true,
+		Secure:   h.cfg.Server.Env == "production",
+		SameSite: http.SameSiteLaxMode,
+	})
 }
