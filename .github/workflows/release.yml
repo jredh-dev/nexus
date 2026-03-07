@@ -1,0 +1,237 @@
+name: Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+jobs:
+  release:
+    name: Create Release
+    # Only run when the PR was actually merged (not just closed) and came from an RC branch.
+    if: >
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'rc/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to push tags, create releases, and push the next RC branch
+      pull-requests: read
+
+    steps:
+      - name: Checkout main (full history for tag resolution)
+        uses: actions/checkout@v4
+        with:
+          # Fetch all tags so `git describe` can find the latest semver tag.
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ------------------------------------------------------------------ #
+      # Step 1: Determine version bump type                                  #
+      # Priority: PR labels > conventional commit scanning > default patch   #
+      # ------------------------------------------------------------------ #
+      - name: Determine bump type
+        id: bump
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          BUMP="patch"   # default
+
+          # --- 1a. Check PR labels first (fastest, most explicit) ---
+          LABELS='${{ toJson(github.event.pull_request.labels.*.name) }}'
+          if echo "$LABELS" | grep -q '"major"'; then
+            BUMP="major"
+          elif echo "$LABELS" | grep -q '"minor"'; then
+            BUMP="minor"
+          elif echo "$LABELS" | grep -q '"patch"'; then
+            BUMP="patch"
+          else
+            # --- 1b. Scan commit messages via GitHub API ---
+            # Paginate up to 250 commits (5 pages × 50). In practice RC PRs
+            # are much smaller; this guard prevents runaway loops.
+            PAGE=1
+            MESSAGES=""
+            while [ "$PAGE" -le 5 ]; do
+              BODY=$(curl -sf \
+                -H "Authorization: token $GITHUB_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}/commits?per_page=50&page=${PAGE}")
+
+              # Empty array → no more pages.
+              COUNT=$(echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d))" 2>/dev/null || echo "0")
+              [ "$COUNT" -eq 0 ] && break
+
+              # Collect full commit messages (subject + body) for BREAKING CHANGE footer detection.
+              MESSAGES="$MESSAGES
+          $(echo "$BODY" | python3 -c "
+          import sys, json
+          for c in json.load(sys.stdin):
+              print(c['commit']['message'])
+          ")"
+              PAGE=$((PAGE + 1))
+            done
+
+            # Detect breaking change: explicit footer OR bang-prefix shorthand.
+            if echo "$MESSAGES" | grep -qE '(BREAKING CHANGE|feat!:|fix!:|refactor!:)'; then
+              BUMP="major"
+            elif echo "$MESSAGES" | grep -qE '^feat(\(.+\))?:'; then
+              BUMP="minor"
+            fi
+            # Otherwise stays "patch".
+          fi
+
+          echo "type=$BUMP" >> "$GITHUB_OUTPUT"
+          echo "Bump type: $BUMP"
+
+      # ------------------------------------------------------------------ #
+      # Step 2: Calculate new semver from latest tag                        #
+      # ------------------------------------------------------------------ #
+      - name: Calculate new version
+        id: version
+        env:
+          BUMP: ${{ steps.bump.outputs.type }}
+        run: |
+          # Get the latest semver tag; fall back to v0.0.0 if no tags exist yet.
+          CURRENT=$(git describe --tags --abbrev=0 --match "v*" 2>/dev/null || echo "v0.0.0")
+          echo "Current tag: $CURRENT"
+
+          # Strip leading 'v' and split into components.
+          VERSION="${CURRENT#v}"
+          MAJOR=$(echo "$VERSION" | cut -d. -f1)
+          MINOR=$(echo "$VERSION" | cut -d. -f2)
+          PATCH=$(echo "$VERSION" | cut -d. -f3)
+
+          case "$BUMP" in
+            major)
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            minor)
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            patch)
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+
+          NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+          NEXT_RC_BRANCH="rc/v${MAJOR}.$((MINOR + 1)).0"
+
+          echo "new_version=$NEW_VERSION"       >> "$GITHUB_OUTPUT"
+          echo "next_rc_branch=$NEXT_RC_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "New version: $NEW_VERSION  |  Next RC branch: $NEXT_RC_BRANCH"
+
+      # ------------------------------------------------------------------ #
+      # Step 3: Create and push the semver tag on HEAD of main              #
+      # ------------------------------------------------------------------ #
+      - name: Tag release commit
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git tag "$NEW_VERSION" HEAD
+          git push origin "$NEW_VERSION"
+          echo "Pushed tag $NEW_VERSION"
+
+      # ------------------------------------------------------------------ #
+      # Step 4: Create GitHub Release with auto-generated release notes     #
+      # ------------------------------------------------------------------ #
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_HTML_URL: ${{ github.event.pull_request.html_url }}
+          REPO: ${{ github.repository }}
+        run: |
+          # Build a short release body pointing back to the RC PR for full context.
+          BODY="**${PR_TITLE}**
+
+          Merged RC PR: ${PR_HTML_URL}
+
+          _Full changelog auto-generated below._"
+
+          curl -sf -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${REPO}/releases" \
+            -d "$(python3 -c "
+          import json, sys
+          print(json.dumps({
+              'tag_name': '${NEW_VERSION}',
+              'name': '${NEW_VERSION}',
+              'body': '''${BODY}''',
+              'generate_release_notes': True,
+              'draft': False,
+              'prerelease': False,
+          }))
+          ")"
+          echo "Release $NEW_VERSION created"
+
+      # ------------------------------------------------------------------ #
+      # Step 5: Create next RC branch (always minor bump — scope TBD)       #
+      # ------------------------------------------------------------------ #
+      - name: Create next RC branch
+        env:
+          NEXT_RC_BRANCH: ${{ steps.version.outputs.next_rc_branch }}
+        run: |
+          git checkout -b "$NEXT_RC_BRANCH"
+          git push origin "$NEXT_RC_BRANCH"
+          echo "Created and pushed next RC branch: $NEXT_RC_BRANCH"
+
+      # ------------------------------------------------------------------ #
+      # Step 6: Notify Discord — success                                    #
+      # ------------------------------------------------------------------ #
+      - name: Notify Discord (success)
+        if: success()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+          NEXT_RC_BRANCH: ${{ steps.version.outputs.next_rc_branch }}
+          REPO: ${{ github.repository }}
+        run: |
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"embeds\": [{
+                \"title\": \"Released: nexus ${NEW_VERSION}\",
+                \"description\": \"New release tagged and published. Next RC branch ready.\",
+                \"color\": 3066993,
+                \"fields\": [
+                  {\"name\": \"Version\",          \"value\": \"\`${NEW_VERSION}\`\",     \"inline\": true},
+                  {\"name\": \"Next RC Branch\",   \"value\": \"\`${NEXT_RC_BRANCH}\`\",  \"inline\": true},
+                  {\"name\": \"Repo\",             \"value\": \"\`${REPO}\`\",            \"inline\": true}
+                ],
+                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+              }]
+            }"
+
+      # ------------------------------------------------------------------ #
+      # Step 6b: Notify Discord — failure                                   #
+      # ------------------------------------------------------------------ #
+      - name: Notify Discord (failure)
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+          REPO: ${{ github.repository }}
+        run: |
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"embeds\": [{
+                \"title\": \"Release FAILED: nexus ${NEW_VERSION:-unknown}\",
+                \"description\": \"Release workflow failed. Check Actions for details.\",
+                \"color\": 15158332,
+                \"fields\": [
+                  {\"name\": \"Run\",  \"value\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\", \"inline\": false}
+                ],
+                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+              }]
+            }"
