@@ -513,10 +513,18 @@ func buildPageData(
 		},
 	}
 
+	// Display the fetch time in Pacific time (PST/PDT) — where this server runs.
+	// time.LoadLocation uses the tzdata embedded in the Go binary (or the host's
+	// zoneinfo); "America/Los_Angeles" covers both PST (UTC-8) and PDT (UTC-7).
+	loc, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		// Fallback: UTC with an explicit suffix so it's never silently wrong.
+		loc = time.UTC
+	}
 	return TemplateData{
 		Services:  services,
 		Repos:     repos,
 		Errors:    errors,
-		FetchedAt: time.Now().Format("15:04:05"),
+		FetchedAt: time.Now().In(loc).Format("15:04:05 MST"),
 	}
 }
