@@ -82,8 +82,8 @@ jobs:
             --cpu 1 \
             --min-instances 0 \
             --max-instances 10 \
-            --set-env-vars "ENVIRONMENT=dev" \
-            --set-secrets "FIREBASE_CREDENTIALS=firebase-credentials-dev:latest,SESSION_SECRET=session-secret-dev:latest" \
+            --set-env-vars "ENV=production,JWT_COOKIE_DOMAIN=jredh.com" \
+            --set-secrets "FIREBASE_CREDENTIALS=firebase-credentials-dev:latest,SESSION_SECRET=session-secret-dev:latest,JWT_SIGNING_KEY=jwt-signing-key-dev:latest" \
             --service-account ${{ secrets.WIF_SERVICE_ACCOUNT }} \
             --labels "environment=dev,app=nexus-portal,version=$VERSION_LABEL"
 

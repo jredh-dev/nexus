@@ -83,7 +83,8 @@ jobs:
             --cpu 1 \
             --min-instances 0 \
             --max-instances 5 \
-            --set-env-vars "ENVIRONMENT=dev" \
+            --set-env-vars "ENV=production" \
+            --set-secrets "JWT_SIGNING_KEY=jwt-signing-key-dev:latest" \
             --service-account ${{ secrets.WIF_SERVICE_ACCOUNT }} \
             --labels "environment=dev,app=nexus-secrets,version=$VERSION_LABEL"
 

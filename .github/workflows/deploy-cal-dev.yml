@@ -92,7 +92,8 @@ jobs:
             --cpu 1 \
             --min-instances 0 \
             --max-instances 3 \
-            --set-env-vars "ENVIRONMENT=dev,CAL_PORT=8085,CAL_DB_PATH=/data/cal.db" \
+            --set-env-vars "CAL_PORT=8085,CAL_DB_PATH=/data/cal.db,ENV=production" \
+            --set-secrets "JWT_SIGNING_KEY=jwt-signing-key-dev:latest" \
             --add-volume=name=cal-data,type=cloud-storage,bucket=${{ env.GCS_BUCKET }} \
             --add-volume-mount=volume=cal-data,mount-path=/data \
             --service-account ${{ secrets.WIF_SERVICE_ACCOUNT }} \
