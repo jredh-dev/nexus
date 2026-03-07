@@ -40,12 +40,14 @@ func FetchGiteaWorkflows(ctx context.Context, baseURL, owner, repo, token string
 
 	var raw struct {
 		Runs []struct {
-			ID         int    `json:"id"`   // Gitea's run ID, used as run number
-			Path       string `json:"path"` // e.g. "docker-deploy.yml@refs/heads/main"
-			Status     string `json:"status"`
-			Conclusion string `json:"conclusion"`
-			HTMLURL    string `json:"html_url"`
-			UpdatedAt  string `json:"updated_at"` // present on all runs (completed_at is only set on done runs)
+			ID          int    `json:"id"`         // Gitea's internal run ID
+			RunNumber   int    `json:"run_number"` // display run number (used in html_url)
+			Path        string `json:"path"`       // e.g. "docker-deploy.yml@refs/heads/main"
+			Status      string `json:"status"`
+			Conclusion  string `json:"conclusion"`
+			HTMLURL     string `json:"html_url"`
+			StartedAt   string `json:"started_at"`   // set when the run begins
+			CompletedAt string `json:"completed_at"` // set only when the run finishes; empty while in-flight
 		} `json:"workflow_runs"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
@@ -60,12 +62,17 @@ func FetchGiteaWorkflows(ctx context.Context, baseURL, owner, repo, token string
 		if _, seen := out[file]; seen {
 			continue // already have latest for this file
 		}
+		// Use completed_at when available; fall back to started_at for in-flight runs.
+		ts := run.CompletedAt
+		if ts == "" {
+			ts = run.StartedAt
+		}
 		out[file] = WorkflowRun{
 			Name:      file,
 			Status:    giteaRunStatus(run.Status, run.Conclusion),
 			URL:       run.HTMLURL,
-			UpdatedAt: run.UpdatedAt,
-			RunNumber: run.ID,
+			UpdatedAt: ts,
+			RunNumber: run.RunNumber, // matches the run_number in html_url
 		}
 	}
 

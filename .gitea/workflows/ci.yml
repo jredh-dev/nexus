@@ -1,0 +1,23 @@
+# CI: build and test all Go packages on every branch push.
+# This is the primary pre-merge gate for local development.
+name: CI
+
+on:
+  push:
+    branches-ignore: [main]  # main is covered by install.yml + docker-deploy.yml
+
+jobs:
+  ci:
+    runs-on: local
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
+          go build ./...
+
+      - name: Test
+        run: |
+          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
+          go test ./...
