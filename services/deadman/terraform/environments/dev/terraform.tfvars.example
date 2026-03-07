@@ -1,0 +1,13 @@
+# Example: copy to terraform.tfvars and fill in real values.
+# NEVER commit terraform.tfvars (it's in .gitignore).
+
+project_id          = "dea-noctua"
+region              = "us-central1"
+cloud_run_image     = "gcr.io/dea-noctua/nexus-deadman-dev:latest"
+twilio_from         = "+15706006135"
+deadman_phone       = "+6016914667"
+
+# Sensitive — set via env vars instead:
+#   export TF_VAR_twilio_account_sid="ACxxx"
+#   export TF_VAR_twilio_auth_token="xxx"
+#   export TF_VAR_deadman_db_password="xxx"

@@ -45,3 +45,4 @@ target/
 names.txt
 /microtokenizer
 /servicectl
+/deadman

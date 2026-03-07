@@ -57,7 +57,7 @@ jobs:
     needs: [lint, build, test]
     if: success()
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
