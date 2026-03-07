@@ -299,7 +299,9 @@ func MakeStatusHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			})
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(out)
+		if err := json.NewEncoder(w).Encode(out); err != nil {
+			slog.Error("status encode", "err", err)
+		}
 	}
 }
 
