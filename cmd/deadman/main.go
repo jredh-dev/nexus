@@ -21,6 +21,8 @@
 //	TWILIO_ACCOUNT_SID   required
 //	TWILIO_AUTH_TOKEN    required
 //	TWILIO_FROM          required  E.164 Twilio number
+//	DEADMAN_PUBLIC_URL   optional  public base URL (e.g. https://nexus-deadman-dev-xxx.run.app)
+//	                               when set, configures Twilio SMS webhook on startup
 //	PORT                 optional  default 8095
 //	DATABASE_URL         optional  default host=/tmp/ctl-pg dbname=deadman user=jredh
 package main
@@ -101,6 +103,20 @@ func main() {
 // -----------------------------------------------------------------------
 
 func cmdServe(ctx context.Context, pool *pgxpool.Pool, twilio deadman.TwilioConfig, port string) {
+	// Auto-configure Twilio webhook if DEADMAN_PUBLIC_URL is set.
+	// Format: https://nexus-deadman-dev-xxx.run.app  (no trailing slash)
+	if publicURL := os.Getenv("DEADMAN_PUBLIC_URL"); publicURL != "" {
+		smsURL := strings.TrimRight(publicURL, "/") + "/sms"
+		slog.Info("configuring Twilio webhook", "url", smsURL)
+		if err := deadman.ConfigureWebhook(twilio, smsURL); err != nil {
+			// Non-fatal: log and continue.  SMS won't arrive until fixed, but
+			// the server is still useful for outbound sends and CLI commands.
+			slog.Error("failed to configure Twilio webhook", "err", err)
+		}
+	} else {
+		slog.Warn("DEADMAN_PUBLIC_URL not set — Twilio webhook not auto-configured; set it to your Cloud Run URL")
+	}
+
 	go deadman.RunTicker(ctx, pool, twilio)
 
 	mux := http.NewServeMux()
@@ -442,6 +458,8 @@ Environment variables:
   TWILIO_ACCOUNT_SID   required
   TWILIO_AUTH_TOKEN    required
   TWILIO_FROM          required  E.164 Twilio number (e.g. +15706006135)
+  DEADMAN_PUBLIC_URL   optional  public base URL (e.g. https://nexus-deadman-dev-xxx.run.app)
+                                 when set, Twilio SMS webhook is auto-configured on startup
   PORT                 optional  HTTP listen port (default: 8095)
   DATABASE_URL         optional  PostgreSQL DSN
                                  (default: host=/tmp/ctl-pg dbname=deadman user=jredh)
