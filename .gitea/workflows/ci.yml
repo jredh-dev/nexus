@@ -57,7 +57,8 @@ jobs:
     needs: [lint, build, test]
     if: success()
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Use GH_ACCESS_TOKEN — Gitea reserves the name GITHUB_TOKEN for its own token.
+      GITHUB_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
