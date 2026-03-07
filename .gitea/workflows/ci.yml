@@ -87,13 +87,14 @@ jobs:
         id: base
         run: |
           export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
-          # Fetch all branches from GitHub, filter rc/v*, sort descending, take first
+          # Fetch all branches from GitHub, filter rc/v*, sort descending, take first.
+          # Use grep -F || true to avoid non-zero exit when no RC branches exist yet.
           base=$(curl -s \
             -H "Authorization: token ${GITHUB_TOKEN}" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/jredh-dev/nexus/branches?per_page=100" \
             | grep '"name"' \
-            | grep '"rc/v' \
+            | grep '"rc/v' || true \
             | sed 's/.*"name": "\(.*\)".*/\1/' \
             | sort -rV \
             | head -1)
