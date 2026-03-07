@@ -58,7 +58,7 @@ jobs:
     # Run on both success and failure so we can post the commit status either way.
     if: always()
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
