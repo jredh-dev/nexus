@@ -29,6 +29,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/jredh-dev/nexus/internal/authmw"
 	"github.com/jredh-dev/nexus/services/cal/config"
 	"github.com/jredh-dev/nexus/services/cal/internal/database"
 	"github.com/jredh-dev/nexus/services/cal/internal/handlers"
@@ -59,6 +60,7 @@ func main() {
 	}
 
 	cfg := config.Load()
+	requireAuth := authmw.Middleware(cfg.Env, cfg.JWTSigningKey)
 
 	db, err := database.Open(cfg.DBPath)
 	if err != nil {
@@ -85,8 +87,9 @@ func main() {
 	// webcal://host/{token}.ics
 	r.Get("/{token}.ics", h.Subscribe)
 
-	// Management API
+	// Management API — requires valid session (dev bypass in non-prod).
 	r.Route("/api", func(r chi.Router) {
+		r.Use(requireAuth)
 		r.Post("/feeds", h.CreateFeed)
 		r.Get("/feeds", h.ListFeeds)
 		r.Delete("/feeds/{id}", h.DeleteFeed)

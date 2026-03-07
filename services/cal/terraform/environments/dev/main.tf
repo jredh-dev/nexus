@@ -58,7 +58,7 @@ module "cloud_run" {
   port                  = 8085
 
   environment_variables = {
-    ENVIRONMENT = local.environment
+    ENV         = "production"
     CAL_PORT    = "8085"
     CAL_DB_PATH = "/data/cal.db"
   }

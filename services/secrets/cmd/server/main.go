@@ -23,6 +23,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/jredh-dev/nexus/internal/authmw"
 	gohttp "github.com/jredh-dev/nexus/services/go-http"
 	"github.com/jredh-dev/nexus/services/go-http/config"
 	"github.com/jredh-dev/nexus/services/secrets/internal/handlers"
@@ -54,22 +55,27 @@ func main() {
 	}
 
 	cfg := config.Load()
+	env := os.Getenv("ENV")
+	jwtKey := os.Getenv("JWT_SIGNING_KEY")
+	requireAuth := authmw.Middleware(env, jwtKey)
+
 	s := store.New()
 	h := handlers.New(s)
 
 	srv := gohttp.New()
 	srv.OnStop(h.Stop)
 
-	// The riddle — start here
+	// The riddle and public read endpoints — no auth required.
+	// The game is public; anyone can submit and read secrets.
 	srv.Router.Get("/", h.Riddle)
 	srv.Router.Get("/api/riddle", h.Riddle)
-
-	// Secrets API
 	srv.Router.Post("/api/secrets", h.Submit)
 	srv.Router.Get("/api/secrets", h.List)
 	srv.Router.Get("/api/secrets/{id}", h.Get)
-	srv.Router.Get("/api/stats", h.Stats)
 	srv.Router.Get("/api/exposed", h.Exposed)
+
+	// Stats and admin views require a valid session (dev bypass in non-prod).
+	srv.Router.With(requireAuth).Get("/api/stats", h.Stats)
 
 	// Mount Swagger UI if --docs flag is set (local dev only).
 	if *enableDocs {
