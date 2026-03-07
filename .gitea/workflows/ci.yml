@@ -55,7 +55,8 @@ jobs:
     name: Propagate to GitHub
     runs-on: local
     needs: [lint, build, test]
-    if: success()
+    # Run on both success and failure so we can post the commit status either way.
+    if: always()
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -74,7 +75,47 @@ jobs:
           echo "feat_branch=${feat_name}" >> $GITHUB_OUTPUT
           echo "Derived feat branch: ${feat_name}"
 
+      - name: Determine CI outcome
+        id: ci_outcome
+        run: |
+          # needs context: success only if all three passed
+          lint="${{ needs.lint.result }}"
+          build="${{ needs.build.result }}"
+          test="${{ needs.test.result }}"
+          if [ "$lint" = "success" ] && [ "$build" = "success" ] && [ "$test" = "success" ]; then
+            echo "state=success" >> $GITHUB_OUTPUT
+            echo "description=lint + build + test passed" >> $GITHUB_OUTPUT
+          else
+            echo "state=failure" >> $GITHUB_OUTPUT
+            echo "description=CI failed: lint=$lint build=$build test=$test" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Post GitHub commit status
+        run: |
+          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
+          sha="${GITHUB_SHA}"
+          state="${{ steps.ci_outcome.outputs.state }}"
+          description="${{ steps.ci_outcome.outputs.description }}"
+          feat_branch="${{ steps.branch.outputs.feat_branch }}"
+
+          # Post commit status to GitHub — same SHA exists on both remotes
+          http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Content-Type: application/json" \
+            "https://api.github.com/repos/jredh-dev/nexus/statuses/${sha}" \
+            -d "{
+              \"state\": \"${state}\",
+              \"description\": \"${description}\",
+              \"context\": \"gitea-ci\",
+              \"target_url\": \"${GITEA_SERVER_URL:-http://localhost:3000}/jredhbot/nexus/actions/runs/${GITHUB_RUN_NUMBER}\"
+            }")
+          echo "GitHub status API response: ${http_code}"
+
       - name: Push branch to GitHub
+        # Only push on success — no point propagating a broken branch
+        if: ${{ needs.lint.result == 'success' && needs.build.result == 'success' && needs.test.result == 'success' }}
         run: |
           export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
           feat_branch="${{ steps.branch.outputs.feat_branch }}"
@@ -84,6 +125,7 @@ jobs:
 
       - name: Determine base branch (latest RC or main)
         id: base
+        if: ${{ needs.lint.result == 'success' && needs.build.result == 'success' && needs.test.result == 'success' }}
         run: |
           export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
           # Fetch all branches from GitHub, filter rc/v*, sort descending, take first
@@ -104,6 +146,7 @@ jobs:
 
       - name: Build PR title from branch name
         id: pr_meta
+        if: ${{ needs.lint.result == 'success' && needs.build.result == 'success' && needs.test.result == 'success' }}
         run: |
           export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
           feat_branch="${{ steps.branch.outputs.feat_branch }}"
@@ -114,6 +157,7 @@ jobs:
           echo "pr_title=${title}" >> $GITHUB_OUTPUT
 
       - name: Open GitHub PR
+        if: ${{ needs.lint.result == 'success' && needs.build.result == 'success' && needs.test.result == 'success' }}
         run: |
           export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
           feat_branch="${{ steps.branch.outputs.feat_branch }}"
