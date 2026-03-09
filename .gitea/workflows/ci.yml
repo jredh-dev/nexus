@@ -137,6 +137,51 @@ jobs:
               \"body\": \"Propagated from Gitea CI. Branch: \`${gitea_ref}\`\"
             }" || true
 
+      - name: Ensure RC→main PR exists on GitHub
+        # If the base branch is an rc/* branch, make sure there is an open
+        # PR targeting main so the release workflow can fire on merge.
+        run: |
+          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
+          rc_branch="${{ steps.base.outputs.base_branch }}"
+
+          # Only act when the base is an RC branch (not main itself).
+          if [[ "$rc_branch" != rc/v* ]]; then
+            echo "Base branch is '${rc_branch}', not an RC branch — skipping."
+            exit 0
+          fi
+
+          # Count open PRs from rc_branch → main.
+          existing=$(curl -sf \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/jredh-dev/nexus/pulls?state=open&base=main&head=jredh-dev:${rc_branch}" \
+            | python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
+
+          if [ "$existing" -eq 0 ]; then
+            echo "No open RC→main PR found. Creating ${rc_branch} → main..."
+            http_code=$(curl -s -o /tmp/pr_response.json -w "%{http_code}" \
+              -X POST \
+              -H "Authorization: token ${GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              -H "Content-Type: application/json" \
+              "https://api.github.com/repos/jredh-dev/nexus/pulls" \
+              -d "{
+                \"title\": \"${rc_branch} \u2192 main\",
+                \"head\": \"${rc_branch}\",
+                \"base\": \"main\",
+                \"body\": \"Release candidate. Merge to trigger versioned release and deploy.\"
+              }")
+            if [ "$http_code" -eq 201 ] || [ "$http_code" -eq 422 ]; then
+              echo "RC→main PR created (or already existed): HTTP $http_code"
+            else
+              echo "Unexpected response creating RC→main PR: HTTP $http_code"
+              cat /tmp/pr_response.json
+              exit 1
+            fi
+          else
+            echo "RC→main PR already exists for ${rc_branch} — skipping."
+          fi
+
   notify-failure:
     name: Notify Discord on Failure
     runs-on: local
