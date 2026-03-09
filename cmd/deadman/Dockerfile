@@ -37,3 +37,6 @@ RUN chmod +x /entrypoint.sh
 EXPOSE 8095
 
 ENTRYPOINT ["/entrypoint.sh"]
+# Default command: start the HTTP server.
+# Without this, Cloud Run passes no arguments → printUsage → exit(0) → health check fails.
+CMD ["serve"]
