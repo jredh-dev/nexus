@@ -86,7 +86,7 @@ jobs:
             --min-instances 0 \
             --max-instances 5 \
             --update-secrets="TWILIO_ACCOUNT_SID=twilio-account-sid-dev:latest,TWILIO_AUTH_TOKEN=twilio-auth-token-dev:latest,TWILIO_FROM=twilio-from-dev:latest,DEADMAN_PHONE=deadman-phone-dev:latest" \
-            --set-env-vars "ENVIRONMENT=dev,PORT=8080,DEADMAN_PUBLIC_URL=https://${{ env.CUSTOM_DOMAIN }}" \
+            --set-env-vars "ENVIRONMENT=dev,DEADMAN_PUBLIC_URL=https://${{ env.CUSTOM_DOMAIN }}" \
             --service-account ${{ secrets.WIF_SERVICE_ACCOUNT }} \
             --labels "environment=dev,app=nexus-deadman,version=$VERSION_LABEL"
 
