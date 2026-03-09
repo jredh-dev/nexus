@@ -18,13 +18,15 @@
 //
 // Environment variables:
 //
-//	TWILIO_ACCOUNT_SID   required
-//	TWILIO_AUTH_TOKEN    required
-//	TWILIO_FROM          required  E.164 Twilio number
-//	DEADMAN_PUBLIC_URL   optional  public base URL (e.g. https://nexus-deadman-dev-xxx.run.app)
-//	                               when set, configures Twilio SMS webhook on startup
-//	PORT                 optional  default 8095
-//	DATABASE_URL         optional  default host=/tmp/ctl-pg dbname=deadman user=jredh
+//	TWILIO_ACCOUNT_SID      required
+//	TWILIO_AUTH_TOKEN       required
+//	TWILIO_FROM             required  E.164 Twilio number
+//	DEADMAN_PUBLIC_URL      optional  public base URL (e.g. https://nexus-deadman-dev-xxx.run.app)
+//	                                  when set, configures Twilio SMS webhook on startup
+//	DEADMAN_PHONE           optional  owner phone used as default recipient for test endpoints
+//	PORT                    optional  default 8095
+//	DATABASE_URL            optional  default host=/tmp/ctl-pg dbname=deadman user=jredh
+//	TEST_ENDPOINTS_ENABLED  optional  set to "true" to mount /test/* endpoints (dev only)
 package main
 
 import (
@@ -125,6 +127,15 @@ func cmdServe(ctx context.Context, pool *pgxpool.Pool, twilio deadman.TwilioConf
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintln(w, "ok")
 	})
+
+	// Test endpoints — only mounted when TEST_ENDPOINTS_ENABLED=true.
+	// Provides POST /test/trigger, POST /test/warn, POST /test/checkin.
+	// DEADMAN_PHONE (from Vault secrets) is used as the default recipient.
+	if deadman.TestEndpointsEnabled() {
+		defaultPhone := os.Getenv("DEADMAN_PHONE")
+		mux.Handle("/test/", deadman.MakeTestHandler(pool, twilio, defaultPhone))
+		slog.Warn("test endpoints enabled", "routes", "/test/trigger /test/warn /test/checkin")
+	}
 
 	addr := ":" + port
 	slog.Info("deadman serving", "addr", addr)
@@ -455,19 +466,24 @@ Commands:
   status [<owner-phone>]                 Print current timer status
 
 Environment variables:
-  TWILIO_ACCOUNT_SID   required
-  TWILIO_AUTH_TOKEN    required
-  TWILIO_FROM          required  E.164 Twilio number (e.g. +15706006135)
-  DEADMAN_PUBLIC_URL   optional  public base URL (e.g. https://nexus-deadman-dev-xxx.run.app)
-                                 when set, Twilio SMS webhook is auto-configured on startup
-  PORT                 optional  HTTP listen port (default: 8095)
-  DATABASE_URL         optional  PostgreSQL DSN
-                                 (default: host=/tmp/ctl-pg dbname=deadman user=jredh)
+  TWILIO_ACCOUNT_SID      required
+  TWILIO_AUTH_TOKEN       required
+  TWILIO_FROM             required  E.164 Twilio number (e.g. +15706006135)
+  DEADMAN_PUBLIC_URL      optional  public base URL (e.g. https://nexus-deadman-dev-xxx.run.app)
+                                    when set, Twilio SMS webhook is auto-configured on startup
+  DEADMAN_PHONE           optional  default phone for test endpoints (set from Vault secrets)
+  PORT                    optional  HTTP listen port (default: 8095)
+  DATABASE_URL            optional  PostgreSQL DSN
+                                    (default: host=/tmp/ctl-pg dbname=deadman user=jredh)
+  TEST_ENDPOINTS_ENABLED  optional  set "true" to mount /test/* endpoints (never in prod)
 
 HTTP endpoints (when serving):
-  POST /sms     Twilio inbound SMS webhook
-  GET  /status  JSON owner status
-  GET  /health  200 OK
+  POST /sms              Twilio inbound SMS webhook
+  GET  /status           JSON owner status
+  GET  /health           200 OK
+  POST /test/trigger     Send trigger SMS to ?to=<phone> (TEST_ENDPOINTS_ENABLED only)
+  POST /test/warn        Send warn SMS to ?to=<phone>    (TEST_ENDPOINTS_ENABLED only)
+  POST /test/checkin     Reset owner timer for ?phone=<phone> (TEST_ENDPOINTS_ENABLED only)
 
 SMS protocol:
   Owner texts:      any message → check-in, timer reset
