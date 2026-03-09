@@ -1,0 +1,268 @@
+---
+// Account page — shows user info and account management actions.
+// Server-rendered: calls portal /api/me to get the current user.
+// Actions (change email, delete account) are performed via client-side fetch.
+import Base from '../../layouts/Base.astro';
+import Topbar from '../../components/Topbar.astro';
+import { getPortalUrl } from '../../lib/proxy';
+import { isLocale, type Locale } from '../../i18n/config';
+import { t, localePath } from '../../i18n/utils';
+
+const { lang } = Astro.params;
+if (!lang || !isLocale(lang)) return Astro.redirect('/en/account', 302);
+const locale = lang as Locale;
+
+// Redirect to login if no session cookie present.
+const sessionCookie = Astro.cookies.get('session');
+if (!sessionCookie?.value) {
+    return Astro.redirect(localePath(locale, '/login'));
+}
+
+// Fetch current user from portal REST API.
+const portalUrl = getPortalUrl();
+let user: {
+    id: string;
+    email: string;
+    username: string;
+    name: string;
+    is_admin: boolean;
+    is_active: boolean;
+    created_at: string;
+    last_login_at: string;
+} | null = null;
+
+try {
+    const resp = await fetch(`${portalUrl}/api/me/`, {
+        headers: { Cookie: `session=${sessionCookie.value}` },
+    });
+    if (resp.status === 401) {
+        return Astro.redirect(localePath(locale, '/login'));
+    }
+    if (resp.ok) {
+        user = await resp.json();
+    }
+} catch (_err) {
+    return Astro.redirect(localePath(locale, '/login'));
+}
+
+if (!user) {
+    return Astro.redirect(localePath(locale, '/login'));
+}
+
+// Check for success message from email-change confirmation redirect.
+const successParam = Astro.url.searchParams.get('success');
+const emailChangedSuccess = successParam === 'email-changed';
+---
+
+<Base title={t(locale, 'account.title')} lang={locale}>
+    <Topbar slot="topbar" locale={locale} />
+
+    <section class="section">
+        <div class="container">
+            <div class="columns is-centered">
+                <div class="column is-8-tablet is-6-desktop">
+
+                    <h1 class="title is-3 mb-2" style="font-family: 'Montserrat', sans-serif;">
+                        {t(locale, 'account.heading')}
+                        {user.is_admin && (
+                            <span class="tag is-warning is-light ml-3" style="vertical-align: middle; font-size: 0.65rem; font-weight: 600; letter-spacing: 0.05em;">
+                                {t(locale, 'account.adminBadge')}
+                            </span>
+                        )}
+                    </h1>
+
+                    {emailChangedSuccess && (
+                        <div class="notification is-success is-light mb-4">
+                            <span class="icon"><i class="fas fa-check-circle"></i></span>
+                            {t(locale, 'account.emailChangedSuccess')}
+                        </div>
+                    )}
+
+                    <!-- Profile info -->
+                    <div class="box mb-4" style="border-radius: 8px; border: none; box-shadow: 0 2px 12px rgba(0,0,0,0.06);">
+                        <table class="table is-fullwidth is-narrow">
+                            <tbody>
+                                <tr>
+                                    <th style="color: var(--fresh-dark); width: 40%;">{t(locale, 'account.emailLabel')}</th>
+                                    <td style="color: var(--fresh-muted);">{user.email}</td>
+                                </tr>
+                                <tr>
+                                    <th style="color: var(--fresh-dark);">{t(locale, 'account.memberSince')}</th>
+                                    <td style="color: var(--fresh-muted);">
+                                        <time data-iso={user.created_at} data-fmt="date">{user.created_at}</time>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th style="color: var(--fresh-dark);">{t(locale, 'account.lastLogin')}</th>
+                                    <td style="color: var(--fresh-muted);">
+                                        <time data-iso={user.last_login_at} data-fmt="datetime">{user.last_login_at}</time>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th style="color: var(--fresh-dark);">{t(locale, 'account.status')}</th>
+                                    <td>
+                                        {user.is_active
+                                            ? <span class="tag is-success is-light">{t(locale, 'account.statusActive')}</span>
+                                            : <span class="tag is-warning is-light">{t(locale, 'account.statusInactive')}</span>
+                                        }
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div class="mt-4">
+                            <a class="button secondary-btn btn-outlined is-rounded" href="/logout">
+                                <span class="icon"><i class="fas fa-right-from-bracket"></i></span>
+                                <span>{t(locale, 'account.logout')}</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Change email -->
+                    <div class="box mb-4" style="border-radius: 8px; border: none; box-shadow: 0 2px 12px rgba(0,0,0,0.06);">
+                        <h2 class="title is-5 mb-4">{t(locale, 'account.changeEmail')}</h2>
+                        <div id="email-feedback" class="notification is-hidden mb-3" role="alert"></div>
+                        <form id="change-email-form">
+                            <div class="field has-addons">
+                                <div class="control is-expanded">
+                                    <input
+                                        class="input"
+                                        type="email"
+                                        id="new-email"
+                                        name="new_email"
+                                        placeholder={t(locale, 'account.newEmailPlaceholder')}
+                                        required
+                                    />
+                                </div>
+                                <div class="control">
+                                    <button class="button primary-btn is-rounded" type="submit">
+                                        {t(locale, 'account.changeEmailSubmit')}
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Delete account -->
+                    <div class="box" style="border-radius: 8px; border: 1px solid rgba(255,80,80,0.2); box-shadow: 0 2px 12px rgba(0,0,0,0.06);">
+                        <h2 class="title is-5 mb-2" style="color: var(--fresh-danger, #e74c3c);">{t(locale, 'account.deleteAccount')}</h2>
+                        <p class="is-size-7 mb-4" style="color: var(--fresh-muted);">{t(locale, 'account.deleteConfirm')}</p>
+                        <div id="delete-confirmation" class="is-hidden">
+                            <div class="buttons">
+                                <button id="confirm-delete-btn" class="button is-danger is-rounded">
+                                    <span class="icon"><i class="fas fa-trash"></i></span>
+                                    <span>{t(locale, 'account.deleteConfirmBtn')}</span>
+                                </button>
+                                <button id="cancel-delete-btn" class="button is-light is-rounded">
+                                    {t(locale, 'account.deleteCancelBtn')}
+                                </button>
+                            </div>
+                        </div>
+                        <button id="delete-account-btn" class="button is-danger is-outlined is-rounded">
+                            <span class="icon"><i class="fas fa-trash-alt"></i></span>
+                            <span>{t(locale, 'account.deleteAccount')}</span>
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </section>
+</Base>
+
+<script>
+// Client-side timezone-aware date formatting (same pattern as dashboard).
+document.querySelectorAll('time[data-iso]').forEach((el) => {
+    const iso = el.getAttribute('data-iso');
+    if (!iso) return;
+    try {
+        const date = new Date(iso);
+        if (isNaN(date.getTime())) return;
+        const fmt = el.getAttribute('data-fmt');
+        const opts: Intl.DateTimeFormatOptions = fmt === 'date'
+            ? { month: 'short', day: 'numeric', year: 'numeric' }
+            : { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' };
+        el.textContent = new Intl.DateTimeFormat(undefined, opts).format(date);
+    } catch {
+        // Leave ISO string as-is on formatting failure.
+    }
+});
+
+// --- Change email form ---
+const emailForm = document.getElementById('change-email-form') as HTMLFormElement | null;
+const emailFeedback = document.getElementById('email-feedback') as HTMLDivElement | null;
+
+function showFeedback(el: HTMLElement | null, msg: string, isSuccess: boolean) {
+    if (!el) return;
+    el.textContent = msg;
+    el.className = `notification ${isSuccess ? 'is-success' : 'is-danger'} is-light mb-3`;
+}
+
+emailForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('new-email') as HTMLInputElement | null;
+    const newEmail = input?.value.trim() ?? '';
+    if (!newEmail) return;
+
+    const submitBtn = emailForm.querySelector('button[type="submit"]') as HTMLButtonElement | null;
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+        const resp = await fetch('/api/me/email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ new_email: newEmail }),
+        });
+        const data: { message?: string; error?: string } = await resp.json();
+        if (resp.ok) {
+            showFeedback(emailFeedback, data.message ?? 'Verification email sent.', true);
+            if (input) input.value = '';
+        } else {
+            showFeedback(emailFeedback, data.error ?? 'Something went wrong.', false);
+        }
+    } catch {
+        showFeedback(emailFeedback, 'Network error. Please try again.', false);
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
+    }
+});
+
+// --- Delete account flow ---
+const deleteBtn = document.getElementById('delete-account-btn') as HTMLButtonElement | null;
+const deleteConfirmation = document.getElementById('delete-confirmation') as HTMLDivElement | null;
+const confirmDeleteBtn = document.getElementById('confirm-delete-btn') as HTMLButtonElement | null;
+const cancelDeleteBtn = document.getElementById('cancel-delete-btn') as HTMLButtonElement | null;
+
+deleteBtn?.addEventListener('click', () => {
+    deleteBtn.classList.add('is-hidden');
+    deleteConfirmation?.classList.remove('is-hidden');
+});
+
+cancelDeleteBtn?.addEventListener('click', () => {
+    deleteConfirmation?.classList.add('is-hidden');
+    deleteBtn?.classList.remove('is-hidden');
+});
+
+confirmDeleteBtn?.addEventListener('click', async () => {
+    if (confirmDeleteBtn) confirmDeleteBtn.disabled = true;
+
+    try {
+        const resp = await fetch('/api/me/', { method: 'DELETE' });
+        if (resp.ok || resp.status === 204) {
+            // Account deleted — redirect to home.
+            window.location.href = '/';
+        } else {
+            const data: { error?: string } = await resp.json().catch(() => ({}));
+            alert(data.error ?? 'Failed to delete account. Please try again.');
+            deleteConfirmation?.classList.add('is-hidden');
+            deleteBtn?.classList.remove('is-hidden');
+        }
+    } catch {
+        alert('Network error. Please try again.');
+        deleteConfirmation?.classList.add('is-hidden');
+        deleteBtn?.classList.remove('is-hidden');
+    } finally {
+        if (confirmDeleteBtn) confirmDeleteBtn.disabled = false;
+    }
+});
+</script>
