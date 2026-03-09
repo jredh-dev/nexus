@@ -409,14 +409,14 @@ func buildPageData(
 		card("hermit", "rust grpc server", "hermit",
 			[]Endpoint{
 				localEp(":9090", "http://localhost:9090", "local_hermit"),
-				cloudEp("nexus-hermit-dev", "https://nexus-hermit-dev-2tvic4xjjq-uc.a.run.app", "cloud-run_hermit-(cloud)"),
+				cloudEp("nexus-hermit-dev", "https://nexus-hermit-dev-2tvic4xjjq-uc.a.run.app", "cloud-run_hermit (cloud)"),
 			},
 			append(dockerInstall, ghRows(ghNexus, "deploy-hermit-dev.yml")...),
 		),
 		card("secrets", "confessions api", "secrets",
 			[]Endpoint{
 				localEp(":8081", "http://localhost:8081", "local_secrets"),
-				cloudEp("nexus-secrets-dev", "https://nexus-secrets-dev-2tvic4xjjq-uc.a.run.app/health", "cloud-run_secrets-(cloud)"),
+				cloudEp("nexus-secrets-dev", "https://nexus-secrets-dev-2tvic4xjjq-uc.a.run.app/health", "cloud-run_secrets (cloud)"),
 				domainEp("secrets.jredh.com", "https://secrets.jredh.com", "https://nexus-secrets-dev-2tvic4xjjq-uc.a.run.app", "domains_secrets.jredh.com"),
 			},
 			append(dockerDeploy, ghRows(ghNexus, "deploy-go-http-dev.yml")...),
@@ -424,14 +424,14 @@ func buildPageData(
 		card("portal", "web portal / admin", "portal",
 			[]Endpoint{
 				localEp(":8090", "http://localhost:8090/login", "local_portal"),
-				cloudEp("nexus-portal-dev", "https://nexus-portal-dev-2tvic4xjjq-uc.a.run.app", "cloud-run_portal-(cloud)"),
+				cloudEp("nexus-portal-dev", "https://nexus-portal-dev-2tvic4xjjq-uc.a.run.app", "cloud-run_portal (cloud)"),
 			},
 			append(dockerDeploy, ghRows(ghNexus, "deploy-portal-dev.yml")...),
 		),
 		card("web", "astro frontend", "web",
 			[]Endpoint{
 				localEp(":8083", "http://localhost:8083", "local_web"),
-				cloudEp("nexus-web-dev", "https://nexus-web-dev-2tvic4xjjq-uc.a.run.app", "cloud-run_web-(cloud)"),
+				cloudEp("nexus-web-dev", "https://nexus-web-dev-2tvic4xjjq-uc.a.run.app", "cloud-run_web (cloud)"),
 				domainEp("portal.jredh.com", "https://portal.jredh.com", "https://nexus-web-dev-2tvic4xjjq-uc.a.run.app", "domains_portal.jredh.com"),
 			},
 			append(dockerDeploy, ghRows(ghNexus, "deploy-web-dev.yml")...),
@@ -439,14 +439,14 @@ func buildPageData(
 		card("vn", "visual novel engine", "vn",
 			[]Endpoint{
 				localEp(":8082", "http://localhost:8082/health", "local_vn"),
-				cloudEp("nexus-vn-dev", "https://nexus-vn-dev-2tvic4xjjq-uc.a.run.app/health", "cloud-run_vn-(cloud)"),
+				cloudEp("nexus-vn-dev", "https://nexus-vn-dev-2tvic4xjjq-uc.a.run.app/health", "cloud-run_vn (cloud)"),
 			},
 			append(vnDeploy, ghRows(ghNexus, "deploy-vn-dev.yml")...),
 		),
 		card("deadman", "sms deadman switch", "deadman",
 			[]Endpoint{
 				localEp(":8095", "http://localhost:8095/health", "local_deadman"),
-				cloudEp("nexus-deadman-dev", "https://nexus-deadman-dev-2tvic4xjjq-uc.a.run.app", "cloud-run_deadman-(cloud)"),
+				cloudEp("nexus-deadman-dev", "https://nexus-deadman-dev-2tvic4xjjq-uc.a.run.app", "cloud-run_deadman (cloud)"),
 				domainEp("deadman.jredh.com", "https://deadman.jredh.com", "https://nexus-deadman-dev-2tvic4xjjq-uc.a.run.app", "domains_deadman.jredh.com"),
 			},
 			append(dockerDeploy, ghRows(ghNexus, "deploy-deadman-dev.yml")...),
@@ -469,7 +469,7 @@ func buildPageData(
 	cloudServices := []ServiceCard{
 		card("cal", "calendar / ical", "cal",
 			[]Endpoint{
-				cloudEp("nexus-cal-dev", "https://nexus-cal-dev-2tvic4xjjq-uc.a.run.app/health", "cloud-run_cal-(cloud)"),
+				cloudEp("nexus-cal-dev", "https://nexus-cal-dev-2tvic4xjjq-uc.a.run.app/health", "cloud-run_cal (cloud)"),
 				domainEp("cal.jredh.com", "https://cal.jredh.com", "https://nexus-cal-dev-2tvic4xjjq-uc.a.run.app", "domains_cal.jredh.com"),
 			},
 			ghRows(ghNexus, "deploy-cal-dev.yml"),
