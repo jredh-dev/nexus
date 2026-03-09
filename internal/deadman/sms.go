@@ -7,7 +7,7 @@
 // Unknown/new texts: ignored (silent TwiML response)
 // Subscriber texts (after trigger):
 //
-//	R → resend status
+//	R → resubscribe (resend current status for active deadmans)
 //	W → log WHY poll, ack, alert admins
 //	H → log HOW poll, ack, alert admins
 //	U → begin unsubscribe flow (one confirm per deadman)

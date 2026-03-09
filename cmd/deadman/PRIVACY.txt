@@ -1,0 +1,78 @@
+DEADMAN SWITCH SERVICE — PRIVACY POLICY
+Last updated: 2026-03-08
+
+1. WHAT THIS SERVICE IS
+
+The Deadman Switch is a personal SMS alert service. An owner registers a check-in
+schedule. If the owner stops checking in, the service sends SMS notifications to
+designated subscribers.
+
+2. INFORMATION COLLECTED
+
+We collect only what is required to operate the service:
+
+  - Phone numbers of owners, subscribers, and administrators
+  - Optional display names provided at registration
+  - Timestamps of check-ins and subscription events
+  - Inbound SMS message content (the first character is used to route commands;
+    full message content is logged for debugging)
+
+We do not collect: location data, device identifiers, browsing history, or any
+information beyond what you explicitly send via SMS.
+
+3. HOW INFORMATION IS USED
+
+Phone numbers and names are used exclusively to:
+  - Send check-in reminders and trigger alerts
+  - Route inbound SMS commands (R, W, H, U, Y, N, Q)
+  - Notify administrators of subscriber polls (W and H commands)
+
+We do not sell, share, or disclose your information to third parties except as
+required to transmit SMS (Twilio, Inc., acting as our SMS carrier).
+
+4. SMS CONSENT
+
+Subscribers receive an initial consent SMS before being enrolled. Subscribing
+requires an explicit Y reply. You may decline (N) or block all messages (Q) at
+any time.
+
+After enrolling, you may unsubscribe at any time by texting U to the service
+number.
+
+5. DATA RETENTION
+
+Data is retained for as long as you are registered with the service. You may
+request deletion of your phone number and associated records by contacting the
+service administrator.
+
+6. THIRD PARTIES
+
+SMS delivery is handled by Twilio, Inc. (twilio.com). Twilio's privacy policy
+applies to message transmission. No other third parties receive your data.
+
+7. SECURITY
+
+Data is stored in a PostgreSQL database on privately hosted infrastructure.
+Twilio credentials are stored in HashiCorp Vault and are never written to disk
+in plaintext. Access is restricted to the service administrator.
+
+8. YOUR RIGHTS
+
+You have the right to:
+  - Know what data we hold about you
+  - Request correction of inaccurate data
+  - Request deletion of your data
+  - Opt out of SMS communications at any time
+
+To exercise these rights, contact the service administrator directly.
+
+9. CONTACT
+
+This service is operated by its registered owner. For questions or data
+requests, contact the administrator via the service's registered contact
+information.
+
+10. CHANGES
+
+This policy may be updated. The current version is always available at the
+service's /privacy endpoint.
