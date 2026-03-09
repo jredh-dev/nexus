@@ -97,11 +97,21 @@ jobs:
     runs-on: local
     needs: [lint, build, test]
     if: failure()
+    env:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
     steps:
       - name: Discord notification
         run: |
-          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
-          ctl notify discord \
-            --event build \
-            --service nexus \
-            --status failure
+          # Notify via discord-mcp HTTP API if available; fall back to direct webhook curl.
+          # discord-mcp is not yet deployed on the first CI run, so direct curl is the fallback.
+          if curl -sf http://discord-mcp:8092/health >/dev/null 2>&1; then
+            curl -sf -X POST "http://discord-mcp:8092/mcp" \
+              -H "Content-Type: application/json" \
+              -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"notify_discord","arguments":{"event":"build","service":"nexus","status":"failure","env":"local"}}}' \
+              2>/dev/null || true
+          elif [ -n "$DISCORD_WEBHOOK_URL" ]; then
+            curl -sf -X POST "$DISCORD_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              -d '{"embeds":[{"title":"build nexus","description":"env: local | status: failure","color":15158332}]}' \
+              2>/dev/null || true
+          fi
