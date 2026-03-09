@@ -10,8 +10,12 @@ set -e
 SECRETS_FILE="/vault/secrets/humanish.env"
 
 if [ -f "$SECRETS_FILE" ]; then
+    # set -a auto-exports all variables defined during source,
+    # ensuring they are inherited by the exec'd binary.
+    set -a
     # shellcheck disable=SC1090
     . "$SECRETS_FILE"
+    set +a
 fi
 
 exec /app/humanish "$@"
