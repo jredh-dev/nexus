@@ -1,11 +1,5 @@
 # Nexus Deadman - Development Environment
-# Provisions secrets and Cloud Run service for the deadman switch.
-#
-# NOTE: This module does NOT create a Cloud SQL instance — the deadman
-# service uses a PostgreSQL connection string injected via DATABASE_URL.
-# For dev, this is a Cloud SQL instance you provision separately (or a
-# shared PG instance).  Terraform manages the secret; the DB itself is
-# out of scope here (like portal's Firebase credentials).
+# Provisions Cloud SQL, secrets, DNS, and Cloud Run service for the deadman switch.
 
 terraform {
   required_version = ">= 1.6.0"
@@ -15,11 +9,20 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 5.0"
     }
+    google-beta = {
+      source  = "hashicorp/google-beta"
+      version = "~> 5.0"
+    }
   }
 }
 
 # Provider configuration
 provider "google" {
+  project = var.project_id
+  region  = var.region
+}
+
+provider "google-beta" {
   project = var.project_id
   region  = var.region
 }
@@ -40,19 +43,32 @@ locals {
 
 # Module: GCP Project APIs — reuse portal's project module
 module "project" {
-  source     = "../../../portal/terraform/modules/project"
+  source     = "../../../../portal/terraform/modules/project"
   project_id = var.project_id
 }
 
 # Module: IAM and Workload Identity Federation — reuse portal's IAM module
 module "iam" {
-  source      = "../../../portal/terraform/modules/iam"
+  source      = "../../../../portal/terraform/modules/iam"
   project_id  = var.project_id
   environment = local.environment
   github_org  = local.github_org
   github_repo = local.github_repo
 
   depends_on = [module.project]
+}
+
+# Module: Cloud SQL (PostgreSQL 16, us-west1, shared instance nexus-dev-west1)
+module "cloud_sql" {
+  source                = "../../modules/cloud-sql"
+  project_id            = var.project_id
+  region                = var.region
+  instance_name         = "nexus-dev-west1"
+  database_name         = "deadman"
+  db_user               = "deadman"
+  service_account_email = module.iam.service_account_email
+
+  depends_on = [module.project, module.iam]
 }
 
 # Module: Secret Manager
@@ -70,6 +86,14 @@ module "secrets" {
   depends_on = [module.project, module.iam]
 }
 
+# Module: Cloud DNS — CNAME for deadman.jredh.com
+module "dns" {
+  source        = "../../modules/dns"
+  project_id    = var.project_id
+  dns_zone_name = var.dns_zone_name
+  custom_domain = var.custom_domain
+}
+
 # Module: Cloud Run
 module "cloud_run" {
   source                = "../../modules/cloud-run"
@@ -79,20 +103,26 @@ module "cloud_run" {
   image                 = var.cloud_run_image
   service_account_email = module.iam.service_account_email
 
-  # Non-secret config
+  # Non-secret config.
+  # NOTE: do NOT include PORT here — Cloud Run reserves it.
   environment_variables = {
-    ENVIRONMENT = local.environment
-    PORT        = "8080"
+    ENVIRONMENT               = local.environment
+    CLOUD_SQL_CONNECTION_NAME = module.cloud_sql.connection_name
+    DEADMAN_PUBLIC_URL        = var.deadman_public_url
   }
 
-  # Secrets injected as env vars from Secret Manager
+  # Secrets injected as env vars from Secret Manager.
+  # DEADMAN_DB_PASSWORD is the raw password; entrypoint.sh builds the full DSN.
   secrets = {
-    TWILIO_ACCOUNT_SID = "${module.secrets.twilio_account_sid_secret_id}:latest"
-    TWILIO_AUTH_TOKEN  = "${module.secrets.twilio_auth_token_secret_id}:latest"
-    TWILIO_FROM        = "${module.secrets.twilio_from_secret_id}:latest"
-    DEADMAN_PHONE      = "${module.secrets.deadman_phone_secret_id}:latest"
-    DATABASE_URL       = "${module.secrets.deadman_db_password_secret_id}:latest"
+    TWILIO_ACCOUNT_SID  = "${module.secrets.twilio_account_sid_secret_id}:latest"
+    TWILIO_AUTH_TOKEN   = "${module.secrets.twilio_auth_token_secret_id}:latest"
+    TWILIO_FROM         = "${module.secrets.twilio_from_secret_id}:latest"
+    DEADMAN_PHONE       = "${module.secrets.deadman_phone_secret_id}:latest"
+    DEADMAN_DB_PASSWORD = "${module.secrets.deadman_db_password_secret_id}:latest"
   }
+
+  cloud_sql_connection_name = module.cloud_sql.connection_name
+  custom_domain             = var.custom_domain
 
   memory                = "256Mi"
   cpu                   = "1"
@@ -102,5 +132,5 @@ module "cloud_run" {
 
   labels = local.common_labels
 
-  depends_on = [module.project, module.iam, module.secrets]
+  depends_on = [module.project, module.iam, module.secrets, module.cloud_sql]
 }
