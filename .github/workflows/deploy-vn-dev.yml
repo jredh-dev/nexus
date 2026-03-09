@@ -36,7 +36,7 @@ jobs:
       - name: Set version variables
         id: version
         run: |
-          VERSION="v0.0.1.$(git rev-list --count HEAD)"
+          VERSION="${{ github.event.release.tag_name != '' && github.event.release.tag_name || 'manual' }}"
           COMMIT=$(git rev-parse --short HEAD)
           BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT

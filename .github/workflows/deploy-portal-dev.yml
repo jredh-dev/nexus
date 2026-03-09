@@ -1,13 +1,8 @@
 name: Deploy Portal to Cloud Run (DEV)
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'services/portal/**'
-      - 'go.mod'
-      - 'go.sum'
+  release:
+    types: [published]
   workflow_dispatch:
 
 env:
@@ -33,7 +28,7 @@ jobs:
       - name: Set version variables
         id: version
         run: |
-          VERSION="v0.0.1.$(git rev-list --count HEAD)"
+          VERSION="${{ github.event.release.tag_name }}"
           COMMIT=$(git rev-parse --short HEAD)
           BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
