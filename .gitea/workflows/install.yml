@@ -27,7 +27,19 @@ jobs:
 
           notify() {
             local service=$1 status=$2
-            ctl notify discord --event install --service "$service" --env local --status "$status" 2>/dev/null || true
+            # Notify via discord-mcp HTTP API if available; fall back to direct webhook curl.
+            if curl -sf http://discord-mcp:8092/health >/dev/null 2>&1; then
+              curl -sf -X POST "http://discord-mcp:8092/mcp" \
+                -H "Content-Type: application/json" \
+                -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"notify_discord\",\"arguments\":{\"event\":\"install\",\"service\":\"$service\",\"status\":\"$status\",\"env\":\"local\"}}}" \
+                2>/dev/null || true
+            elif [ -n "$DISCORD_WEBHOOK_URL" ]; then
+              COLOR=$([ "$status" = "success" ] && echo "3066993" || echo "15158332")
+              curl -sf -X POST "$DISCORD_WEBHOOK_URL" \
+                -H "Content-Type: application/json" \
+                -d "{\"embeds\":[{\"title\":\"install $service\",\"description\":\"env: local | status: $status\",\"color\":$COLOR}]}" \
+                2>/dev/null || true
+            fi
           }
 
           # tui — Go TUI client (with obfuscated prod values if secrets are set)
@@ -77,4 +89,16 @@ jobs:
             fi
           else
             echo "--- servicectl: no changes"
+          fi
+
+          # wstr — workstream lifecycle CLI
+          if echo "$CHANGED" | grep -qE '^(cmd/wstr/|go\.(mod|sum)$)'; then
+            echo "==> Installing wstr"
+            if go install ./cmd/wstr; then
+              notify wstr success
+            else
+              notify wstr failure
+            fi
+          else
+            echo "--- wstr: no changes"
           fi

@@ -1,0 +1,40 @@
+# Auto-deploy github-mcp service on push to main.
+# Rebuilds the Docker image and restarts the container.
+name: Deploy GitHub MCP
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/mcp/github/**'
+      - 'go.mod'
+      - 'go.sum'
+
+jobs:
+  deploy:
+    runs-on: local
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and restart github-mcp
+        working-directory: /Users/jredh/Development/agentic
+        run: |
+          echo "==> Building github-mcp Docker image"
+          docker compose build github-mcp
+          echo "==> Restarting github-mcp service"
+          docker compose up -d github-mcp
+          echo "==> Waiting for health check"
+          sleep 5
+          docker compose ps github-mcp
+
+      - name: Notify Discord
+        if: always()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          STATUS="${{ job.status }}"
+          COLOR=$([ "$STATUS" = "success" ] && echo "3066993" || echo "15158332")
+          curl -sf -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"deploy github-mcp\",\"description\":\"env: local | status: $STATUS\",\"color\":$COLOR}]}" \
+            2>/dev/null || true
