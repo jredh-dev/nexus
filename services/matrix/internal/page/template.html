@@ -211,7 +211,37 @@
     @keyframes pulse-pending { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
     .dot.ci-pending { animation: pulse-pending 1.6s ease-in-out infinite; }
 
-    /* ---- repo grid ---- */
+    /* ---- health monitor section ---- */
+    .health-groups {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: var(--gap);
+    }
+    .health-group {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+    }
+    .health-group-name {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .health-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 2px 0;
+      font-size: 11px;
+    }
+    .health-row a { color: var(--text); text-decoration: none; }
+    .health-row a:hover { color: var(--accent); }
+
+
     .repo-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -326,6 +356,28 @@
     {{end}}
   </div>
 </section>
+
+<!-- ================================================================ -->
+<!-- HEALTH MONITOR (Gatus)                                             -->
+<!-- ================================================================ -->
+{{if .GatusGroups}}
+<section>
+  <h2>health monitor</h2>
+  <div class="health-groups">
+    {{range .GatusGroups}}
+    <div class="health-group">
+      <div class="health-group-name">{{.Name}}</div>
+      {{range .Entries}}
+      <div class="health-row">
+        <span class="dot {{statusClass .Status}}" title="{{statusText .Status}}"></span>
+        <a href="{{.URL}}" target="_blank">{{.Name}}</a>
+      </div>
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+</section>
+{{end}}
 
 <!-- ================================================================ -->
 <!-- REPOS                                                              -->

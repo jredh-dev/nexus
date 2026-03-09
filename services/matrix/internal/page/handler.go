@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/jredh-dev/nexus/services/matrix/internal/data"
+	"github.com/jredh-dev/nexus/services/matrix/internal/discover"
 )
 
 //go:embed template.html
@@ -113,6 +114,7 @@ type Config struct {
 	OpenObserveUser       string // e.g. "admin@local.dev"
 	OpenObservePass       string // e.g. "changeme"
 	OpenCodeURL           string // e.g. "http://localhost:4096" — browser-facing nav link
+	DockerHost            string // Docker socket path (default: /var/run/docker.sock); set DOCKER_HOST env
 }
 
 // ConfigFromEnv reads handler config from environment variables with defaults.
@@ -131,6 +133,7 @@ func ConfigFromEnv() Config {
 		OpenObserveUser:       envOr("OPENOBSERVE_USER", "admin@local.dev"),
 		OpenObservePass:       envOr("OPENOBSERVE_PASS", "changeme"),
 		OpenCodeURL:           envOr("OPENCODE_URL", "http://localhost:4096"),
+		DockerHost:            os.Getenv("DOCKER_HOST"),
 	}
 }
 
@@ -173,16 +176,17 @@ func Handler(cfg Config) http.HandlerFunc {
 		}
 
 		var (
-			gatusData  map[string]data.GatusResult
-			ghNexus    map[string]data.WorkflowRun
-			ghCtl      map[string]data.WorkflowRun
-			giteaNexus map[string]data.WorkflowRun
-			giteaCtl   map[string]data.WorkflowRun
-			logCounts  map[string]int
+			gatusData      map[string]data.GatusResult
+			ghNexus        map[string]data.WorkflowRun
+			ghCtl          map[string]data.WorkflowRun
+			giteaNexus     map[string]data.WorkflowRun
+			giteaCtl       map[string]data.WorkflowRun
+			logCounts      map[string]int
+			discoveredSvcs []discover.ServiceDef
 		)
 
 		var wg sync.WaitGroup
-		wg.Add(6)
+		wg.Add(7)
 
 		go func() {
 			defer wg.Done()
@@ -213,11 +217,22 @@ func Handler(cfg Config) http.HandlerFunc {
 			defer wg.Done()
 			logCounts = data.FetchLogCounts(ctx, cfg.OpenObserveURL, cfg.OpenObserveUser, cfg.OpenObservePass)
 		}()
+		go func() {
+			defer wg.Done()
+			// Docker discovery is best-effort: if the socket is unavailable (e.g. no
+			// DOCKER_HOST set, or not in Docker), just log and continue.
+			svcs, err := discover.Services(ctx)
+			if err != nil {
+				log.Printf("matrix: docker discovery unavailable: %v", err)
+				svcs = nil
+			}
+			discoveredSvcs = svcs
+		}()
 
 		wg.Wait()
 		log.Printf("matrix: data fetched in %s", time.Since(start).Round(time.Millisecond))
 
-		pd := buildPageData(cfg, gatusData, ghNexus, ghCtl, giteaNexus, giteaCtl, logCounts, errors)
+		pd := buildPageData(cfg, gatusData, ghNexus, ghCtl, giteaNexus, giteaCtl, logCounts, discoveredSvcs, errors)
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "public, max-age=10")
@@ -237,9 +252,29 @@ type TemplateData struct {
 	CloudServices []ServiceCard // cloud-only services (cal)
 	InfraServices []ServiceCard
 
+	// GatusGroups is the Gatus health monitor data, grouped and sorted for the
+	// inline health-monitor section. Groups are ordered: local, cloud-run,
+	// domains, then anything else alphabetically.
+	GatusGroups []GatusGroup
+
 	Repos     []RepoGroup
 	Errors    []string
 	FetchedAt string
+}
+
+// GatusGroup is one named group of Gatus endpoint rows.
+type GatusGroup struct {
+	Name    string
+	Entries []GatusEntry
+}
+
+// GatusEntry is one Gatus endpoint row in the health-monitor section.
+type GatusEntry struct {
+	Name   string
+	Key    string
+	Status data.Status
+	// URL is the Gatus endpoint detail page link (e.g. /endpoints/<key>).
+	URL string
 }
 
 // ServiceCard is one service tile. Endpoints is a flat ordered list:
@@ -302,6 +337,7 @@ func buildPageData(
 	giteaNexus map[string]data.WorkflowRun,
 	giteaCtl map[string]data.WorkflowRun,
 	logCounts map[string]int,
+	discovered []discover.ServiceDef,
 	errors []string,
 ) TemplateData {
 	gs := func(key string) data.Status {
@@ -508,6 +544,64 @@ func buildPageData(
 		),
 	}
 
+	// ---- Auto-discovered services (from Docker labels) ----
+	// Build a set of service names already represented in the hardcoded lists so
+	// we don't duplicate them. Discovered services not in this set get simple cards
+	// appended to the appropriate group.
+	known := make(map[string]bool)
+	for _, s := range appServices {
+		known[s.Name] = true
+	}
+	for _, s := range cloudServices {
+		known[s.Name] = true
+	}
+	for _, s := range infraServices {
+		known[s.Name] = true
+	}
+
+	for _, svc := range discovered {
+		if known[svc.Name] {
+			continue
+		}
+		// Build a minimal endpoint from nexus.port (if set) or nexus.health_url.
+		var eps []Endpoint
+		gatusKey := "local_" + svc.Name
+		if svc.Port != "" {
+			label := ":" + svc.Port
+			href := ""
+			if svc.HealthURL != "" {
+				href = svc.HealthURL
+			} else if svc.HealthType != "none" {
+				href = "http://localhost:" + svc.Port
+			}
+			eps = append(eps, localEp(label, href, gatusKey))
+		} else if svc.HealthURL != "" && svc.HealthType != "none" {
+			eps = append(eps, localEp(svc.HealthURL, svc.HealthURL, gatusKey))
+		} else {
+			// No HTTP endpoint — show as presence-only (no clickable link).
+			eps = append(eps, localEp("docker", "", gatusKey))
+		}
+
+		// Build workflow rows from nexus.workflows label.
+		var pipelines []WorkflowRow
+		for _, wf := range svc.Workflows {
+			pipelines = append(pipelines, giteaRow(giteaNexus, wf))
+		}
+
+		desc := svc.Description
+		autoCard := card(svc.Name, desc, svc.Name, eps, pipelines)
+
+		switch svc.Group {
+		case "cloud":
+			cloudServices = append(cloudServices, autoCard)
+		case "infra":
+			infraServices = append(infraServices, autoCard)
+		default: // "app" or anything else
+			appServices = append(appServices, autoCard)
+		}
+		known[svc.Name] = true
+	}
+
 	repos := []RepoGroup{
 		{
 			Name:      "nexus",
@@ -540,8 +634,69 @@ func buildPageData(
 		AppServices:    appServices,
 		CloudServices:  cloudServices,
 		InfraServices:  infraServices,
+		GatusGroups:    buildGatusGroups(cfg.GatusURL, gatus),
 		Repos:          repos,
 		Errors:         errors,
 		FetchedAt:      time.Now().In(loc).Format("15:04:05 MST"),
 	}
+}
+
+// buildGatusGroups converts the raw Gatus result map into ordered GatusGroup
+// slices for the health-monitor section. Group order: local, cloud-run,
+// domains, then anything else alphabetically.
+func buildGatusGroups(gatusBaseURL string, results map[string]data.GatusResult) []GatusGroup {
+	// Canonical group order.
+	orderedGroups := []string{"local", "cloud-run", "domains"}
+
+	// Collect entries per group.
+	groupMap := map[string][]GatusEntry{}
+	for _, r := range results {
+		entry := GatusEntry{
+			Name:   r.Name,
+			Key:    r.Key,
+			Status: r.Status,
+			// Gatus detail page: baseURL + /endpoints/<key>
+			URL: gatusBaseURL + "/endpoints/" + r.Key,
+		}
+		groupMap[r.Group] = append(groupMap[r.Group], entry)
+	}
+
+	// Sort entries within each group alphabetically by name.
+	for grp := range groupMap {
+		entries := groupMap[grp]
+		for i := 1; i < len(entries); i++ {
+			for j := i; j > 0 && entries[j].Name < entries[j-1].Name; j-- {
+				entries[j], entries[j-1] = entries[j-1], entries[j]
+			}
+		}
+		groupMap[grp] = entries
+	}
+
+	// Append any groups not in the canonical order (alphabetically).
+	extra := []string{}
+	known := map[string]bool{}
+	for _, g := range orderedGroups {
+		known[g] = true
+	}
+	for g := range groupMap {
+		if !known[g] {
+			extra = append(extra, g)
+		}
+	}
+	for i := 1; i < len(extra); i++ {
+		for j := i; j > 0 && extra[j] < extra[j-1]; j-- {
+			extra[j], extra[j-1] = extra[j-1], extra[j]
+		}
+	}
+	allGroups := append(orderedGroups, extra...)
+
+	var out []GatusGroup
+	for _, grp := range allGroups {
+		entries, ok := groupMap[grp]
+		if !ok {
+			continue
+		}
+		out = append(out, GatusGroup{Name: grp, Entries: entries})
+	}
+	return out
 }
