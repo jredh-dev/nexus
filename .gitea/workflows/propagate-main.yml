@@ -1,0 +1,94 @@
+# Propagate Gitea main to GitHub main and open a PR against the current RC branch.
+# Runs on every push to main (including squash-merges from workstream branches).
+name: Propagate Main to GitHub
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  propagate:
+    name: Push to GitHub and open RC PR
+    runs-on: local
+    env:
+      GITHUB_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push main to GitHub
+        run: |
+          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
+          git push \
+            "https://${GITHUB_TOKEN}@github.com/jredh-dev/nexus.git" \
+            "HEAD:refs/heads/main"
+
+      - name: Determine current RC branch
+        id: rc
+        run: |
+          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
+          rc=$(curl -s \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/jredh-dev/nexus/branches?per_page=100" \
+            | grep '"name"' \
+            | grep '"rc/v' \
+            | sed 's/.*"name": "\(.*\)".*/\1/' \
+            | sort -rV \
+            | head -1)
+          if [ -z "$rc" ]; then
+            echo "No RC branch found, skipping PR creation"
+            echo "rc_branch=" >> $GITHUB_OUTPUT
+          else
+            echo "rc_branch=${rc}" >> $GITHUB_OUTPUT
+            echo "Using RC branch: ${rc}"
+          fi
+
+      - name: Open PR main → RC on GitHub
+        if: steps.rc.outputs.rc_branch != ''
+        run: |
+          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
+          rc_branch="${{ steps.rc.outputs.rc_branch }}"
+
+          # Build title from last commit message subject
+          title=$(git log -1 --format="%s")
+
+          # 422 = PR already exists; treat as success
+          http_code=$(curl -s -o /tmp/pr_response.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Content-Type: application/json" \
+            "https://api.github.com/repos/jredh-dev/nexus/pulls" \
+            -d "{
+              \"title\": \"${title}\",
+              \"head\": \"main\",
+              \"base\": \"${rc_branch}\",
+              \"body\": \"Propagated from Gitea main. Commit: \`${GITHUB_SHA}\`\"
+            }")
+          if [ "$http_code" = "422" ]; then
+            echo "PR already exists, skipping"
+          elif [ "$http_code" != "201" ]; then
+            echo "PR creation failed (HTTP ${http_code}):"
+            cat /tmp/pr_response.json
+            exit 1
+          else
+            echo "PR created:"
+            cat /tmp/pr_response.json | grep '"html_url"' | head -1
+          fi
+
+  notify-failure:
+    name: Notify Discord on Failure
+    runs-on: local
+    needs: [propagate]
+    if: failure()
+    steps:
+      - name: Discord notification
+        run: |
+          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
+          ctl notify discord \
+            --event build \
+            --service nexus \
+            --status failure \
+            --message "main propagation to GitHub failed"
