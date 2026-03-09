@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 )
@@ -19,9 +20,13 @@ type ServerConfig struct {
 	Env  string
 }
 
-// DBConfig holds database settings.
+// DBConfig holds PostgreSQL connection settings.
 type DBConfig struct {
-	Path string // path to SQLite database file
+	Host     string // postgres hostname (default: localhost)
+	Port     string // postgres port (default: 5432)
+	Name     string // database name (default: portal)
+	User     string // database role (default: portal)
+	Password string // injected by Vault Agent via PORTAL_DB_PASSWORD
 }
 
 // SessionConfig holds session/cookie settings.
@@ -45,7 +50,11 @@ func Load() *Config {
 			Env:  getEnv("ENV", "development"),
 		},
 		DB: DBConfig{
-			Path: getEnv("DB_PATH", "portal.db"),
+			Host:     getEnv("PORTAL_DB_HOST", "localhost"),
+			Port:     getEnv("PORTAL_DB_PORT", "5432"),
+			Name:     getEnv("PORTAL_DB_NAME", "portal"),
+			User:     getEnv("PORTAL_DB_USER", "portal"),
+			Password: getEnv("PORTAL_DB_PASSWORD", "portal-dev-password"),
 		},
 		Session: SessionConfig{
 			Secret: getEnv("SESSION_SECRET", ""),
@@ -57,6 +66,14 @@ func Load() *Config {
 			From: getEnv("SMTP_FROM", "noreply@jredh.com"),
 		},
 	}
+}
+
+// DSN returns a libpq-style connection string for pgxpool.
+func (d DBConfig) DSN() string {
+	return fmt.Sprintf(
+		"host=%s port=%s dbname=%s user=%s password=%s",
+		d.Host, d.Port, d.Name, d.User, d.Password,
+	)
 }
 
 func getEnv(key, defaultValue string) string {

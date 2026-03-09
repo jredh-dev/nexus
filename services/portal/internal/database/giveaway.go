@@ -1,45 +1,50 @@
 //go:build giveaway
 
+// Package database provides PostgreSQL access for the portal service.
+// This file contains the giveaway sub-feature (items and claims), guarded by
+// the "giveaway" build tag so it is not compiled in normal builds.
 package database
 
 import (
-	"database/sql"
+	"context"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jredh-dev/nexus/services/portal/pkg/models"
-
-	_ "modernc.org/sqlite"
 )
 
-// GiveawayDB wraps a SQLite connection for the giveaway service.
+// GiveawayDB wraps a pgxpool.Pool for the giveaway service.
 type GiveawayDB struct {
-	conn *sql.DB
+	pool *pgxpool.Pool
 }
 
-// NewGiveaway opens (or creates) the giveaway SQLite database and runs migrations.
-func NewGiveaway(path string) (*GiveawayDB, error) {
-	conn, err := sql.Open("sqlite", path+"?_journal_mode=WAL&_busy_timeout=5000")
+// NewGiveaway connects to PostgreSQL and runs giveaway schema migrations.
+func NewGiveaway(ctx context.Context, connStr string) (*GiveawayDB, error) {
+	pool, err := pgxpool.New(ctx, connStr)
 	if err != nil {
 		return nil, fmt.Errorf("open giveaway database: %w", err)
 	}
-
-	conn.SetMaxOpenConns(1)
-
-	if err := migrateGiveaway(conn); err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("migrate giveaway: %w", err)
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("ping giveaway database: %w", err)
 	}
-
-	return &GiveawayDB{conn: conn}, nil
+	db := &GiveawayDB{pool: pool}
+	if err := db.migrate(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("migrate giveaway database: %w", err)
+	}
+	return db, nil
 }
 
-// Close closes the database connection.
-func (db *GiveawayDB) Close() error {
-	return db.conn.Close()
+// Close shuts down the connection pool.
+func (db *GiveawayDB) Close() {
+	db.pool.Close()
 }
 
-func migrateGiveaway(conn *sql.DB) error {
+func (db *GiveawayDB) migrate(ctx context.Context) error {
 	const ddl = `
 	CREATE TABLE IF NOT EXISTS items (
 		id            TEXT PRIMARY KEY,
@@ -50,11 +55,11 @@ func migrateGiveaway(conn *sql.DB) error {
 		status        TEXT NOT NULL DEFAULT 'available',
 		dist_miles    REAL NOT NULL DEFAULT 0,
 		drive_minutes INTEGER NOT NULL DEFAULT 0,
-		created_at    DATETIME NOT NULL,
-		updated_at    DATETIME NOT NULL
+		created_at    TIMESTAMPTZ NOT NULL,
+		updated_at    TIMESTAMPTZ NOT NULL
 	);
 
-	CREATE INDEX IF NOT EXISTS idx_items_status ON items(status);
+	CREATE INDEX IF NOT EXISTS idx_items_status     ON items(status);
 	CREATE INDEX IF NOT EXISTS idx_items_created_at ON items(created_at);
 
 	CREATE TABLE IF NOT EXISTS claims (
@@ -66,14 +71,14 @@ func migrateGiveaway(conn *sql.DB) error {
 		delivery_fee  REAL NOT NULL DEFAULT 0,
 		status        TEXT NOT NULL DEFAULT 'pending',
 		notes         TEXT NOT NULL DEFAULT '',
-		created_at    DATETIME NOT NULL,
-		updated_at    DATETIME NOT NULL
+		created_at    TIMESTAMPTZ NOT NULL,
+		updated_at    TIMESTAMPTZ NOT NULL
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_claims_item_id ON claims(item_id);
-	CREATE INDEX IF NOT EXISTS idx_claims_status ON claims(status);
+	CREATE INDEX IF NOT EXISTS idx_claims_status  ON claims(status);
 	`
-	_, err := conn.Exec(ddl)
+	_, err := db.pool.Exec(ctx, ddl)
 	return err
 }
 
@@ -81,14 +86,14 @@ func migrateGiveaway(conn *sql.DB) error {
 
 const itemColumns = `id, title, description, image_url, condition, status, dist_miles, drive_minutes, created_at, updated_at`
 
-func scanItem(row interface{ Scan(...interface{}) error }) (*models.Item, error) {
+func scanItem(row pgx.Row) (*models.Item, error) {
 	item := &models.Item{}
 	err := row.Scan(
 		&item.ID, &item.Title, &item.Description, &item.ImageURL,
 		&item.Condition, &item.Status, &item.DistMiles, &item.DriveMinutes,
 		&item.CreatedAt, &item.UpdatedAt,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 	return item, err
@@ -97,8 +102,8 @@ func scanItem(row interface{ Scan(...interface{}) error }) (*models.Item, error)
 // CreateItem inserts a new giveaway item.
 func (db *GiveawayDB) CreateItem(item *models.Item) error {
 	const q = `INSERT INTO items (id, title, description, image_url, condition, status, dist_miles, drive_minutes, created_at, updated_at)
-	           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err := db.conn.Exec(q,
+	           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
+	_, err := db.pool.Exec(context.Background(), q,
 		item.ID, item.Title, item.Description, item.ImageURL,
 		item.Condition, item.Status, item.DistMiles, item.DriveMinutes,
 		item.CreatedAt, item.UpdatedAt,
@@ -108,23 +113,23 @@ func (db *GiveawayDB) CreateItem(item *models.Item) error {
 
 // GetItem returns an item by ID.
 func (db *GiveawayDB) GetItem(id string) (*models.Item, error) {
-	q := `SELECT ` + itemColumns + ` FROM items WHERE id = ?`
-	return scanItem(db.conn.QueryRow(q, id))
+	q := `SELECT ` + itemColumns + ` FROM items WHERE id = $1`
+	return scanItem(db.pool.QueryRow(context.Background(), q, id))
 }
 
 // ListItems returns items filtered by status. If status is empty, all items are returned.
 func (db *GiveawayDB) ListItems(status models.ItemStatus) ([]models.Item, error) {
-	var q string
-	var args []interface{}
-
+	var (
+		rows pgx.Rows
+		err  error
+	)
 	if status != "" {
-		q = `SELECT ` + itemColumns + ` FROM items WHERE status = ? ORDER BY created_at DESC`
-		args = append(args, string(status))
+		q := `SELECT ` + itemColumns + ` FROM items WHERE status = $1 ORDER BY created_at DESC`
+		rows, err = db.pool.Query(context.Background(), q, string(status))
 	} else {
-		q = `SELECT ` + itemColumns + ` FROM items ORDER BY created_at DESC`
+		q := `SELECT ` + itemColumns + ` FROM items ORDER BY created_at DESC`
+		rows, err = db.pool.Query(context.Background(), q)
 	}
-
-	rows, err := db.conn.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -147,9 +152,9 @@ func (db *GiveawayDB) ListItems(status models.ItemStatus) ([]models.Item, error)
 
 // UpdateItem updates an existing item.
 func (db *GiveawayDB) UpdateItem(item *models.Item) error {
-	const q = `UPDATE items SET title = ?, description = ?, image_url = ?, condition = ?,
-	           status = ?, dist_miles = ?, drive_minutes = ?, updated_at = ? WHERE id = ?`
-	_, err := db.conn.Exec(q,
+	const q = `UPDATE items SET title = $1, description = $2, image_url = $3, condition = $4,
+	           status = $5, dist_miles = $6, drive_minutes = $7, updated_at = $8 WHERE id = $9`
+	_, err := db.pool.Exec(context.Background(), q,
 		item.Title, item.Description, item.ImageURL, item.Condition,
 		item.Status, item.DistMiles, item.DriveMinutes, time.Now(), item.ID,
 	)
@@ -158,7 +163,7 @@ func (db *GiveawayDB) UpdateItem(item *models.Item) error {
 
 // DeleteItem removes an item by ID.
 func (db *GiveawayDB) DeleteItem(id string) error {
-	_, err := db.conn.Exec(`DELETE FROM items WHERE id = ?`, id)
+	_, err := db.pool.Exec(context.Background(), `DELETE FROM items WHERE id = $1`, id)
 	return err
 }
 
@@ -166,13 +171,13 @@ func (db *GiveawayDB) DeleteItem(id string) error {
 
 const claimColumns = `id, item_id, claimer_name, claimer_email, claimer_phone, delivery_fee, status, notes, created_at, updated_at`
 
-func scanClaim(row interface{ Scan(...interface{}) error }) (*models.Claim, error) {
+func scanClaim(row pgx.Row) (*models.Claim, error) {
 	c := &models.Claim{}
 	err := row.Scan(
 		&c.ID, &c.ItemID, &c.ClaimerName, &c.ClaimerEmail, &c.ClaimerPhone,
 		&c.DeliveryFee, &c.Status, &c.Notes, &c.CreatedAt, &c.UpdatedAt,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 	return c, err
@@ -181,8 +186,8 @@ func scanClaim(row interface{ Scan(...interface{}) error }) (*models.Claim, erro
 // CreateClaim inserts a new claim.
 func (db *GiveawayDB) CreateClaim(claim *models.Claim) error {
 	const q = `INSERT INTO claims (id, item_id, claimer_name, claimer_email, claimer_phone, delivery_fee, status, notes, created_at, updated_at)
-	           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err := db.conn.Exec(q,
+	           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
+	_, err := db.pool.Exec(context.Background(), q,
 		claim.ID, claim.ItemID, claim.ClaimerName, claim.ClaimerEmail,
 		claim.ClaimerPhone, claim.DeliveryFee, claim.Status, claim.Notes,
 		claim.CreatedAt, claim.UpdatedAt,
@@ -192,35 +197,35 @@ func (db *GiveawayDB) CreateClaim(claim *models.Claim) error {
 
 // GetClaim returns a claim by ID.
 func (db *GiveawayDB) GetClaim(id string) (*models.Claim, error) {
-	q := `SELECT ` + claimColumns + ` FROM claims WHERE id = ?`
-	return scanClaim(db.conn.QueryRow(q, id))
+	q := `SELECT ` + claimColumns + ` FROM claims WHERE id = $1`
+	return scanClaim(db.pool.QueryRow(context.Background(), q, id))
 }
 
-// ListClaimsByItem returns all claims for an item.
+// ListClaimsByItem returns all claims for an item, newest first.
 func (db *GiveawayDB) ListClaimsByItem(itemID string) ([]models.Claim, error) {
-	q := `SELECT ` + claimColumns + ` FROM claims WHERE item_id = ? ORDER BY created_at DESC`
-	return db.queryClaims(q, itemID)
+	q := `SELECT ` + claimColumns + ` FROM claims WHERE item_id = $1 ORDER BY created_at DESC`
+	return db.queryClaims(context.Background(), q, itemID)
 }
 
 // ListClaims returns all claims, optionally filtered by status.
 func (db *GiveawayDB) ListClaims(status models.ClaimStatus) ([]models.Claim, error) {
 	if status != "" {
-		q := `SELECT ` + claimColumns + ` FROM claims WHERE status = ? ORDER BY created_at DESC`
-		return db.queryClaims(q, string(status))
+		q := `SELECT ` + claimColumns + ` FROM claims WHERE status = $1 ORDER BY created_at DESC`
+		return db.queryClaims(context.Background(), q, string(status))
 	}
 	q := `SELECT ` + claimColumns + ` FROM claims ORDER BY created_at DESC`
-	return db.queryClaims(q)
+	return db.queryClaims(context.Background(), q)
 }
 
 // UpdateClaimStatus updates a claim's status.
 func (db *GiveawayDB) UpdateClaimStatus(id string, status models.ClaimStatus) error {
-	const q = `UPDATE claims SET status = ?, updated_at = ? WHERE id = ?`
-	_, err := db.conn.Exec(q, string(status), time.Now(), id)
+	const q = `UPDATE claims SET status = $1, updated_at = $2 WHERE id = $3`
+	_, err := db.pool.Exec(context.Background(), q, string(status), time.Now(), id)
 	return err
 }
 
-func (db *GiveawayDB) queryClaims(query string, args ...interface{}) ([]models.Claim, error) {
-	rows, err := db.conn.Query(query, args...)
+func (db *GiveawayDB) queryClaims(ctx context.Context, query string, args ...any) ([]models.Claim, error) {
+	rows, err := db.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

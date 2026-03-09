@@ -62,8 +62,9 @@ func main() {
 		cfg.Session.Secret = "insecure-dev-secret-change-me"
 	}
 
-	// Initialize SQLite database.
-	db, err := database.New(cfg.DB.Path)
+	// Initialize PostgreSQL database.
+	ctx := context.Background()
+	db, err := database.New(ctx, cfg.DB.DSN())
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}

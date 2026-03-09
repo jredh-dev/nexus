@@ -1,45 +1,64 @@
+// Package database provides PostgreSQL access for the portal service.
+//
+// It manages connection pooling via pgxpool, schema migrations, and CRUD
+// operations for users, sessions, magic tokens, and email change tokens.
+//
+// All timestamps are stored as TIMESTAMPTZ and handled as time.Time natively
+// by pgx/v5 — no manual parsing required.
 package database
 
 import (
-	"database/sql"
+	"context"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jredh-dev/nexus/services/portal/pkg/models"
-
-	_ "modernc.org/sqlite"
 )
 
-// DB wraps a SQLite connection.
+// DB wraps a pgxpool.Pool and provides portal domain operations.
 type DB struct {
-	conn *sql.DB
+	pool *pgxpool.Pool
 }
 
-// New opens (or creates) the SQLite database and runs migrations.
-func New(path string) (*DB, error) {
-	conn, err := sql.Open("sqlite", path+"?_journal_mode=WAL&_busy_timeout=5000")
+// New connects to PostgreSQL using connStr and runs schema migrations.
+// connStr is a libpq-style DSN, e.g.:
+//
+//	"host=localhost port=5432 dbname=portal user=portal password=portal-dev-password"
+func New(ctx context.Context, connStr string) (*DB, error) {
+	pool, err := pgxpool.New(ctx, connStr)
 	if err != nil {
-		return nil, fmt.Errorf("open database: %w", err)
+		return nil, fmt.Errorf("open portal database: %w", err)
 	}
-
-	// Single writer, many readers.
-	conn.SetMaxOpenConns(1)
-
-	if err := migrate(conn); err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("migrate: %w", err)
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("ping portal database: %w", err)
 	}
-
-	return &DB{conn: conn}, nil
+	db := &DB{pool: pool}
+	if err := db.migrate(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("migrate portal database: %w", err)
+	}
+	return db, nil
 }
 
-// Close closes the database connection.
-func (db *DB) Close() error {
-	return db.conn.Close()
+// Close shuts down the connection pool.
+func (db *DB) Close() {
+	db.pool.Close()
 }
 
-// migrate creates tables if they do not exist and applies schema updates.
-func migrate(conn *sql.DB) error {
+// Pool returns the underlying pgxpool for callers that need direct pool access
+// (e.g. pgbus.Publish).
+func (db *DB) Pool() *pgxpool.Pool {
+	return db.pool
+}
+
+// migrate creates all tables and indexes if they do not exist.
+// PostgreSQL supports IF NOT EXISTS for CREATE TABLE and CREATE INDEX, so
+// this is idempotent and safe to run on every startup.
+func (db *DB) migrate(ctx context.Context) error {
 	const ddl = `
 	CREATE TABLE IF NOT EXISTS users (
 		id            TEXT PRIMARY KEY,
@@ -51,33 +70,33 @@ func migrate(conn *sql.DB) error {
 		password_hash TEXT NOT NULL,
 		email_hash    TEXT NOT NULL DEFAULT '',
 		phone_hash    TEXT NOT NULL DEFAULT '',
-		created_at    DATETIME NOT NULL,
-		updated_at    DATETIME NOT NULL,
-		last_login_at DATETIME NOT NULL
+		created_at    TIMESTAMPTZ NOT NULL,
+		updated_at    TIMESTAMPTZ NOT NULL,
+		last_login_at TIMESTAMPTZ NOT NULL
 	);
 
-	CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-	CREATE INDEX IF NOT EXISTS idx_users_email_hash ON users(email_hash);
-	CREATE INDEX IF NOT EXISTS idx_users_phone_hash ON users(phone_hash);
+	CREATE INDEX IF NOT EXISTS idx_users_username    ON users(username);
+	CREATE INDEX IF NOT EXISTS idx_users_email_hash  ON users(email_hash);
+	CREATE INDEX IF NOT EXISTS idx_users_phone_hash  ON users(phone_hash);
 
 	CREATE TABLE IF NOT EXISTS sessions (
 		id         TEXT PRIMARY KEY,
 		user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-		expires_at DATETIME NOT NULL,
-		created_at DATETIME NOT NULL,
+		expires_at TIMESTAMPTZ NOT NULL,
+		created_at TIMESTAMPTZ NOT NULL,
 		ip_address TEXT NOT NULL DEFAULT '',
 		user_agent TEXT NOT NULL DEFAULT ''
 	);
 
-	CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+	CREATE INDEX IF NOT EXISTS idx_sessions_user_id    ON sessions(user_id);
 	CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
 
 	CREATE TABLE IF NOT EXISTS magic_tokens (
 		id         TEXT PRIMARY KEY,
 		user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-		expires_at DATETIME NOT NULL,
-		used_at    DATETIME,
-		created_at DATETIME NOT NULL
+		expires_at TIMESTAMPTZ NOT NULL,
+		used_at    TIMESTAMPTZ,
+		created_at TIMESTAMPTZ NOT NULL
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_magic_tokens_user_id ON magic_tokens(user_id);
@@ -86,68 +105,32 @@ func migrate(conn *sql.DB) error {
 		id         TEXT PRIMARY KEY,
 		user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 		new_email  TEXT NOT NULL,
-		expires_at DATETIME NOT NULL,
-		used_at    DATETIME,
-		created_at DATETIME NOT NULL
+		expires_at TIMESTAMPTZ NOT NULL,
+		used_at    TIMESTAMPTZ,
+		created_at TIMESTAMPTZ NOT NULL
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_email_change_tokens_user_id ON email_change_tokens(user_id);
 	`
-	if _, err := conn.Exec(ddl); err != nil {
-		return err
-	}
-
-	// Add role column to existing databases that lack it.
-	if err := addColumnIfNotExists(conn, "users", "role", "TEXT NOT NULL DEFAULT 'user'"); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// addColumnIfNotExists adds a column to a table if it does not already exist.
-// SQLite doesn't support IF NOT EXISTS for ALTER TABLE ADD COLUMN, so we
-// check the schema first.
-func addColumnIfNotExists(conn *sql.DB, table, column, colDef string) error {
-	rows, err := conn.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var cid int
-		var name, ctype string
-		var notnull int
-		var dfltValue sql.NullString
-		var pk int
-		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk); err != nil {
-			return err
-		}
-		if name == column {
-			return nil // column already exists
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return err
-	}
-
-	_, err = conn.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, colDef))
+	_, err := db.pool.Exec(ctx, ddl)
 	return err
 }
+
+// --- helpers ---
 
 // userColumns is the SELECT column list for user queries.
 const userColumns = `id, username, email, phone_number, name, role, password_hash, email_hash, phone_hash, created_at, updated_at, last_login_at`
 
-// scanUser scans a row into a User model.
-func scanUser(row interface{ Scan(...interface{}) error }) (*models.User, error) {
+// scanUser scans a pgx.Row or pgx.Rows into a User model.
+// Returns (nil, nil) if no row was found.
+func scanUser(row pgx.Row) (*models.User, error) {
 	u := &models.User{}
 	err := row.Scan(
 		&u.ID, &u.Username, &u.Email, &u.PhoneNumber, &u.Name, &u.Role,
 		&u.PasswordHash, &u.EmailHash, &u.PhoneHash,
 		&u.CreatedAt, &u.UpdatedAt, &u.LastLoginAt,
 	)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 	return u, err
@@ -158,8 +141,8 @@ func scanUser(row interface{ Scan(...interface{}) error }) (*models.User, error)
 // CreateUser inserts a new user.
 func (db *DB) CreateUser(u *models.User) error {
 	const q = `INSERT INTO users (id, username, email, phone_number, name, role, password_hash, email_hash, phone_hash, created_at, updated_at, last_login_at)
-	           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err := db.conn.Exec(q,
+	           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
+	_, err := db.pool.Exec(context.Background(), q,
 		u.ID, u.Username, u.Email, u.PhoneNumber, u.Name, u.Role,
 		u.PasswordHash, u.EmailHash, u.PhoneHash,
 		u.CreatedAt, u.UpdatedAt, u.LastLoginAt,
@@ -169,38 +152,58 @@ func (db *DB) CreateUser(u *models.User) error {
 
 // GetUserByEmail looks up a user by email.
 func (db *DB) GetUserByEmail(email string) (*models.User, error) {
-	q := `SELECT ` + userColumns + ` FROM users WHERE email = ?`
-	return scanUser(db.conn.QueryRow(q, email))
+	q := `SELECT ` + userColumns + ` FROM users WHERE email = $1`
+	return scanUser(db.pool.QueryRow(context.Background(), q, email))
 }
 
 // GetUserByID looks up a user by ID.
 func (db *DB) GetUserByID(id string) (*models.User, error) {
-	q := `SELECT ` + userColumns + ` FROM users WHERE id = ?`
-	return scanUser(db.conn.QueryRow(q, id))
+	q := `SELECT ` + userColumns + ` FROM users WHERE id = $1`
+	return scanUser(db.pool.QueryRow(context.Background(), q, id))
 }
 
 // GetUserByUsername looks up a user by username (case-insensitive).
 func (db *DB) GetUserByUsername(username string) (*models.User, error) {
-	q := `SELECT ` + userColumns + ` FROM users WHERE username = ? COLLATE NOCASE`
-	return scanUser(db.conn.QueryRow(q, username))
+	q := `SELECT ` + userColumns + ` FROM users WHERE lower(username) = lower($1)`
+	return scanUser(db.pool.QueryRow(context.Background(), q, username))
 }
 
 // GetUserByEmailHash looks up a user by normalized email hash.
 func (db *DB) GetUserByEmailHash(hash string) (*models.User, error) {
-	q := `SELECT ` + userColumns + ` FROM users WHERE email_hash = ?`
-	return scanUser(db.conn.QueryRow(q, hash))
+	q := `SELECT ` + userColumns + ` FROM users WHERE email_hash = $1`
+	return scanUser(db.pool.QueryRow(context.Background(), q, hash))
 }
 
 // GetUserByPhoneHash looks up a user by normalized phone hash.
 func (db *DB) GetUserByPhoneHash(hash string) (*models.User, error) {
-	q := `SELECT ` + userColumns + ` FROM users WHERE phone_hash = ?`
-	return scanUser(db.conn.QueryRow(q, hash))
+	q := `SELECT ` + userColumns + ` FROM users WHERE phone_hash = $1`
+	return scanUser(db.pool.QueryRow(context.Background(), q, hash))
 }
 
 // UpdateLastLogin sets the last_login_at timestamp.
 func (db *DB) UpdateLastLogin(userID string, t time.Time) error {
-	const q = `UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?`
-	_, err := db.conn.Exec(q, t, t, userID)
+	const q = `UPDATE users SET last_login_at = $1, updated_at = $2 WHERE id = $3`
+	_, err := db.pool.Exec(context.Background(), q, t, t, userID)
+	return err
+}
+
+// UpdateUserRole sets the role for a user.
+func (db *DB) UpdateUserRole(userID, role string) error {
+	const q = `UPDATE users SET role = $1, updated_at = $2 WHERE id = $3`
+	_, err := db.pool.Exec(context.Background(), q, role, time.Now(), userID)
+	return err
+}
+
+// UpdateUserEmail updates a user's email and email hash.
+func (db *DB) UpdateUserEmail(userID, newEmail, newEmailHash string) error {
+	const q = `UPDATE users SET email = $1, email_hash = $2, updated_at = $3 WHERE id = $4`
+	_, err := db.pool.Exec(context.Background(), q, newEmail, newEmailHash, time.Now(), userID)
+	return err
+}
+
+// DeleteUser deletes a user by ID (cascades to sessions and tokens).
+func (db *DB) DeleteUser(userID string) error {
+	_, err := db.pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, userID)
 	return err
 }
 
@@ -209,18 +212,20 @@ func (db *DB) UpdateLastLogin(userID string, t time.Time) error {
 // CreateSession inserts a new session.
 func (db *DB) CreateSession(s *models.Session) error {
 	const q = `INSERT INTO sessions (id, user_id, expires_at, created_at, ip_address, user_agent)
-	           VALUES (?, ?, ?, ?, ?, ?)`
-	_, err := db.conn.Exec(q, s.ID, s.UserID, s.ExpiresAt, s.CreatedAt, s.IPAddress, s.UserAgent)
+	           VALUES ($1, $2, $3, $4, $5, $6)`
+	_, err := db.pool.Exec(context.Background(), q, s.ID, s.UserID, s.ExpiresAt, s.CreatedAt, s.IPAddress, s.UserAgent)
 	return err
 }
 
 // GetSession looks up a session by ID and ensures it has not expired.
 func (db *DB) GetSession(id string) (*models.Session, error) {
 	const q = `SELECT id, user_id, expires_at, created_at, ip_address, user_agent
-	           FROM sessions WHERE id = ? AND expires_at > ?`
+	           FROM sessions WHERE id = $1 AND expires_at > $2`
 	s := &models.Session{}
-	err := db.conn.QueryRow(q, id, time.Now()).Scan(&s.ID, &s.UserID, &s.ExpiresAt, &s.CreatedAt, &s.IPAddress, &s.UserAgent)
-	if err == sql.ErrNoRows {
+	err := db.pool.QueryRow(context.Background(), q, id, time.Now()).Scan(
+		&s.ID, &s.UserID, &s.ExpiresAt, &s.CreatedAt, &s.IPAddress, &s.UserAgent,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 	return s, err
@@ -228,21 +233,21 @@ func (db *DB) GetSession(id string) (*models.Session, error) {
 
 // DeleteSession removes a session by ID.
 func (db *DB) DeleteSession(id string) error {
-	_, err := db.conn.Exec(`DELETE FROM sessions WHERE id = ?`, id)
+	_, err := db.pool.Exec(context.Background(), `DELETE FROM sessions WHERE id = $1`, id)
 	return err
 }
 
 // DeleteExpiredSessions cleans up sessions that have passed their expiry.
 func (db *DB) DeleteExpiredSessions() error {
-	_, err := db.conn.Exec(`DELETE FROM sessions WHERE expires_at <= ?`, time.Now())
+	_, err := db.pool.Exec(context.Background(), `DELETE FROM sessions WHERE expires_at <= $1`, time.Now())
 	return err
 }
 
-// GetSessionsByUserID returns all active sessions for a user.
+// GetSessionsByUserID returns all active sessions for a user, newest first.
 func (db *DB) GetSessionsByUserID(userID string) ([]models.Session, error) {
 	const q = `SELECT id, user_id, expires_at, created_at, ip_address, user_agent
-	           FROM sessions WHERE user_id = ? AND expires_at > ? ORDER BY created_at DESC`
-	rows, err := db.conn.Query(q, userID, time.Now())
+	           FROM sessions WHERE user_id = $1 AND expires_at > $2 ORDER BY created_at DESC`
+	rows, err := db.pool.Query(context.Background(), q, userID, time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -259,32 +264,25 @@ func (db *DB) GetSessionsByUserID(userID string) ([]models.Session, error) {
 	return sessions, rows.Err()
 }
 
-// --- Role operations ---
-
-// UpdateUserRole sets the role for a user.
-func (db *DB) UpdateUserRole(userID, role string) error {
-	const q = `UPDATE users SET role = ?, updated_at = ? WHERE id = ?`
-	_, err := db.conn.Exec(q, role, time.Now(), userID)
-	return err
-}
-
 // --- Magic token operations ---
 
 // CreateMagicToken inserts a new magic login token.
 func (db *DB) CreateMagicToken(t *models.MagicToken) error {
 	const q = `INSERT INTO magic_tokens (id, user_id, expires_at, created_at)
-	           VALUES (?, ?, ?, ?)`
-	_, err := db.conn.Exec(q, t.ID, t.UserID, t.ExpiresAt, t.CreatedAt)
+	           VALUES ($1, $2, $3, $4)`
+	_, err := db.pool.Exec(context.Background(), q, t.ID, t.UserID, t.ExpiresAt, t.CreatedAt)
 	return err
 }
 
 // GetMagicToken retrieves a magic token by ID if it is unused and not expired.
 func (db *DB) GetMagicToken(id string) (*models.MagicToken, error) {
 	const q = `SELECT id, user_id, expires_at, created_at
-	           FROM magic_tokens WHERE id = ? AND used_at IS NULL AND expires_at > ?`
+	           FROM magic_tokens WHERE id = $1 AND used_at IS NULL AND expires_at > $2`
 	t := &models.MagicToken{}
-	err := db.conn.QueryRow(q, id, time.Now()).Scan(&t.ID, &t.UserID, &t.ExpiresAt, &t.CreatedAt)
-	if err == sql.ErrNoRows {
+	err := db.pool.QueryRow(context.Background(), q, id, time.Now()).Scan(
+		&t.ID, &t.UserID, &t.ExpiresAt, &t.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 	return t, err
@@ -292,15 +290,15 @@ func (db *DB) GetMagicToken(id string) (*models.MagicToken, error) {
 
 // ConsumeMagicToken marks a magic token as used.
 func (db *DB) ConsumeMagicToken(id string) error {
-	const q = `UPDATE magic_tokens SET used_at = ? WHERE id = ?`
-	_, err := db.conn.Exec(q, time.Now(), id)
+	const q = `UPDATE magic_tokens SET used_at = $1 WHERE id = $2`
+	_, err := db.pool.Exec(context.Background(), q, time.Now(), id)
 	return err
 }
 
 // DeleteExpiredMagicTokens cleans up tokens that have expired or been used.
 func (db *DB) DeleteExpiredMagicTokens() error {
-	const q = `DELETE FROM magic_tokens WHERE expires_at <= ? OR used_at IS NOT NULL`
-	_, err := db.conn.Exec(q, time.Now())
+	const q = `DELETE FROM magic_tokens WHERE expires_at <= $1 OR used_at IS NOT NULL`
+	_, err := db.pool.Exec(context.Background(), q, time.Now())
 	return err
 }
 
@@ -309,18 +307,20 @@ func (db *DB) DeleteExpiredMagicTokens() error {
 // CreateEmailChangeToken inserts a new email-change verification token.
 func (db *DB) CreateEmailChangeToken(t *models.EmailChangeToken) error {
 	const q = `INSERT INTO email_change_tokens (id, user_id, new_email, expires_at, created_at)
-	           VALUES (?, ?, ?, ?, ?)`
-	_, err := db.conn.Exec(q, t.ID, t.UserID, t.NewEmail, t.ExpiresAt, t.CreatedAt)
+	           VALUES ($1, $2, $3, $4, $5)`
+	_, err := db.pool.Exec(context.Background(), q, t.ID, t.UserID, t.NewEmail, t.ExpiresAt, t.CreatedAt)
 	return err
 }
 
 // GetEmailChangeToken retrieves an email-change token by ID if it is unused and not expired.
 func (db *DB) GetEmailChangeToken(id string) (*models.EmailChangeToken, error) {
 	const q = `SELECT id, user_id, new_email, expires_at, created_at
-	           FROM email_change_tokens WHERE id = ? AND used_at IS NULL AND expires_at > ?`
+	           FROM email_change_tokens WHERE id = $1 AND used_at IS NULL AND expires_at > $2`
 	t := &models.EmailChangeToken{}
-	err := db.conn.QueryRow(q, id, time.Now()).Scan(&t.ID, &t.UserID, &t.NewEmail, &t.ExpiresAt, &t.CreatedAt)
-	if err == sql.ErrNoRows {
+	err := db.pool.QueryRow(context.Background(), q, id, time.Now()).Scan(
+		&t.ID, &t.UserID, &t.NewEmail, &t.ExpiresAt, &t.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 	return t, err
@@ -328,27 +328,14 @@ func (db *DB) GetEmailChangeToken(id string) (*models.EmailChangeToken, error) {
 
 // ConsumeEmailChangeToken marks an email-change token as used.
 func (db *DB) ConsumeEmailChangeToken(id string) error {
-	const q = `UPDATE email_change_tokens SET used_at = ? WHERE id = ?`
-	_, err := db.conn.Exec(q, time.Now(), id)
+	const q = `UPDATE email_change_tokens SET used_at = $1 WHERE id = $2`
+	_, err := db.pool.Exec(context.Background(), q, time.Now(), id)
 	return err
 }
 
 // DeleteExpiredEmailChangeTokens cleans up tokens that have expired or been used.
 func (db *DB) DeleteExpiredEmailChangeTokens() error {
-	const q = `DELETE FROM email_change_tokens WHERE expires_at <= ? OR used_at IS NOT NULL`
-	_, err := db.conn.Exec(q, time.Now())
-	return err
-}
-
-// UpdateUserEmail updates a user's email and email hash.
-func (db *DB) UpdateUserEmail(userID, newEmail, newEmailHash string) error {
-	const q = `UPDATE users SET email = ?, email_hash = ?, updated_at = ? WHERE id = ?`
-	_, err := db.conn.Exec(q, newEmail, newEmailHash, time.Now(), userID)
-	return err
-}
-
-// DeleteUser deletes a user by ID (cascades to sessions and tokens).
-func (db *DB) DeleteUser(userID string) error {
-	_, err := db.conn.Exec(`DELETE FROM users WHERE id = ?`, userID)
+	const q = `DELETE FROM email_change_tokens WHERE expires_at <= $1 OR used_at IS NOT NULL`
+	_, err := db.pool.Exec(context.Background(), q, time.Now())
 	return err
 }

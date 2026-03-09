@@ -235,6 +235,28 @@
     .repo-links a { color: var(--muted); font-size: 11px; text-decoration: none; }
     .repo-links a:hover { color: var(--accent); }
 
+    /* ---- event feed ---- */
+    .event-feed {
+      font-size: 11px;
+      max-height: 220px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column-reverse; /* newest at top */
+      gap: 3px;
+    }
+    .event-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 3px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .event-ts   { color: var(--muted); font-size: 10px; white-space: nowrap; flex-shrink: 0; }
+    .event-name { color: var(--accent); white-space: nowrap; }
+    .event-svc  { color: var(--yellow); font-size: 10px; }
+    .event-data { color: var(--muted); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .event-empty { color: var(--muted); font-size: 11px; font-style: italic; }
+
     /* ---- errors ---- */
     .errors {
       margin-top: 24px;
@@ -341,6 +363,62 @@
   {{range .Errors}}<p>&#9888; {{.}}</p>{{end}}
 </div>
 {{end}}
+
+<!-- ================================================================ -->
+<!-- PORTAL EVENTS (live SSE feed from portal.events channel)          -->
+<!-- ================================================================ -->
+<section>
+  <h2>portal events</h2>
+  <div id="event-feed" class="event-feed">
+    <span class="event-empty" id="event-empty">waiting for events…</span>
+  </div>
+</section>
+
+<script>
+(function() {
+  var feed  = document.getElementById('event-feed');
+  var empty = document.getElementById('event-empty');
+
+  function fmtTs(ts) {
+    if (!ts) return '';
+    try {
+      var d = new Date(ts);
+      return d.toLocaleTimeString('en-US', {hour12: false, hour:'2-digit', minute:'2-digit', second:'2-digit'});
+    } catch(e) { return ts; }
+  }
+
+  function fmtData(data) {
+    if (!data) return '';
+    var parts = [];
+    for (var k in data) { parts.push(k + '=' + data[k]); }
+    return parts.join(' ');
+  }
+
+  function addEvent(e) {
+    if (empty && empty.parentNode) { empty.parentNode.removeChild(empty); empty = null; }
+    var row = document.createElement('div');
+    row.className = 'event-row';
+    row.innerHTML =
+      '<span class="event-ts">'   + fmtTs(e.ts)      + '</span>' +
+      '<span class="event-name">' + (e.event||'')    + '</span>' +
+      '<span class="event-svc">'  + (e.service||'')  + '</span>' +
+      '<span class="event-data">' + fmtData(e.data)  + '</span>';
+    // Prepend so newest is at top (column-reverse on container also helps).
+    if (feed.firstChild) { feed.insertBefore(row, feed.firstChild); }
+    else { feed.appendChild(row); }
+    // Trim to 50 rows.
+    while (feed.children.length > 50) { feed.removeChild(feed.lastChild); }
+  }
+
+  var src = new EventSource('/events/stream');
+  src.onmessage = function(ev) {
+    try { addEvent(JSON.parse(ev.data)); } catch(e) {}
+  };
+  src.onerror = function() {
+    // SSE auto-reconnects — nothing to do here.
+  };
+})();
+</script>
 
 </body>
 </html>

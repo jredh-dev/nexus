@@ -1,12 +1,15 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jredh-dev/nexus/internal/pgbus"
 	"github.com/jredh-dev/nexus/services/portal/config"
 	"github.com/jredh-dev/nexus/services/portal/internal/database"
 	"github.com/jredh-dev/nexus/services/portal/internal/mailer"
@@ -15,7 +18,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// bcryptCost is the work factor for bcrypt password hashing.
 const bcryptCost = 12
+
+// portalEventsChannel is the Postgres LISTEN/NOTIFY channel for portal events.
+const portalEventsChannel = "portal.events"
 
 // Service handles authentication operations.
 type Service struct {
@@ -28,6 +35,15 @@ type Service struct {
 func New(db *database.DB, cfg *config.Config) *Service {
 	m := mailer.New(cfg.SMTP.Host, cfg.SMTP.Port, cfg.SMTP.From)
 	return &Service{db: db, cfg: cfg, mailer: m}
+}
+
+// publish fires a pgbus event on portal.events, logging on error (non-fatal).
+func (s *Service) publish(eventName string, data map[string]any) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := pgbus.Publish(ctx, s.db.Pool(), portalEventsChannel, eventName, "portal", data); err != nil {
+		log.Printf("portal: publish %s: %v", eventName, err)
+	}
 }
 
 // HashPassword hashes a plaintext password with bcrypt.
@@ -104,6 +120,10 @@ func (s *Service) Signup(username, email, phone, password, name string) (*models
 	if err := s.db.CreateUser(user); err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
 	}
+
+	// Publish user.created event — non-fatal if it fails.
+	s.publish("user.created", map[string]any{"user_id": user.ID, "email": user.Email})
+
 	return user, nil
 }
 
@@ -141,6 +161,9 @@ func (s *Service) Login(email, password, ipAddress, userAgent string) (string, e
 	if err := s.db.UpdateLastLogin(user.ID, now); err != nil {
 		return "", fmt.Errorf("update last login: %w", err)
 	}
+
+	// Publish user.login event — non-fatal if it fails.
+	s.publish("user.login", map[string]any{"user_id": user.ID, "email": user.Email})
 
 	return session.ID, nil
 }
@@ -386,5 +409,9 @@ func (s *Service) DeleteAccount(userID string) error {
 	if err := s.db.DeleteUser(userID); err != nil {
 		return fmt.Errorf("delete user: %w", err)
 	}
+
+	// Publish user.deleted event — non-fatal if it fails.
+	s.publish("user.deleted", map[string]any{"user_id": userID})
+
 	return nil
 }
