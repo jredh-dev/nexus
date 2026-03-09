@@ -81,6 +81,17 @@ func migrate(conn *sql.DB) error {
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_magic_tokens_user_id ON magic_tokens(user_id);
+
+	CREATE TABLE IF NOT EXISTS email_change_tokens (
+		id         TEXT PRIMARY KEY,
+		user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		new_email  TEXT NOT NULL,
+		expires_at DATETIME NOT NULL,
+		used_at    DATETIME,
+		created_at DATETIME NOT NULL
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_email_change_tokens_user_id ON email_change_tokens(user_id);
 	`
 	if _, err := conn.Exec(ddl); err != nil {
 		return err
@@ -290,5 +301,54 @@ func (db *DB) ConsumeMagicToken(id string) error {
 func (db *DB) DeleteExpiredMagicTokens() error {
 	const q = `DELETE FROM magic_tokens WHERE expires_at <= ? OR used_at IS NOT NULL`
 	_, err := db.conn.Exec(q, time.Now())
+	return err
+}
+
+// --- Email change token operations ---
+
+// CreateEmailChangeToken inserts a new email-change verification token.
+func (db *DB) CreateEmailChangeToken(t *models.EmailChangeToken) error {
+	const q = `INSERT INTO email_change_tokens (id, user_id, new_email, expires_at, created_at)
+	           VALUES (?, ?, ?, ?, ?)`
+	_, err := db.conn.Exec(q, t.ID, t.UserID, t.NewEmail, t.ExpiresAt, t.CreatedAt)
+	return err
+}
+
+// GetEmailChangeToken retrieves an email-change token by ID if it is unused and not expired.
+func (db *DB) GetEmailChangeToken(id string) (*models.EmailChangeToken, error) {
+	const q = `SELECT id, user_id, new_email, expires_at, created_at
+	           FROM email_change_tokens WHERE id = ? AND used_at IS NULL AND expires_at > ?`
+	t := &models.EmailChangeToken{}
+	err := db.conn.QueryRow(q, id, time.Now()).Scan(&t.ID, &t.UserID, &t.NewEmail, &t.ExpiresAt, &t.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return t, err
+}
+
+// ConsumeEmailChangeToken marks an email-change token as used.
+func (db *DB) ConsumeEmailChangeToken(id string) error {
+	const q = `UPDATE email_change_tokens SET used_at = ? WHERE id = ?`
+	_, err := db.conn.Exec(q, time.Now(), id)
+	return err
+}
+
+// DeleteExpiredEmailChangeTokens cleans up tokens that have expired or been used.
+func (db *DB) DeleteExpiredEmailChangeTokens() error {
+	const q = `DELETE FROM email_change_tokens WHERE expires_at <= ? OR used_at IS NOT NULL`
+	_, err := db.conn.Exec(q, time.Now())
+	return err
+}
+
+// UpdateUserEmail updates a user's email and email hash.
+func (db *DB) UpdateUserEmail(userID, newEmail, newEmailHash string) error {
+	const q = `UPDATE users SET email = ?, email_hash = ?, updated_at = ? WHERE id = ?`
+	_, err := db.conn.Exec(q, newEmail, newEmailHash, time.Now(), userID)
+	return err
+}
+
+// DeleteUser deletes a user by ID (cascades to sessions and tokens).
+func (db *DB) DeleteUser(userID string) error {
+	_, err := db.conn.Exec(`DELETE FROM users WHERE id = ?`, userID)
 	return err
 }

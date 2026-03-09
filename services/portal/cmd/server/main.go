@@ -114,10 +114,19 @@ func main() {
 	r.Post("/signup", h.Signup)
 	r.Get("/logout", h.Logout)
 	r.Get("/auth/magic", h.MagicLogin)
+	r.Get("/auth/email-change", h.ConfirmEmailChange)
 
 	// Public JSON API.
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/actions", h.SearchActions)
+	})
+
+	// Authenticated JSON API — returns 401 JSON (not redirect) on missing session.
+	r.Route("/api/me", func(r chi.Router) {
+		r.Use(handlers.APIAuthMiddleware(authService))
+		r.Get("/", h.GetMe)
+		r.Post("/email", h.ChangeEmail)
+		r.Delete("/", h.DeleteAccount)
 	})
 
 	// Admin routes (login + admin role required).
