@@ -47,3 +47,14 @@ type MagicToken struct {
 	UsedAt    time.Time `json:"used_at,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 }
+
+// EmailChangeToken represents a one-time-use token for verifying an email change.
+// The token is sent to the new address; on click, the user's email is updated.
+type EmailChangeToken struct {
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	NewEmail  string    `json:"new_email"`
+	ExpiresAt time.Time `json:"expires_at"`
+	UsedAt    time.Time `json:"used_at,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+}
