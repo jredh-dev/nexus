@@ -1,0 +1,38 @@
+# Auto-deploy watcher service on push to main.
+# Rebuilds the Docker image and restarts the container.
+name: Deploy Watcher
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/watcher/**'
+      - 'go.mod'
+      - 'go.sum'
+
+jobs:
+  deploy:
+    runs-on: local
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and restart watcher
+        working-directory: /Users/jredh/Development/agentic
+        run: |
+          echo "==> Building watcher Docker image"
+          docker compose build watcher
+          echo "==> Restarting watcher service"
+          docker compose up -d watcher
+          echo "==> Waiting for startup"
+          sleep 5
+          docker compose ps watcher
+
+      - name: Notify Discord
+        if: always()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          STATUS="${{ job.status }}"
+          curl -s -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"content\": \"watcher deploy: $STATUS\"}" || true
