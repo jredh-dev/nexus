@@ -17,6 +17,7 @@ env:
   GCP_REGION: us-central1
   SERVICE_NAME: nexus-deadman-dev
   IMAGE_NAME: gcr.io/dea-noctua/nexus-deadman-dev
+  CUSTOM_DOMAIN: deadman.jredh.com
 
 jobs:
   deploy:
@@ -85,19 +86,20 @@ jobs:
             --min-instances 0 \
             --max-instances 5 \
             --update-secrets="TWILIO_ACCOUNT_SID=twilio-account-sid-dev:latest,TWILIO_AUTH_TOKEN=twilio-auth-token-dev:latest,TWILIO_FROM=twilio-from-dev:latest,DEADMAN_PHONE=deadman-phone-dev:latest" \
-            --set-env-vars "ENVIRONMENT=dev,PORT=8080" \
+            --set-env-vars "ENVIRONMENT=dev,PORT=8080,DEADMAN_PUBLIC_URL=https://${{ env.CUSTOM_DOMAIN }}" \
             --service-account ${{ secrets.WIF_SERVICE_ACCOUNT }} \
             --labels "environment=dev,app=nexus-deadman,version=$VERSION_LABEL"
 
-      - name: Set DEADMAN_PUBLIC_URL env var
-        # Inject the Cloud Run URL so the service can auto-configure the Twilio webhook on startup.
+      - name: Create domain mapping (idempotent)
+        # Maps deadman.jredh.com → nexus-deadman-dev.
+        # jredh.com is already a verified domain in this GCP project.
+        # Safe to run on every deploy — gcloud exits 0 if the mapping already exists.
         run: |
-          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+          gcloud beta run domain-mappings create \
+            --service ${{ env.SERVICE_NAME }} \
+            --domain ${{ env.CUSTOM_DOMAIN }} \
             --region ${{ env.GCP_REGION }} \
-            --format 'value(status.url)')
-          gcloud run services update ${{ env.SERVICE_NAME }} \
-            --region ${{ env.GCP_REGION }} \
-            --update-env-vars "DEADMAN_PUBLIC_URL=${SERVICE_URL}"
+            --project ${{ env.GCP_PROJECT_ID }} 2>&1 | grep -v "already exists" || true
 
       - name: Get service URL
         id: service-url
@@ -107,7 +109,8 @@ jobs:
             --format 'value(status.url)')
           echo "url=$SERVICE_URL" >> $GITHUB_OUTPUT
           echo "Service deployed to: $SERVICE_URL"
-          echo "Twilio webhook URL: ${SERVICE_URL}/sms"
+          echo "Custom domain: https://${{ env.CUSTOM_DOMAIN }}"
+          echo "Twilio webhook URL: https://${{ env.CUSTOM_DOMAIN }}/sms"
 
       - name: Summary
         run: |
@@ -116,8 +119,10 @@ jobs:
           echo "- **Environment**: DEV" >> $GITHUB_STEP_SUMMARY
           echo "- **Version**: ${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit**: ${{ steps.version.outputs.COMMIT }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Service URL**: ${{ steps.service-url.outputs.url }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Twilio Webhook**: ${{ steps.service-url.outputs.url }}/sms" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cloud Run URL**: ${{ steps.service-url.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Custom Domain**: https://${{ env.CUSTOM_DOMAIN }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Twilio Webhook**: https://${{ env.CUSTOM_DOMAIN }}/sms" >> $GITHUB_STEP_SUMMARY
+          echo "- **Privacy Policy**: https://${{ env.CUSTOM_DOMAIN }}/privacy" >> $GITHUB_STEP_SUMMARY
           echo "- **Image**: ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
 
       - name: Notify Discord
