@@ -25,7 +25,7 @@
 //	                                  when set, configures Twilio SMS webhook on startup
 //	DEADMAN_PHONE           optional  owner phone used as default recipient for test endpoints
 //	PORT                    optional  default 8095
-//	DATABASE_URL            optional  default host=/tmp/ctl-pg dbname=deadman user=jredh
+//	DATABASE_URL            optional  default host=localhost port=5432 dbname=deadman user=jredh
 //	TEST_ENDPOINTS_ENABLED  optional  set to "true" to mount /test/* endpoints (dev only)
 package main
 
@@ -439,7 +439,7 @@ func loadConfig() appConfig {
 		c.port = "8095"
 	}
 	if c.databaseURL == "" {
-		c.databaseURL = "host=/tmp/ctl-pg dbname=deadman user=jredh"
+		c.databaseURL = "host=localhost port=5432 dbname=deadman user=jredh"
 	}
 	return c
 }
@@ -484,7 +484,7 @@ Environment variables:
   DEADMAN_PHONE           optional  default phone for test endpoints (set from Vault secrets)
   PORT                    optional  HTTP listen port (default: 8095)
   DATABASE_URL            optional  PostgreSQL DSN
-                                    (default: host=/tmp/ctl-pg dbname=deadman user=jredh)
+                                    (default: host=localhost port=5432 dbname=deadman user=jredh)
   TEST_ENDPOINTS_ENABLED  optional  set "true" to mount /test/* endpoints (never in prod)
 
 HTTP endpoints (when serving):

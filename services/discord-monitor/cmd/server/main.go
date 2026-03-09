@@ -8,7 +8,7 @@
 //
 //	PORT                     HTTP listen port (default: "8080")
 //	DATABASE_URL             PostgreSQL connection string
-//	                         (default: "host=/tmp/ctl-pg dbname=discord_monitor user=jredh")
+//	                         (default: "host=localhost port=5432 dbname=discord_monitor user=jredh")
 //	DISCORD_SELFBOT_TOKEN    Discord user token for selfbot mode (optional)
 //	SCAN_INTERVAL_SELFBOT    Polling interval for selfbot scanner (default: "60s")
 //
@@ -77,7 +77,7 @@ func run() int {
 
 	// Resolve config: flag > env > default.
 	port := resolve(*portFlag, os.Getenv("PORT"), "8080")
-	dbURL := resolve(*dbFlag, os.Getenv("DATABASE_URL"), "host=/tmp/ctl-pg dbname=discord_monitor user=jredh")
+	dbURL := resolve(*dbFlag, os.Getenv("DATABASE_URL"), "host=localhost port=5432 dbname=discord_monitor user=jredh")
 	selfbotToken := os.Getenv("DISCORD_SELFBOT_TOKEN")
 	scanInterval := parseDuration(os.Getenv("SCAN_INTERVAL_SELFBOT"), 60*time.Second)
 
