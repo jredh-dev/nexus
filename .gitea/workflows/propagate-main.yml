@@ -5,6 +5,11 @@
 #
 # Gitea CI is the quality gate. Code reaching Gitea main is already vetted.
 # No additional CI needed on GitHub before RC — that runs on rc/* → main PRs.
+#
+# After propagation:
+#   - Posts a summary comment on the open GitHub RC PR (rc/vX.Y.Z → main).
+#   - Pulls work/source/jredh-dev/nexus on the host so new workstreams
+#     branch from current main, preventing rebase conflicts.
 name: Propagate Main to GitHub RC
 
 on:
@@ -17,6 +22,8 @@ jobs:
     runs-on: local
     env:
       GITHUB_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+    outputs:
+      rc_branch: ${{ steps.rc.outputs.rc_branch }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -49,10 +56,89 @@ jobs:
             "https://${GITHUB_TOKEN}@github.com/jredh-dev/nexus.git" \
             "HEAD:refs/heads/${{ steps.rc.outputs.rc_branch }}"
 
+  comment-rc-pr:
+    name: Comment on GitHub RC PR
+    runs-on: local
+    needs: [propagate]
+    if: success()
+    env:
+      GITHUB_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Post summary comment on RC PR
+        run: |
+          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
+          rc_branch="${{ needs.propagate.outputs.rc_branch }}"
+
+          # Find the open PR for rc_branch -> main on GitHub.
+          pr_number=$(curl -s \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/jredh-dev/nexus/pulls?state=open&head=jredh-dev:${rc_branch}&base=main" \
+            | jq -r '.[0].number // empty')
+
+          if [ -z "$pr_number" ]; then
+            echo "No open RC PR found for ${rc_branch} -> main, skipping comment"
+            exit 0
+          fi
+          echo "Commenting on PR #${pr_number}"
+
+          # Pull commit metadata from the HEAD that just landed on Gitea main.
+          # GITHUB_SHA is set by the runner to the triggering commit.
+          short_sha=$(echo "${GITHUB_SHA}" | cut -c1-8)
+          commit_msg=$(git log -1 --pretty=format:'%s')
+          commit_body=$(git log -1 --pretty=format:'%b')
+          author=$(git log -1 --pretty=format:'%an')
+          timestamp=$(date -u '+%Y-%m-%d %H:%M UTC')
+
+          # Build the markdown comment body.
+          # Write to a temp file to avoid shell quoting nightmares.
+          tmpfile=$(mktemp)
+          printf '### Merged to Gitea main · `%s`\n\n**%s**\n' \
+            "${short_sha}" "${commit_msg}" > "${tmpfile}"
+          if [ -n "${commit_body}" ]; then
+            printf '\n%s\n' "${commit_body}" >> "${tmpfile}"
+          fi
+          printf '\n---\n*Author: %s · %s · [View commit](https://github.com/jredh-dev/nexus/commit/%s)*\n' \
+            "${author}" "${timestamp}" "${GITHUB_SHA}" >> "${tmpfile}"
+
+          # jq encodes the file contents as a JSON string safely.
+          body_json=$(jq -Rs '.' "${tmpfile}")
+          rm -f "${tmpfile}"
+
+          http_code=$(curl -s -o /dev/null -w '%{http_code}' \
+            -X POST \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Content-Type: application/json" \
+            "https://api.github.com/repos/jredh-dev/nexus/issues/${pr_number}/comments" \
+            -d "{\"body\": ${body_json}}")
+
+          echo "GitHub API response: ${http_code}"
+          [ "${http_code}" = "201" ] || exit 1
+
+  update-source-clone:
+    name: Update local source clone
+    runs-on: local
+    needs: [propagate]
+    if: success()
+    steps:
+      - name: Pull work/source/jredh-dev/nexus
+        # Keeps the source clone current so ctl workstream create branches
+        # from the latest main, preventing rebase conflicts on new workstreams.
+        run: |
+          cd /Users/jredh/Development/agentic/work/source/jredh-dev/nexus
+          git fetch gitea main
+          git checkout main
+          git merge --ff-only gitea/main
+
   notify-failure:
     name: Notify Discord on Failure
     runs-on: local
-    needs: [propagate]
+    needs: [propagate, comment-rc-pr, update-source-clone]
     if: failure()
     steps:
       - name: Discord notification
