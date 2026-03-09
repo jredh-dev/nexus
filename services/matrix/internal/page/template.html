@@ -18,6 +18,7 @@
       --green:   #3fb950;
       --red:     #f85149;
       --yellow:  #d29922;
+      --purple:  #bc8cff;
       --radius:  6px;
       --gap:     14px;
     }
@@ -32,15 +33,43 @@
       max-width: 1200px;
     }
 
-    /* ---- header ---- */
-    header {
+    /* ---- top nav ---- */
+    nav {
       display: flex;
-      align-items: baseline;
-      gap: 16px;
+      align-items: center;
+      gap: 10px;
       margin-bottom: 28px;
+      flex-wrap: wrap;
     }
-    h1 { font-size: 18px; font-weight: 600; color: var(--accent); letter-spacing: 0.05em; }
-    .fetched-at { color: var(--muted); font-size: 11px; }
+    .nav-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+      margin-right: 8px;
+    }
+    .fetched-at {
+      color: var(--muted);
+      font-size: 11px;
+      margin-left: auto;
+    }
+    /* big nav buttons linking to monitoring tools */
+    .nav-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 600;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .nav-btn .nav-icon { font-size: 14px; }
 
     /* ---- section ---- */
     section { margin-bottom: 28px; }
@@ -82,7 +111,24 @@
     .card-desc {
       color: var(--muted);
       font-size: 11px;
+      flex: 1;
     }
+    /* log count badge — shows recent log lines from OpenObserve */
+    .log-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 1px 6px;
+      background: rgba(188,140,255,0.12);
+      border: 1px solid rgba(188,140,255,0.25);
+      border-radius: 10px;
+      color: var(--purple);
+      font-size: 10px;
+      font-weight: 600;
+      text-decoration: none;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .log-badge:hover { border-color: var(--purple); }
 
     /* ---- env rows (local / cloud) ---- */
     .env-row {
@@ -114,6 +160,11 @@
       font-size: 11px;
     }
     .env-urls a:hover { color: var(--accent); }
+    /* no-link URL (e.g. postgres socket path) */
+    .env-urls span {
+      color: var(--muted);
+      font-size: 11px;
+    }
 
     /* ---- pipelines list (wraps naturally) ---- */
     .pipelines {
@@ -213,58 +264,57 @@
 </head>
 <body>
 
-<header>
-  <h1>matrix</h1>
+<!-- ================================================================ -->
+<!-- TOP NAV: title + monitoring tool links + fetch timestamp          -->
+<!-- ================================================================ -->
+<nav>
+  <span class="nav-title">matrix</span>
+  <a class="nav-btn" href="{{.GatusURL}}" target="_blank">
+    <span class="nav-icon">◉</span> gatus
+  </a>
+  <a class="nav-btn" href="{{.OpenObserveURL}}" target="_blank">
+    <span class="nav-icon">◈</span> openobserve
+  </a>
+  <a class="nav-btn" href="{{.OpenCodeURL}}" target="_blank">
+    <span class="nav-icon">◆</span> opencode
+  </a>
   <span class="fetched-at">fetched {{.FetchedAt}}</span>
-</header>
+</nav>
 
 <!-- ================================================================ -->
-<!-- SERVICES                                                           -->
+<!-- APP SERVICES (local + cloud)                                       -->
 <!-- ================================================================ -->
 <section>
-  <h2>services</h2>
+  <h2>app services</h2>
   <div class="service-grid">
-    {{range .Services}}
-    <div class="card">
-      <div class="card-header">
-        <span class="card-name">{{.Name}}</span>
-        <span class="card-desc">{{.Description}}</span>
-      </div>
+    {{range .AppServices}}
+    {{template "serviceCard" .}}
+    {{end}}
+  </div>
+</section>
 
-      {{if .Local}}
-      <div class="env-row">
-        <span class="env-label">local</span>
-        <span class="dot {{statusClass .Local.GatusStatus}}" title="{{statusText .Local.GatusStatus}}"></span>
-        <div class="env-urls">
-          {{range .Local.URLs}}<a href="{{.Href}}" target="_blank">{{.Label}}</a>{{end}}
-        </div>
-        {{if .Local.Pipelines}}
-        <div class="pipelines">
-          {{range .Local.Pipelines}}
-            {{template "pill" .}}
-          {{end}}
-        </div>
-        {{end}}
-      </div>
-      {{end}}
+<!-- ================================================================ -->
+<!-- CLOUD RUN (cloud-only services)                                    -->
+<!-- ================================================================ -->
+{{if .CloudServices}}
+<section>
+  <h2>cloud run</h2>
+  <div class="service-grid">
+    {{range .CloudServices}}
+    {{template "serviceCard" .}}
+    {{end}}
+  </div>
+</section>
+{{end}}
 
-      {{if .Cloud}}
-      <div class="env-row">
-        <span class="env-label">cloud</span>
-        <span class="dot {{statusClass .Cloud.GatusStatus}}" title="{{statusText .Cloud.GatusStatus}}"></span>
-        <div class="env-urls">
-          {{range .Cloud.URLs}}<a href="{{.Href}}" target="_blank">{{.Label}}</a>{{end}}
-        </div>
-        {{if .Cloud.Pipelines}}
-        <div class="pipelines">
-          {{range .Cloud.Pipelines}}
-            {{template "pill" .}}
-          {{end}}
-        </div>
-        {{end}}
-      </div>
-      {{end}}
-    </div>
+<!-- ================================================================ -->
+<!-- INFRA                                                              -->
+<!-- ================================================================ -->
+<section>
+  <h2>infra</h2>
+  <div class="service-grid">
+    {{range .InfraServices}}
+    {{template "serviceCard" .}}
     {{end}}
   </div>
 </section>
@@ -310,6 +360,57 @@
 
 </body>
 </html>
+
+{{/* ---- serviceCard sub-template: renders one ServiceGroup card ---- */}}
+{{define "serviceCard"}}
+<div class="card">
+  <div class="card-header">
+    <span class="card-name">{{.Name}}</span>
+    <span class="card-desc">{{.Description}}</span>
+    {{if gt .LogCount 0}}
+    <a class="log-badge" href="{{.LogSearchURL}}" target="_blank" title="log lines in last 5 min">{{.LogCount}} logs</a>
+    {{end}}
+  </div>
+
+  {{if .Local}}
+  <div class="env-row">
+    <span class="env-label">local</span>
+    <span class="dot {{statusClass .Local.GatusStatus}}" title="{{statusText .Local.GatusStatus}}"></span>
+    <div class="env-urls">
+      {{range .Local.URLs}}
+        {{if .Href}}<a href="{{.Href}}" target="_blank">{{.Label}}</a>{{else}}<span>{{.Label}}</span>{{end}}
+      {{end}}
+    </div>
+    {{if .Local.Pipelines}}
+    <div class="pipelines">
+      {{range .Local.Pipelines}}
+        {{template "pill" .}}
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+  {{end}}
+
+  {{if .Cloud}}
+  <div class="env-row">
+    <span class="env-label">cloud</span>
+    <span class="dot {{statusClass .Cloud.GatusStatus}}" title="{{statusText .Cloud.GatusStatus}}"></span>
+    <div class="env-urls">
+      {{range .Cloud.URLs}}
+        {{if .Href}}<a href="{{.Href}}" target="_blank">{{.Label}}</a>{{else}}<span>{{.Label}}</span>{{end}}
+      {{end}}
+    </div>
+    {{if .Cloud.Pipelines}}
+    <div class="pipelines">
+      {{range .Cloud.Pipelines}}
+        {{template "pill" .}}
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+  {{end}}
+</div>
+{{end}}
 
 {{/* ---- pill sub-template: renders one WorkflowRow as a CI pill + age stamp ---- */}}
 {{define "pill"}}
