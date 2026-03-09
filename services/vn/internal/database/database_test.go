@@ -3,7 +3,7 @@
 // Package database_test provides integration tests for the vn database
 // layer against a real PostgreSQL instance.
 //
-// These tests require PostgreSQL 16 running at /tmp/ctl-pg.
+// These tests require PostgreSQL 16 running at localhost:5432.
 // They create and drop a test-specific database for isolation.
 //
 // Run with: go test -tags integration ./services/vn/internal/database/
@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	pgHost = "/tmp/ctl-pg"
+	pgHost = "localhost"
 	pgUser = "jredh"
 	// Test database gets a unique name per run to allow parallel test runs.
 	testDBPrefix = "vn_test_"
@@ -60,9 +60,8 @@ func testDB(t *testing.T) (*database.DB, func()) {
 
 func findPsql(t *testing.T) string {
 	t.Helper()
-	// Try PG16 first, then fall back to PATH.
+	// Try /usr/local/bin/psql first, then fall back to PATH.
 	candidates := []string{
-		"/usr/local/Cellar/postgresql@16/16.13/bin/psql",
 		"/usr/local/bin/psql",
 	}
 	for _, c := range candidates {

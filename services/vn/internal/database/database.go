@@ -20,7 +20,7 @@ type DB struct {
 // New connects to PostgreSQL and runs migrations.
 // connStr is a libpq-style connection string or DSN, e.g.:
 //
-//	"host=/tmp/ctl-pg dbname=vn user=jredh"
+//	"host=localhost port=5432 dbname=vn user=jredh"
 func New(ctx context.Context, connStr string) (*DB, error) {
 	pool, err := pgxpool.New(ctx, connStr)
 	if err != nil {
