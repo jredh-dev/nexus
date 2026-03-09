@@ -105,8 +105,8 @@ jobs:
           printf '\n---\n*Author: %s · %s · [View commit](https://github.com/jredh-dev/nexus/commit/%s)*\n' \
             "${author}" "${timestamp}" "${GITHUB_SHA}" >> "${tmpfile}"
 
-          # jq encodes the file contents as a JSON string safely.
-          body_json=$(jq -Rs '.' "${tmpfile}")
+          # python3 encodes the file contents as a JSON string (no jq dep).
+          body_json=$(python3 -c "import sys,json; print(json.dumps(open(sys.argv[1]).read()))" "${tmpfile}")
           rm -f "${tmpfile}"
 
           http_code=$(curl -s -o /dev/null -w '%{http_code}' \
@@ -129,8 +129,9 @@ jobs:
       - name: Pull work/source/jredh-dev/nexus
         # Keeps the source clone current so ctl workstream create branches
         # from the latest main, preventing rebase conflicts on new workstreams.
+        # /agentic is the host workspace bind-mounted into the runner container.
         run: |
-          cd /Users/jredh/Development/agentic/work/source/jredh-dev/nexus
+          cd /agentic/work/source/jredh-dev/nexus
           git fetch gitea main
           git checkout main
           git merge --ff-only gitea/main
