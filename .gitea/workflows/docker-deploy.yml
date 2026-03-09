@@ -18,6 +18,12 @@ jobs:
         with:
           fetch-depth: 2
 
+      - name: Sync source checkout
+        run: |
+          # Pull latest main into work/source so docker compose build context is current.
+          git -C /Users/jredh/Development/agentic/work/source/jredh-dev/nexus \
+            pull "http://jredhbot:opencode@localhost:3000/jredh-dev/nexus.git" main --ff-only
+
       - name: Detect changes and deploy
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
