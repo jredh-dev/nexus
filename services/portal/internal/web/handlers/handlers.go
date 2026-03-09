@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/jredh-dev/nexus/services/portal/config"
 	"github.com/jredh-dev/nexus/services/portal/internal/actions"
@@ -298,6 +299,173 @@ func (h *Handler) SearchActions(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(results); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+// GetMe returns the authenticated user's profile as JSON.
+//
+//	@Summary      Get current user
+//	@Description  Returns the authenticated user's profile. Requires session cookie.
+//	@Tags         account
+//	@Produce      json
+//	@Success      200  {object}  map[string]interface{}
+//	@Failure      401  {object}  map[string]string
+//	@Router       /api/me [get]
+func (h *Handler) GetMe(w http.ResponseWriter, r *http.Request) {
+	user, ok := GetUserFromContext(r.Context())
+	if !ok || user == nil {
+		h.jsonError(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+
+	type meResponse struct {
+		ID          string    `json:"id"`
+		Email       string    `json:"email"`
+		Username    string    `json:"username"`
+		Name        string    `json:"name"`
+		IsAdmin     bool      `json:"is_admin"`
+		IsActive    bool      `json:"is_active"`
+		CreatedAt   time.Time `json:"created_at"`
+		LastLoginAt time.Time `json:"last_login_at"`
+	}
+
+	resp := meResponse{
+		ID:          user.ID,
+		Email:       user.Email,
+		Username:    user.Username,
+		Name:        user.Name,
+		IsAdmin:     user.IsAdmin(),
+		IsActive:    user.Role != "",
+		CreatedAt:   user.CreatedAt,
+		LastLoginAt: user.LastLoginAt,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("GetMe encode error: %v", err)
+	}
+}
+
+// ChangeEmail initiates an email address change by sending a verification link
+// to the requested new address. The change is not applied until the link is clicked.
+//
+//	@Summary      Request email change
+//	@Description  Sends a verification link to the new email. Change applies on confirmation.
+//	@Tags         account
+//	@Accept       json
+//	@Produce      json
+//	@Param        body  body  map[string]string  true  "new_email"
+//	@Success      200  {object}  map[string]string
+//	@Failure      400  {object}  map[string]string
+//	@Failure      401  {object}  map[string]string
+//	@Router       /api/me/email [post]
+func (h *Handler) ChangeEmail(w http.ResponseWriter, r *http.Request) {
+	user, ok := GetUserFromContext(r.Context())
+	if !ok || user == nil {
+		h.jsonError(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+
+	var body struct {
+		NewEmail string `json:"new_email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		h.jsonError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	body.NewEmail = strings.TrimSpace(strings.ToLower(body.NewEmail))
+	if body.NewEmail == "" {
+		h.jsonError(w, "new_email is required", http.StatusBadRequest)
+		return
+	}
+
+	// Build the base URL for the confirmation link from the incoming request.
+	scheme := "https"
+	if h.cfg.Server.Env != "production" {
+		scheme = "http"
+	}
+	baseURL := fmt.Sprintf("%s://%s", scheme, r.Host)
+
+	if err := h.auth.InitiateEmailChange(user.ID, body.NewEmail, baseURL); err != nil {
+		log.Printf("InitiateEmailChange for user %s: %v", user.ID, err)
+		if errors.Is(err, auth.ErrEmailTaken) {
+			h.jsonError(w, "That email address is already in use.", http.StatusConflict)
+			return
+		}
+		h.jsonError(w, "Failed to send verification email. Please try again.", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, `{"message":"Verification email sent to %s. Click the link to confirm your new address."}`, body.NewEmail)
+}
+
+// ConfirmEmailChange handles GET /auth/email-change?token=X.
+// Validates the token, updates the user's email, and redirects to /account.
+//
+//	@Summary      Confirm email change
+//	@Description  Validates a one-time email-change token and updates the user's email.
+//	@Tags         account
+//	@Param        token  query  string  true  "Email change token"
+//	@Success      303  "Redirect to /account?success=email-changed"
+//	@Failure      400  {string}  string  "Missing token"
+//	@Failure      401  {string}  string  "Invalid or expired token"
+//	@Router       /auth/email-change [get]
+func (h *Handler) ConfirmEmailChange(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		http.Error(w, "Missing token", http.StatusBadRequest)
+		return
+	}
+
+	_, err := h.auth.ConfirmEmailChange(token)
+	if err != nil {
+		log.Printf("ConfirmEmailChange: %v", err)
+		if errors.Is(err, auth.ErrInvalidEmailChangeToken) {
+			http.Error(w, "Invalid or expired email change link.", http.StatusUnauthorized)
+			return
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/account?success=email-changed", http.StatusSeeOther)
+}
+
+// DeleteAccount deletes the authenticated user's account, clears their session
+// cookie, and redirects to /.
+//
+//	@Summary      Delete account
+//	@Description  Permanently deletes the authenticated user's account and all sessions.
+//	@Tags         account
+//	@Success      200  {object}  map[string]string
+//	@Failure      401  {object}  map[string]string
+//	@Router       /api/me [delete]
+func (h *Handler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
+	user, ok := GetUserFromContext(r.Context())
+	if !ok || user == nil {
+		h.jsonError(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+
+	if err := h.auth.DeleteAccount(user.ID); err != nil {
+		log.Printf("DeleteAccount for user %s: %v", user.ID, err)
+		h.jsonError(w, "Failed to delete account. Please try again.", http.StatusInternalServerError)
+		return
+	}
+
+	// Clear session cookie — the DB rows are already gone via CASCADE.
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   h.cfg.Server.Env == "production",
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, `{"message":"Account deleted."}`)
 }
 
 // --- helpers ---

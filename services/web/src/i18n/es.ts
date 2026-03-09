@@ -98,6 +98,28 @@ const es: Record<TranslationKey, string> = {
   'dashboard.sessionExpires': 'Expira',
   'dashboard.noSessions': 'No hay sesiones activas.',
 
+  // Account page
+  'account.title': 'Cuenta',
+  'account.heading': 'Mi Cuenta',
+  'account.emailLabel': 'Correo electrónico',
+  'account.memberSince': 'Miembro desde',
+  'account.lastLogin': 'Último acceso',
+  'account.status': 'Estado de la cuenta',
+  'account.statusActive': 'Activa',
+  'account.statusInactive': 'Inactiva',
+  'account.adminBadge': 'Admin',
+  'account.logout': 'Cerrar sesión',
+  'account.changeEmail': 'Cambiar correo electrónico',
+  'account.newEmailLabel': 'Nuevo correo electrónico',
+  'account.newEmailPlaceholder': 'nuevo@ejemplo.com',
+  'account.changeEmailSubmit': 'Enviar verificación',
+  'account.changeEmailSuccess': 'Correo de verificación enviado. Haz clic en el enlace para confirmar tu nueva dirección.',
+  'account.deleteAccount': 'Eliminar cuenta',
+  'account.deleteConfirm': '¿Estás seguro? Esto no se puede deshacer.',
+  'account.deleteConfirmBtn': 'Sí, eliminar mi cuenta',
+  'account.deleteCancelBtn': 'Cancelar',
+  'account.emailChangedSuccess': 'Dirección de correo actualizada correctamente.',
+
   // Lies wall
   'lies.title': 'Mentiras',
   'lies.heading': 'El Muro de Mentiras',

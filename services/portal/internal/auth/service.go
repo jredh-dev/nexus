@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jredh-dev/nexus/services/portal/config"
 	"github.com/jredh-dev/nexus/services/portal/internal/database"
+	"github.com/jredh-dev/nexus/services/portal/internal/mailer"
 	"github.com/jredh-dev/nexus/services/portal/pkg/identity"
 	"github.com/jredh-dev/nexus/services/portal/pkg/models"
 	"golang.org/x/crypto/bcrypt"
@@ -18,13 +19,15 @@ const bcryptCost = 12
 
 // Service handles authentication operations.
 type Service struct {
-	db  *database.DB
-	cfg *config.Config
+	db     *database.DB
+	cfg    *config.Config
+	mailer *mailer.Mailer
 }
 
 // New creates a new auth service.
 func New(db *database.DB, cfg *config.Config) *Service {
-	return &Service{db: db, cfg: cfg}
+	m := mailer.New(cfg.SMTP.Host, cfg.SMTP.Port, cfg.SMTP.From)
+	return &Service{db: db, cfg: cfg, mailer: m}
 }
 
 // HashPassword hashes a plaintext password with bcrypt.
@@ -293,4 +296,95 @@ func (s *Service) ValidateMagicToken(token, ipAddress, userAgent string) (string
 	}
 
 	return session.ID, nil
+}
+
+// --- Email change operations ---
+
+const emailChangeTokenExpiry = 15 * time.Minute
+
+// InitiateEmailChange sends a verification email to newEmail containing a
+// one-time-use token. The email change is not applied until ConfirmEmailChange
+// is called with the token.
+//
+// baseURL should be the scheme+host used to build the confirmation link,
+// e.g. "https://portal.jredh.com" or "http://localhost:8090".
+func (s *Service) InitiateEmailChange(userID, newEmail, baseURL string) error {
+	// Verify the user exists.
+	user, err := s.db.GetUserByID(userID)
+	if err != nil {
+		return fmt.Errorf("lookup user: %w", err)
+	}
+	if user == nil {
+		return ErrUserNotFound
+	}
+
+	// Reject if new email is already taken by another account.
+	newHash := identity.EmailHash(newEmail)
+	existing, err := s.db.GetUserByEmailHash(newHash)
+	if err != nil {
+		return fmt.Errorf("check email hash: %w", err)
+	}
+	if existing != nil && existing.ID != userID {
+		return ErrEmailTaken
+	}
+
+	// Generate cryptographically secure token.
+	tokenBytes := make([]byte, magicTokenBytes) // reuse same 32-byte constant
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return fmt.Errorf("generate token: %w", err)
+	}
+	token := hex.EncodeToString(tokenBytes)
+
+	now := time.Now()
+	ect := &models.EmailChangeToken{
+		ID:        token,
+		UserID:    userID,
+		NewEmail:  newEmail,
+		ExpiresAt: now.Add(emailChangeTokenExpiry),
+		CreatedAt: now,
+	}
+	if err := s.db.CreateEmailChangeToken(ect); err != nil {
+		return fmt.Errorf("store email change token: %w", err)
+	}
+
+	// Send confirmation email to the NEW address.
+	link := fmt.Sprintf("%s/auth/email-change?token=%s", baseURL, token)
+	if err := s.mailer.SendEmailChangeVerification(newEmail, link); err != nil {
+		return fmt.Errorf("send verification email: %w", err)
+	}
+
+	return nil
+}
+
+// ConfirmEmailChange consumes the token and updates the user's email address.
+// Returns the userID of the affected account so the caller can refresh session context.
+func (s *Service) ConfirmEmailChange(token string) (string, error) {
+	ect, err := s.db.GetEmailChangeToken(token)
+	if err != nil {
+		return "", fmt.Errorf("get email change token: %w", err)
+	}
+	if ect == nil {
+		return "", ErrInvalidEmailChangeToken
+	}
+
+	// Consume first — prevent double-use even if the update below fails.
+	if err := s.db.ConsumeEmailChangeToken(token); err != nil {
+		return "", fmt.Errorf("consume email change token: %w", err)
+	}
+
+	newHash := identity.EmailHash(ect.NewEmail)
+	if err := s.db.UpdateUserEmail(ect.UserID, ect.NewEmail, newHash); err != nil {
+		return "", fmt.Errorf("update user email: %w", err)
+	}
+
+	return ect.UserID, nil
+}
+
+// DeleteAccount deletes the user and all associated sessions/tokens.
+// The caller should clear the session cookie after this returns.
+func (s *Service) DeleteAccount(userID string) error {
+	if err := s.db.DeleteUser(userID); err != nil {
+		return fmt.Errorf("delete user: %w", err)
+	}
+	return nil
 }

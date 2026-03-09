@@ -96,6 +96,28 @@ const en = {
   'dashboard.sessionExpires': 'Expires',
   'dashboard.noSessions': 'No active sessions.',
 
+  // Account page
+  'account.title': 'Account',
+  'account.heading': 'My Account',
+  'account.emailLabel': 'Email',
+  'account.memberSince': 'Member since',
+  'account.lastLogin': 'Last login',
+  'account.status': 'Account status',
+  'account.statusActive': 'Active',
+  'account.statusInactive': 'Inactive',
+  'account.adminBadge': 'Admin',
+  'account.logout': 'Logout',
+  'account.changeEmail': 'Change Email',
+  'account.newEmailLabel': 'New email address',
+  'account.newEmailPlaceholder': 'new@example.com',
+  'account.changeEmailSubmit': 'Send Verification',
+  'account.changeEmailSuccess': "Verification email sent. Click the link to confirm your new address.",
+  'account.deleteAccount': 'Delete Account',
+  'account.deleteConfirm': 'Are you sure? This cannot be undone.',
+  'account.deleteConfirmBtn': 'Yes, delete my account',
+  'account.deleteCancelBtn': 'Cancel',
+  'account.emailChangedSuccess': 'Email address updated successfully.',
+
   // Lies wall
   'lies.title': 'Lies',
   'lies.heading': 'The Wall of Lies',
