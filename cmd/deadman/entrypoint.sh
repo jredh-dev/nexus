@@ -1,16 +1,25 @@
 #!/bin/sh
-# entrypoint.sh — Source Vault Agent rendered secrets then exec deadman.
+# entrypoint.sh — Wait for Vault Agent, source rendered secrets, then exec deadman.
 #
 # The Vault Agent sidecar (vault-agent-deadman) renders secrets from Vault KV
-# into /vault/secrets/secrets.env on a shared tmpfs volume. This script sources
-# that file to inject the secrets into the process environment before handing
-# off to the deadman binary.
+# into /vault/secrets/secrets.env on a shared tmpfs volume. This script waits
+# up to VAULT_SECRETS_TIMEOUT seconds for the file to appear (agent may still
+# be authenticating at container start), then sources it before exec.
 #
-# If the secrets file is absent (e.g. local dev without Vault), deadman starts
-# with whatever environment variables were passed by docker-compose. This allows
-# the DEADMAN_DB_PASSWORD fallback in DATABASE_URL to still work.
+# If the secrets file never appears (e.g. local dev without Vault), deadman
+# starts with whatever environment variables were passed by docker-compose.
+# DEADMAN_DB_PASSWORD fallback in DATABASE_URL still works in that case.
 
 SECRETS_FILE="/vault/secrets/secrets.env"
+VAULT_SECRETS_TIMEOUT="${VAULT_SECRETS_TIMEOUT:-30}"
+
+# Wait for Vault Agent to render the secrets file.
+_waited=0
+while [ ! -f "$SECRETS_FILE" ] && [ "$_waited" -lt "$VAULT_SECRETS_TIMEOUT" ]; do
+    echo "[entrypoint] waiting for $SECRETS_FILE (${_waited}s / ${VAULT_SECRETS_TIMEOUT}s)..."
+    sleep 2
+    _waited=$((_waited + 2))
+done
 
 if [ -f "$SECRETS_FILE" ]; then
     # Export each KEY=VALUE line; skip blank lines and comments.
@@ -21,7 +30,7 @@ if [ -f "$SECRETS_FILE" ]; then
     set +a
     echo "[entrypoint] secrets loaded from $SECRETS_FILE"
 else
-    echo "[entrypoint] $SECRETS_FILE not found — starting without Vault secrets"
+    echo "[entrypoint] $SECRETS_FILE not found after ${VAULT_SECRETS_TIMEOUT}s — starting without Vault secrets"
 fi
 
 # Build DATABASE_URL from the Vault-rendered DEADMAN_DB_PASSWORD if not already
