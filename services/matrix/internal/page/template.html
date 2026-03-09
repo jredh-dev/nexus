@@ -361,7 +361,7 @@
 </body>
 </html>
 
-{{/* ---- serviceCard sub-template: renders one ServiceGroup card ---- */}}
+{{/* ---- serviceCard sub-template: renders one ServiceCard (flat Endpoint model) ---- */}}
 {{define "serviceCard"}}
 <div class="card">
   <div class="card-header">
@@ -372,40 +372,28 @@
     {{end}}
   </div>
 
-  {{if .Local}}
+  {{/* one row per endpoint: dot + label/link, with optional faded sub-URL for domain entries */}}
+  {{range .Endpoints}}
   <div class="env-row">
-    <span class="env-label">local</span>
-    <span class="dot {{statusClass .Local.GatusStatus}}" title="{{statusText .Local.GatusStatus}}"></span>
+    <span class="dot {{statusClass .GatusStatus}}" title="{{statusText .GatusStatus}}"></span>
     <div class="env-urls">
-      {{range .Local.URLs}}
-        {{if .Href}}<a href="{{.Href}}" target="_blank">{{.Label}}</a>{{else}}<span>{{.Label}}</span>{{end}}
+      {{if .URL}}
+        <a href="{{.URL}}" target="_blank">{{if .IsLocal}}localhost{{end}}{{.Label}}</a>
+      {{else}}
+        <span>{{if .IsLocal}}localhost{{end}}{{.Label}}</span>
+      {{end}}
+      {{if .SubURL}}
+      <br><a href="{{.SubURL}}" target="_blank" style="color:var(--muted);font-size:10px;">{{.SubLabel}}</a>
       {{end}}
     </div>
-    {{if .Local.Pipelines}}
-    <div class="pipelines">
-      {{range .Local.Pipelines}}
-        {{template "pill" .}}
-      {{end}}
-    </div>
-    {{end}}
   </div>
   {{end}}
 
-  {{if .Cloud}}
-  <div class="env-row">
-    <span class="env-label">cloud</span>
-    <span class="dot {{statusClass .Cloud.GatusStatus}}" title="{{statusText .Cloud.GatusStatus}}"></span>
-    <div class="env-urls">
-      {{range .Cloud.URLs}}
-        {{if .Href}}<a href="{{.Href}}" target="_blank">{{.Label}}</a>{{else}}<span>{{.Label}}</span>{{end}}
-      {{end}}
-    </div>
-    {{if .Cloud.Pipelines}}
-    <div class="pipelines">
-      {{range .Cloud.Pipelines}}
-        {{template "pill" .}}
-      {{end}}
-    </div>
+  {{/* all pipelines for this service (gitea + github, all envs) */}}
+  {{if .Pipelines}}
+  <div class="pipelines">
+    {{range .Pipelines}}
+      {{template "pill" .}}
     {{end}}
   </div>
   {{end}}
