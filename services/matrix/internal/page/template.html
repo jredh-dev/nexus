@@ -166,13 +166,24 @@
       font-size: 11px;
     }
 
-    /* ---- pipelines list (wraps naturally) ---- */
+    /* ---- pipelines table ---- */
     .pipelines {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-      align-items: center;
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
     }
+    .pipelines td {
+      padding: 2px 4px;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    .pipelines td:first-child { padding-left: 0; width: 14px; }
+    .pipelines td:nth-child(2) { width: 100%; }  /* workflow name stretches */
+    .pipelines td:last-child   { padding-right: 0; color: var(--muted); font-size: 10px; text-align: right; }
+    .pipelines tr:hover td { background: rgba(255,255,255,0.03); }
+    .pipelines a { color: var(--text); text-decoration: none; }
+    .pipelines a:hover { color: var(--accent); }
+    .pipelines .run-num { color: var(--muted); font-size: 10px; }
 
     /* ---- status dot ---- */
     .dot {
@@ -185,45 +196,15 @@
     .dot-up      { background: var(--green); }
     .dot-down    { background: var(--red); box-shadow: 0 0 4px var(--red); }
     .dot-unknown { background: var(--border); }
+    /* CI status dots reuse the same dot element */
+    .dot.ci-success { background: var(--green); }
+    .dot.ci-failure { background: var(--red); box-shadow: 0 0 4px var(--red); }
+    .dot.ci-pending { background: var(--yellow); }
+    .dot.ci-unknown { background: var(--border); }
 
-    /* ---- ci pill ---- */
-    .ci-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      padding: 1px 6px;
-      border-radius: 10px;
-      font-size: 10px;
-      font-weight: 600;
-      text-decoration: none;
-      border: 1px solid transparent;
-      white-space: nowrap;
-    }
-    .ci-success { background: rgba(63,185,80,0.15); color: var(--green); border-color: rgba(63,185,80,0.3); }
-    .ci-failure { background: rgba(248,81,73,0.15); color: var(--red);   border-color: rgba(248,81,73,0.3); }
-    .ci-pending { background: rgba(210,153,34,0.15); color: var(--yellow); border-color: rgba(210,153,34,0.3); }
-    .ci-unknown { background: transparent; color: var(--muted); border-color: var(--border); }
-
-    /* pending pill pulses to signal an in-flight run */
-    @keyframes pulse-pending {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.45; }
-    }
-    .ci-pending { animation: pulse-pending 1.6s ease-in-out infinite; }
-
-    /* run number inside pill — slightly dimmer than the label */
-    .run-num {
-      opacity: 0.65;
-      font-weight: 400;
-    }
-
-    /* time-ago stamp after the pill — very quiet */
-    .run-age {
-      color: var(--muted);
-      font-size: 9px;
-      font-weight: 400;
-      white-space: nowrap;
-    }
+    /* pending CI dot pulses */
+    @keyframes pulse-pending { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .dot.ci-pending { animation: pulse-pending 1.6s ease-in-out infinite; }
 
     /* ---- repo grid ---- */
     .repo-grid {
@@ -333,11 +314,9 @@
         {{if .GiteaURL}}<a href="{{.GiteaURL}}" target="_blank">gitea</a>{{end}}
       </div>
       {{if .Pipelines}}
-      <div class="pipelines">
-        {{range .Pipelines}}
-          {{template "pill" .}}
-        {{end}}
-      </div>
+      <table class="pipelines">
+        {{range .Pipelines}}{{template "pipelineRow" .}}{{end}}
+      </table>
       {{end}}
     </div>
     {{end}}
@@ -391,29 +370,27 @@
 
   {{/* all pipelines for this service (gitea + github, all envs) */}}
   {{if .Pipelines}}
-  <div class="pipelines">
-    {{range .Pipelines}}
-      {{template "pill" .}}
-    {{end}}
-  </div>
+  <table class="pipelines">
+    {{range .Pipelines}}{{template "pipelineRow" .}}{{end}}
+  </table>
   {{end}}
 </div>
 {{end}}
 
-{{/* ---- pill sub-template: renders one WorkflowRow as a CI pill + age stamp ---- */}}
-{{define "pill"}}
+{{/* ---- pipelineRow sub-template: one <tr> per workflow run ---- */}}
+{{define "pipelineRow"}}
   {{- $age := timeAgo .UpdatedAt -}}
   {{- $num := .RunNumber -}}
-  {{- if .URL}}
-  <a class="ci-pill {{ciClass .Status}}" href="{{.URL}}" target="_blank"
-     title="{{if $num}}#{{$num}} {{end}}{{if $age}}{{$age}}{{end}}">
-    {{ciText .Status}} {{.Label}}{{if $num}} <span class="run-num">#{{$num}}</span>{{end}}
-  </a>
-  {{- else}}
-  <span class="ci-pill {{ciClass .Status}}"
-        title="{{if $num}}#{{$num}} {{end}}{{if $age}}{{$age}}{{end}}">
-    {{ciText .Status}} {{.Label}}{{if $num}} <span class="run-num">#{{$num}}</span>{{end}}
-  </span>
-  {{- end}}
-  {{- if $age}}<span class="run-age">{{$age}}</span>{{end}}
+  <tr>
+    <td><span class="dot {{ciClass .Status}}" title="{{ciText .Status}}"></span></td>
+    <td>
+      {{- if .URL -}}
+      <a href="{{.URL}}" target="_blank">{{.Label}}</a>
+      {{- else -}}
+      <span style="color:var(--muted)">{{.Label}}</span>
+      {{- end -}}
+    </td>
+    <td class="run-num">{{if $num}}#{{$num}}{{end}}</td>
+    <td>{{$age}}</td>
+  </tr>
 {{- end}}
