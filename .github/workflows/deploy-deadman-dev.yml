@@ -55,6 +55,9 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Install gcloud beta
+        run: gcloud components install beta --quiet
+
       - name: Configure Docker for GCR
         run: gcloud auth configure-docker
 
