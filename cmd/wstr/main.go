@@ -7,6 +7,8 @@
 //	wstr commit [--message <msg>]
 //	wstr end [--push]
 //	wstr --help
+//	wstr -h
+//	wstr -?
 package main
 
 import (
