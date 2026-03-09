@@ -66,7 +66,7 @@ func ConsentSMS(ownerPhone string) string {
 // TriggerSMS returns the alert message sent to a subscriber when a deadman fires.
 func TriggerSMS(ownerPhone string) string {
 	return fmt.Sprintf(
-		"%s's deadman has triggered. Reply: R=status update, W=ask why, H=ask how, U=unsubscribe all",
+		"The Deadman for %s has been triggered. Reply: R=resubscribe, W=why, H=how, U=unsubscribe",
 		ownerPhone,
 	)
 }
