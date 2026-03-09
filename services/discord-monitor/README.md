@@ -22,11 +22,10 @@ services/discord-monitor/
 
 ## Database
 
-PostgreSQL 16 (native, Unix socket). Database: `discord_monitor`.
+PostgreSQL 16 (Docker, TCP). Database: `discord_monitor`.
 
 ```bash
-export PATH="/usr/local/Cellar/postgresql@16/16.13/bin:$PATH"
-psql -h /tmp/ctl-pg -d discord_monitor
+psql -h localhost -d discord_monitor
 ```
 
 **Tables:** `guilds`, `channels`, `messages`, `read_cursors`, `activity_hourly`, `keywords`, `digests`, `schema_version`
@@ -46,13 +45,13 @@ psql -h /tmp/ctl-pg -d discord_monitor
 # Build server
 go build ./services/discord-monitor/cmd/server
 
-# Run locally (requires PostgreSQL at /tmp/ctl-pg with database 'discord_monitor')
-DATABASE_URL="host=/tmp/ctl-pg dbname=discord_monitor user=jredh" \
+# Run locally (requires PostgreSQL at localhost:5432 with database 'discord_monitor')
+DATABASE_URL="host=localhost port=5432 dbname=discord_monitor user=jredh" \
 go run ./services/discord-monitor/cmd/server
 
 # With selfbot (optional)
 DISCORD_SELFBOT_TOKEN="your_user_token" \
-DATABASE_URL="host=/tmp/ctl-pg dbname=discord_monitor user=jredh" \
+DATABASE_URL="host=localhost port=5432 dbname=discord_monitor user=jredh" \
 go run ./services/discord-monitor/cmd/server
 ```
 
@@ -61,6 +60,6 @@ go run ./services/discord-monitor/cmd/server
 | Var | Default | Description |
 |-----|---------|-------------|
 | `PORT` | `8080` | HTTP listen port |
-| `DATABASE_URL` | `host=/tmp/ctl-pg dbname=discord_monitor user=jredh` | PostgreSQL connection string |
+| `DATABASE_URL` | `host=localhost port=5432 dbname=discord_monitor user=jredh` | PostgreSQL connection string |
 | `DISCORD_SELFBOT_TOKEN` | (optional) | Discord user token for selfbot mode |
 | `SCAN_INTERVAL_SELFBOT` | `60s` | Polling interval for selfbot scanner |

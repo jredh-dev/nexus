@@ -1,6 +1,8 @@
 name: CI
 
-# Trigger on push to any branch except main and rc/* (those have dedicated workflows).
+# Runs on workstream_* branches — the Gitea quality gate.
+# On pass, pushes directly to the current rc/vX.Y.Z branch on GitHub.
+# No feat/* branches. No GitHub PRs from CI. Human reviews rc/* → main on GitHub.
 on:
   push:
     branches-ignore:
@@ -52,7 +54,7 @@ jobs:
           go test ./...
 
   propagate:
-    name: Propagate to GitHub
+    name: Propagate to GitHub rc/vX.Y.Z
     runs-on: local
     needs: [lint, build, test]
     if: success()
@@ -63,31 +65,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Derive feat branch name
-        id: branch
+      - name: Determine current RC branch
+        id: rc
         run: |
           export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
-          # Strip leading "workstream_" and replace with "feat/"
-          # e.g. workstream_foo-bar-abc123 -> feat/foo-bar-abc123
-          raw="${GITHUB_REF_NAME}"
-          feat_name="feat/${raw#workstream_}"
-          echo "feat_branch=${feat_name}" >> $GITHUB_OUTPUT
-          echo "Derived feat branch: ${feat_name}"
-
-      - name: Push branch to GitHub
-        run: |
-          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
-          feat_branch="${{ steps.branch.outputs.feat_branch }}"
-          git push \
-            "https://${GITHUB_TOKEN}@github.com/jredh-dev/nexus.git" \
-            "HEAD:refs/heads/${feat_branch}"
-
-      - name: Determine base branch (latest RC or main)
-        id: base
-        run: |
-          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
-          # Fetch all branches from GitHub, filter rc/v*, sort descending, take first
-          base=$(curl -s \
+          rc=$(curl -s \
             -H "Authorization: token ${GITHUB_TOKEN}" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/jredh-dev/nexus/branches?per_page=100" \
@@ -96,55 +78,40 @@ jobs:
             | sed 's/.*"name": "\(.*\)".*/\1/' \
             | sort -rV \
             | head -1)
-          if [ -z "$base" ]; then
-            base="main"
+          if [ -z "$rc" ]; then
+            echo "No rc/vX.Y.Z branch found on GitHub — cannot propagate"
+            exit 1
           fi
-          echo "base_branch=${base}" >> $GITHUB_OUTPUT
-          echo "Using base branch: ${base}"
+          echo "rc_branch=${rc}" >> $GITHUB_OUTPUT
+          echo "Pushing to: ${rc}"
 
-      - name: Build PR title from branch name
-        id: pr_meta
+      - name: Push to GitHub rc/vX.Y.Z
         run: |
           export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
-          feat_branch="${{ steps.branch.outputs.feat_branch }}"
-          # Strip "feat/" prefix, trim trailing short hash, replace hyphens with spaces
-          title="${feat_branch#feat/}"
-          title=$(echo "$title" | sed 's/-[0-9a-f]\{6,8\}$//')
-          title=$(echo "$title" | tr '-' ' ')
-          echo "pr_title=${title}" >> $GITHUB_OUTPUT
-
-      - name: Open GitHub PR
-        run: |
-          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
-          feat_branch="${{ steps.branch.outputs.feat_branch }}"
-          base_branch="${{ steps.base.outputs.base_branch }}"
-          pr_title="${{ steps.pr_meta.outputs.pr_title }}"
-          gitea_ref="${GITHUB_REF_NAME}"
-
-          # 422 = PR already exists; treat as success
-          curl -s -o /dev/null -w "%{http_code}" \
-            -X POST \
-            -H "Authorization: token ${GITHUB_TOKEN}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            -H "Content-Type: application/json" \
-            "https://api.github.com/repos/jredh-dev/nexus/pulls" \
-            -d "{
-              \"title\": \"${pr_title}\",
-              \"head\": \"${feat_branch}\",
-              \"base\": \"${base_branch}\",
-              \"body\": \"Propagated from Gitea CI. Branch: \`${gitea_ref}\`\"
-            }" || true
+          git push \
+            "https://${GITHUB_TOKEN}@github.com/jredh-dev/nexus.git" \
+            "HEAD:refs/heads/${{ steps.rc.outputs.rc_branch }}"
 
   notify-failure:
     name: Notify Discord on Failure
     runs-on: local
     needs: [lint, build, test]
     if: failure()
+    env:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
     steps:
       - name: Discord notification
         run: |
-          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
-          ctl notify discord \
-            --event build \
-            --service nexus \
-            --status failure
+          # Notify via discord-mcp HTTP API if available; fall back to direct webhook curl.
+          # discord-mcp is not yet deployed on the first CI run, so direct curl is the fallback.
+          if curl -sf http://discord-mcp:8092/health >/dev/null 2>&1; then
+            curl -sf -X POST "http://discord-mcp:8092/mcp" \
+              -H "Content-Type: application/json" \
+              -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"notify_discord","arguments":{"event":"build","service":"nexus","status":"failure","env":"local"}}}' \
+              2>/dev/null || true
+          elif [ -n "$DISCORD_WEBHOOK_URL" ]; then
+            curl -sf -X POST "$DISCORD_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              -d '{"embeds":[{"title":"build nexus","description":"env: local | status: failure","color":15158332}]}' \
+              2>/dev/null || true
+          fi

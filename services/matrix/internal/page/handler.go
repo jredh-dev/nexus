@@ -68,14 +68,12 @@ var tmpl = template.Must(template.New("matrix").Funcs(template.FuncMap{
 		}
 	},
 	// timeAgo formats an RFC3339 timestamp as a human-friendly "Xm ago" string.
-	// Returns an empty string if the timestamp is zero or unparseable.
 	"timeAgo": func(ts string) string {
 		if ts == "" {
 			return ""
 		}
 		t, err := time.Parse(time.RFC3339, ts)
 		if err != nil {
-			// Try without sub-seconds
 			t, err = time.Parse("2006-01-02T15:04:05Z", ts)
 			if err != nil {
 				return ""
@@ -102,27 +100,37 @@ var tmpl = template.Must(template.New("matrix").Funcs(template.FuncMap{
 
 // Config holds runtime configuration for the page handler.
 type Config struct {
-	GatusURL    string // e.g. "http://host.docker.internal:8084"
-	GiteaURL    string // e.g. "http://host.docker.internal:3000"
-	GiteaToken  string
-	GitHubToken string
-	GitHubOwner string
-	GitHubRepo  string
-	GiteaOwner  string
-	GiteaRepo   string
+	GatusURL              string // e.g. "http://host.docker.internal:8084"
+	GiteaURL              string // e.g. "http://host.docker.internal:3000"
+	GiteaToken            string
+	GitHubToken           string
+	GitHubOwner           string
+	GitHubRepo            string
+	GiteaOwner            string
+	GiteaRepo             string
+	OpenObserveURL        string // internal API URL e.g. "http://host.docker.internal:5080"
+	OpenObserveBrowserURL string // browser-facing nav link e.g. "http://localhost:5080"
+	OpenObserveUser       string // e.g. "admin@local.dev"
+	OpenObservePass       string // e.g. "changeme"
+	OpenCodeURL           string // e.g. "http://localhost:4096" — browser-facing nav link
 }
 
 // ConfigFromEnv reads handler config from environment variables with defaults.
 func ConfigFromEnv() Config {
 	return Config{
-		GatusURL:    envOr("GATUS_URL", "http://host.docker.internal:8084"),
-		GiteaURL:    envOr("GITEA_URL", "http://host.docker.internal:3000"),
-		GiteaToken:  os.Getenv("GITEA_TOKEN"),
-		GitHubToken: os.Getenv("GITHUB_TOKEN"),
-		GitHubOwner: envOr("GITHUB_OWNER", "jredh-dev"),
-		GitHubRepo:  envOr("GITHUB_REPO", "nexus"),
-		GiteaOwner:  envOr("GITEA_OWNER", "jredhbot"),
-		GiteaRepo:   envOr("GITEA_REPO", "nexus"),
+		GatusURL:              envOr("GATUS_URL", "http://host.docker.internal:8084"),
+		GiteaURL:              envOr("GITEA_URL", "http://host.docker.internal:3000"),
+		GiteaToken:            os.Getenv("GITEA_TOKEN"),
+		GitHubToken:           os.Getenv("GITHUB_TOKEN"),
+		GitHubOwner:           envOr("GITHUB_OWNER", "jredh-dev"),
+		GitHubRepo:            envOr("GITHUB_REPO", "nexus"),
+		GiteaOwner:            envOr("GITEA_OWNER", "jredh-dev"),
+		GiteaRepo:             envOr("GITEA_REPO", "nexus"),
+		OpenObserveURL:        envOr("OPENOBSERVE_URL", "http://host.docker.internal:5080"),
+		OpenObserveBrowserURL: envOr("OPENOBSERVE_BROWSER_URL", "http://localhost:5080"),
+		OpenObserveUser:       envOr("OPENOBSERVE_USER", "admin@local.dev"),
+		OpenObservePass:       envOr("OPENOBSERVE_PASS", "changeme"),
+		OpenCodeURL:           envOr("OPENCODE_URL", "http://localhost:4096"),
 	}
 }
 
@@ -134,10 +142,7 @@ func envOr(key, def string) string {
 }
 
 // Handler returns an HTTP handler that renders the matrix dashboard.
-// Data is fetched live on each request (with a short timeout).
-// Slow or unavailable sources show "?" rather than blocking the page.
 func Handler(cfg Config) http.HandlerFunc {
-	// All GitHub Actions workflows to fetch for nexus.
 	ghWorkflows := []string{
 		"ci.yml",
 		"deploy-hermit-dev.yml",
@@ -146,15 +151,11 @@ func Handler(cfg Config) http.HandlerFunc {
 		"deploy-web-dev.yml",
 		"deploy-cal-dev.yml",
 		"deploy-vn-dev.yml",
+		"deploy-deadman-dev.yml",
 		"integration-tests-dev.yml",
 	}
-	// ctl repo GitHub workflows.
 	ctlGHWorkflows := []string{"ci.yml"}
-
-	// Gitea workflows to track (nexus repo).
-	nexusGiteaWorkflows := []string{"docker-deploy.yml", "install.yml"}
-
-	// Gitea workflows to track (ctl repo).
+	nexusGiteaWorkflows := []string{"ci.yml", "deploy-vn.yml", "docker-deploy.yml", "install.yml"}
 	ctlGiteaWorkflows := []string{"install.yml"}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -171,17 +172,17 @@ func Handler(cfg Config) http.HandlerFunc {
 			mu.Unlock()
 		}
 
-		// Fetch all data sources in parallel.
 		var (
 			gatusData  map[string]data.GatusResult
 			ghNexus    map[string]data.WorkflowRun
 			ghCtl      map[string]data.WorkflowRun
 			giteaNexus map[string]data.WorkflowRun
 			giteaCtl   map[string]data.WorkflowRun
+			logCounts  map[string]int
 		)
 
 		var wg sync.WaitGroup
-		wg.Add(5)
+		wg.Add(6)
 
 		go func() {
 			defer wg.Done()
@@ -192,35 +193,33 @@ func Handler(cfg Config) http.HandlerFunc {
 			}
 			gatusData = d
 		}()
-
 		go func() {
 			defer wg.Done()
 			ghNexus = data.FetchGitHubWorkflows(ctx, cfg.GitHubOwner, cfg.GitHubRepo, cfg.GitHubToken, ghWorkflows)
 		}()
-
 		go func() {
 			defer wg.Done()
 			ghCtl = data.FetchGitHubWorkflows(ctx, cfg.GitHubOwner, "ctl", cfg.GitHubToken, ctlGHWorkflows)
 		}()
-
 		go func() {
 			defer wg.Done()
 			giteaNexus = data.FetchGiteaWorkflows(ctx, cfg.GiteaURL, cfg.GiteaOwner, cfg.GiteaRepo, cfg.GiteaToken, nexusGiteaWorkflows)
 		}()
-
 		go func() {
 			defer wg.Done()
-			// ctl lives in the jredhbot Gitea org under repo "ctl"
 			giteaCtl = data.FetchGiteaWorkflows(ctx, cfg.GiteaURL, cfg.GiteaOwner, "ctl", cfg.GiteaToken, ctlGiteaWorkflows)
+		}()
+		go func() {
+			defer wg.Done()
+			logCounts = data.FetchLogCounts(ctx, cfg.OpenObserveURL, cfg.OpenObserveUser, cfg.OpenObservePass)
 		}()
 
 		wg.Wait()
 		log.Printf("matrix: data fetched in %s", time.Since(start).Round(time.Millisecond))
 
-		pd := buildPageData(gatusData, ghNexus, ghCtl, giteaNexus, giteaCtl, errors)
+		pd := buildPageData(cfg, gatusData, ghNexus, ghCtl, giteaNexus, giteaCtl, logCounts, errors)
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		// Short cache — stale for 10s is fine, data changes slowly.
 		w.Header().Set("Cache-Control", "public, max-age=10")
 		if err := tmpl.Execute(w, pd); err != nil {
 			log.Printf("matrix: template error: %v", err)
@@ -230,46 +229,54 @@ func Handler(cfg Config) http.HandlerFunc {
 
 // TemplateData is the full view model passed to template.html.
 type TemplateData struct {
-	Services  []ServiceGroup
+	GatusURL       string // browser-facing nav link
+	OpenObserveURL string // browser-facing nav link
+	OpenCodeURL    string // browser-facing nav link
+
+	AppServices   []ServiceCard
+	CloudServices []ServiceCard // cloud-only services (cal)
+	InfraServices []ServiceCard
+
 	Repos     []RepoGroup
 	Errors    []string
 	FetchedAt string
 }
 
-// ServiceGroup is one named service (hermit, secrets, portal, etc.)
-// with its local and cloud environments.
-type ServiceGroup struct {
-	Name        string
-	Description string
-	Local       *ServiceEnv // nil if no local deployment
-	Cloud       *ServiceEnv // nil if no cloud deployment
+// ServiceCard is one service tile. Endpoints is a flat ordered list:
+// localhost first (if any), then cloud run, then custom domains.
+// Each endpoint gets its own health dot.
+type ServiceCard struct {
+	Name         string
+	Description  string
+	Endpoints    []Endpoint
+	Pipelines    []WorkflowRow // all pipelines for this service across envs
+	LogCount     int
+	LogSearchURL string
 }
 
-// ServiceURL is a labelled link to a running instance of a service.
-// Multiple URLs per env allow showing both the cloud run URL and any
-// custom domain mappings side by side.
-type ServiceURL struct {
-	Label string // short display text, e.g. ":8081", "cloud run", "secrets.jredh.com"
-	Href  string // full URL
-}
-
-// ServiceEnv holds the runtime info for one environment (local or cloud).
-type ServiceEnv struct {
-	URLs        []ServiceURL // ordered list of links: primary first, custom domains after
+// Endpoint is one reachable instance of a service.
+// Label is the short display text shown next to the dot.
+// URL is the clickable href (may be empty for socket-only endpoints like postgres).
+// SubURL is an optional faded line beneath — used to show the raw Cloud Run URL
+// under a custom domain entry.
+// IsLocal marks the localhost entry so the template can render "localhost" prefix.
+type Endpoint struct {
+	Label       string
+	URL         string // primary clickable href
+	SubURL      string // faded line beneath (raw Cloud Run URL for domain entries)
+	SubLabel    string // label for SubURL (e.g. "nexus-cal-dev-....run.app")
 	GatusKey    string
 	GatusStatus data.Status
-	// Pipelines is the ordered list of CI/deploy workflows for this env.
-	// Each entry is displayed as an individual named pill.
-	Pipelines []WorkflowRow
+	IsLocal     bool // true for the localhost endpoint
 }
 
 // WorkflowRow holds a single CI/deploy pipeline status + link.
 type WorkflowRow struct {
-	Label     string // display name (workflow filename without .yml)
+	Label     string
 	Status    data.CIStatus
 	URL       string
-	UpdatedAt string // RFC3339 timestamp, formatted by the timeAgo template func
-	RunNumber int    // provider run number; 0 means unknown
+	UpdatedAt string
+	RunNumber int
 }
 
 // RepoGroup is a repo with its Gitea/GitHub links and all associated pipelines.
@@ -277,26 +284,26 @@ type RepoGroup struct {
 	Name      string
 	GitHubURL string
 	GiteaURL  string
-	Pipelines []WorkflowRow // all named pipelines for this repo
+	Pipelines []WorkflowRow
 }
 
-// trimYML strips the ".yml" suffix for display labels.
-func trimYML(s string) string {
-	return strings.TrimSuffix(s, ".yml")
-}
+func trimYML(s string) string { return strings.TrimSuffix(s, ".yml") }
 
-// u is a convenience constructor for ServiceURL.
-func u(label, href string) ServiceURL { return ServiceURL{Label: label, Href: href} }
+// ooLogsURL returns the OpenObserve logs page URL.
+func ooLogsURL(baseURL, _ string) string {
+	return fmt.Sprintf("%s/web/logs?org_identifier=default", baseURL)
+}
 
 func buildPageData(
+	cfg Config,
 	gatus map[string]data.GatusResult,
 	ghNexus map[string]data.WorkflowRun,
 	ghCtl map[string]data.WorkflowRun,
 	giteaNexus map[string]data.WorkflowRun,
 	giteaCtl map[string]data.WorkflowRun,
+	logCounts map[string]int,
 	errors []string,
 ) TemplateData {
-	// gs looks up a Gatus health status by endpoint key.
 	gs := func(key string) data.Status {
 		if r, ok := gatus[key]; ok {
 			return r.Status
@@ -304,7 +311,6 @@ func buildPageData(
 		return data.StatusUnknown
 	}
 
-	// toRow converts a WorkflowRun to a WorkflowRow with a given display label.
 	toRow := func(file string, r data.WorkflowRun) WorkflowRow {
 		return WorkflowRow{
 			Label:     trimYML(file),
@@ -314,8 +320,6 @@ func buildPageData(
 			RunNumber: r.RunNumber,
 		}
 	}
-
-	// ghRow builds a WorkflowRow from a GitHub Actions map.
 	ghRow := func(m map[string]data.WorkflowRun, file string) WorkflowRow {
 		r, ok := m[file]
 		if !ok {
@@ -323,8 +327,6 @@ func buildPageData(
 		}
 		return toRow(file, r)
 	}
-
-	// giteaRow builds a WorkflowRow from a Gitea runs map.
 	giteaRow := func(m map[string]data.WorkflowRun, file string) WorkflowRow {
 		r, ok := m[file]
 		if !ok {
@@ -332,8 +334,6 @@ func buildPageData(
 		}
 		return toRow(file, r)
 	}
-
-	// ghRows builds multiple WorkflowRows from a GitHub Actions map.
 	ghRows := func(m map[string]data.WorkflowRun, files ...string) []WorkflowRow {
 		rows := make([]WorkflowRow, 0, len(files))
 		for _, f := range files {
@@ -341,8 +341,6 @@ func buildPageData(
 		}
 		return rows
 	}
-
-	// giteaRows builds multiple WorkflowRows from a Gitea runs map.
 	giteaRows := func(m map[string]data.WorkflowRun, files ...string) []WorkflowRow {
 		rows := make([]WorkflowRow, 0, len(files))
 		for _, f := range files {
@@ -351,161 +349,179 @@ func buildPageData(
 		return rows
 	}
 
-	services := []ServiceGroup{
-		{
-			Name:        "hermit",
-			Description: "rust grpc server",
-			Local: &ServiceEnv{
-				URLs:        []ServiceURL{u(":9090", "http://localhost:9090")},
-				GatusKey:    "local_hermit-(local)",
-				GatusStatus: gs("local_hermit-(local)"),
-				// docker-deploy rebuilds all containers; install keeps tui binary fresh
-				Pipelines: giteaRows(giteaNexus, "docker-deploy.yml", "install.yml"),
-			},
-			Cloud: &ServiceEnv{
-				URLs: []ServiceURL{
-					u("cloud run", "https://nexus-hermit-dev-2tvic4xjjq-uc.a.run.app"),
-				},
-				GatusKey:    "cloud-run_hermit-(cloud)",
-				GatusStatus: gs("cloud-run_hermit-(cloud)"),
-				Pipelines:   ghRows(ghNexus, "deploy-hermit-dev.yml"),
-			},
-		},
-		{
-			Name:        "secrets",
-			Description: "confessions api",
-			Local: &ServiceEnv{
-				URLs:        []ServiceURL{u(":8081", "http://localhost:8081")},
-				GatusKey:    "local_secrets-(local)",
-				GatusStatus: gs("local_secrets-(local)"),
-				Pipelines:   giteaRows(giteaNexus, "docker-deploy.yml"),
-			},
-			Cloud: &ServiceEnv{
-				// secrets.jredh.com has a failed cert mapping — show it but note it
-				URLs: []ServiceURL{
-					u("cloud run", "https://nexus-secrets-dev-2tvic4xjjq-uc.a.run.app/health"),
-					u("secrets.jredh.com", "https://secrets.jredh.com"),
-				},
-				GatusKey:    "cloud-run_secrets-(cloud)",
-				GatusStatus: gs("cloud-run_secrets-(cloud)"),
-				// secrets is deployed via deploy-go-http-dev.yml (shared go-http workflow)
-				Pipelines: ghRows(ghNexus, "deploy-go-http-dev.yml"),
-			},
-		},
-		{
-			Name:        "portal",
-			Description: "web portal / admin",
-			Local: &ServiceEnv{
-				URLs:        []ServiceURL{u(":8090", "http://localhost:8090/login")},
-				GatusKey:    "local_portal-(local)",
-				GatusStatus: gs("local_portal-(local)"),
-				Pipelines:   giteaRows(giteaNexus, "docker-deploy.yml"),
-			},
-			Cloud: &ServiceEnv{
-				URLs: []ServiceURL{
-					u("cloud run", "https://nexus-portal-dev-2tvic4xjjq-uc.a.run.app"),
-				},
-				GatusKey:    "cloud-run_portal-(cloud)",
-				GatusStatus: gs("cloud-run_portal-(cloud)"),
-				Pipelines:   ghRows(ghNexus, "deploy-portal-dev.yml"),
-			},
-		},
-		{
-			Name:        "web",
-			Description: "astro frontend",
-			Local: &ServiceEnv{
-				URLs:        []ServiceURL{u(":8083", "http://localhost:8083")},
-				GatusKey:    "local_web-(local)",
-				GatusStatus: gs("local_web-(local)"),
-				Pipelines:   giteaRows(giteaNexus, "docker-deploy.yml"),
-			},
-			Cloud: &ServiceEnv{
-				// portal.jredh.com is mapped to nexus-web-dev (the Astro frontend)
-				URLs: []ServiceURL{
-					u("cloud run", "https://nexus-web-dev-2tvic4xjjq-uc.a.run.app"),
-					u("portal.jredh.com", "https://portal.jredh.com"),
-				},
-				GatusKey:    "cloud-run_web-(cloud)",
-				GatusStatus: gs("cloud-run_web-(cloud)"),
-				Pipelines:   ghRows(ghNexus, "deploy-web-dev.yml"),
-			},
-		},
-		{
-			Name:        "vn",
-			Description: "visual novel engine",
-			Local: &ServiceEnv{
-				URLs:        []ServiceURL{u(":8082", "http://localhost:8082/health")},
-				GatusKey:    "local_vn-(local)",
-				GatusStatus: gs("local_vn-(local)"),
-				Pipelines:   giteaRows(giteaNexus, "docker-deploy.yml"),
-			},
-			Cloud: &ServiceEnv{
-				URLs: []ServiceURL{
-					u("cloud run", "https://nexus-vn-dev-2tvic4xjjq-uc.a.run.app/health"),
-				},
-				GatusKey:    "cloud-run_vn-(cloud)",
-				GatusStatus: gs("cloud-run_vn-(cloud)"),
-				Pipelines:   ghRows(ghNexus, "deploy-vn-dev.yml"),
-			},
-		},
-		{
-			Name:        "cal",
-			Description: "calendar / ical service",
-			Cloud: &ServiceEnv{
-				URLs: []ServiceURL{
-					u("cloud run", "https://nexus-cal-dev-2tvic4xjjq-uc.a.run.app/health"),
-					u("cal.jredh.com", "https://cal.jredh.com"),
-				},
-				GatusKey:    "cloud-run_cal-(cloud)",
-				GatusStatus: gs("cloud-run_cal-(cloud)"),
-				Pipelines:   ghRows(ghNexus, "deploy-cal-dev.yml"),
-			},
-		},
-		{
-			Name:        "matrix",
-			Description: "this page",
-			Local: &ServiceEnv{
-				URLs:      []ServiceURL{u(":8085", "http://localhost:8085")},
-				Pipelines: giteaRows(giteaNexus, "docker-deploy.yml"),
-			},
-		},
-		{
-			Name:        "gatus",
-			Description: "health monitor",
-			Local: &ServiceEnv{
-				URLs: []ServiceURL{u(":8084", "http://localhost:8084")},
-			},
-		},
-		{
-			Name:        "gitea",
-			Description: "local git + ci",
-			Local: &ServiceEnv{
-				URLs:        []ServiceURL{u(":3000", "http://localhost:3000")},
-				GatusKey:    "local_gitea",
-				GatusStatus: gs("local_gitea"),
-			},
-		},
+	// localEp builds the localhost endpoint for a service.
+	localEp := func(label, href, gatusKey string) Endpoint {
+		return Endpoint{
+			Label:       label,
+			URL:         href,
+			GatusKey:    gatusKey,
+			GatusStatus: gs(gatusKey),
+			IsLocal:     true,
+		}
 	}
 
-	// Repos section: each repo shows all its named pipelines.
+	// cloudEp builds a cloud run endpoint (no custom domain).
+	cloudEp := func(label, href, gatusKey string) Endpoint {
+		return Endpoint{
+			Label:       label,
+			URL:         href,
+			GatusKey:    gatusKey,
+			GatusStatus: gs(gatusKey),
+		}
+	}
+
+	// domainEp builds a custom domain endpoint with the raw Cloud Run URL shown faded beneath.
+	domainEp := func(domain, domainURL, cloudRunURL, gatusKey string) Endpoint {
+		// Extract just the hostname from cloudRunURL for the sub-label.
+		subLabel := strings.TrimPrefix(cloudRunURL, "https://")
+		subLabel = strings.TrimPrefix(subLabel, "http://")
+		subLabel = strings.SplitN(subLabel, "/", 2)[0]
+		return Endpoint{
+			Label:       domain,
+			URL:         domainURL,
+			SubURL:      cloudRunURL,
+			SubLabel:    subLabel,
+			GatusKey:    gatusKey,
+			GatusStatus: gs(gatusKey),
+		}
+	}
+
+	// card builds a ServiceCard.
+	card := func(name, desc, svcName string, eps []Endpoint, pipelines []WorkflowRow) ServiceCard {
+		return ServiceCard{
+			Name:         name,
+			Description:  desc,
+			Endpoints:    eps,
+			Pipelines:    pipelines,
+			LogCount:     logCounts[svcName],
+			LogSearchURL: ooLogsURL(cfg.OpenObserveBrowserURL, svcName),
+		}
+	}
+
+	// Convenience: combined pipeline slices.
+	dockerDeploy := giteaRows(giteaNexus, "docker-deploy.yml")
+	dockerInstall := giteaRows(giteaNexus, "docker-deploy.yml", "install.yml")
+	// vnDeploy includes the Gitea deploy-vn workflow in addition to docker-deploy.
+	vnDeploy := giteaRows(giteaNexus, "deploy-vn.yml", "docker-deploy.yml")
+
+	// ---- App services ----
+	appServices := []ServiceCard{
+		card("hermit", "rust grpc server", "hermit",
+			[]Endpoint{
+				localEp(":9090", "http://localhost:9090", "local_hermit"),
+				cloudEp("nexus-hermit-dev", "https://nexus-hermit-dev-2tvic4xjjq-uc.a.run.app", "cloud-run_hermit (cloud)"),
+			},
+			append(dockerInstall, ghRows(ghNexus, "deploy-hermit-dev.yml")...),
+		),
+		card("secrets", "confessions api", "secrets",
+			[]Endpoint{
+				localEp(":8081", "http://localhost:8081", "local_secrets"),
+				cloudEp("nexus-secrets-dev", "https://nexus-secrets-dev-2tvic4xjjq-uc.a.run.app/health", "cloud-run_secrets (cloud)"),
+				domainEp("secrets.jredh.com", "https://secrets.jredh.com", "https://nexus-secrets-dev-2tvic4xjjq-uc.a.run.app", "domains_secrets.jredh.com"),
+			},
+			append(dockerDeploy, ghRows(ghNexus, "deploy-go-http-dev.yml")...),
+		),
+		card("portal", "web portal / admin", "portal",
+			[]Endpoint{
+				localEp(":8090", "http://localhost:8090/login", "local_portal"),
+				cloudEp("nexus-portal-dev", "https://nexus-portal-dev-2tvic4xjjq-uc.a.run.app", "cloud-run_portal (cloud)"),
+			},
+			append(dockerDeploy, ghRows(ghNexus, "deploy-portal-dev.yml")...),
+		),
+		card("web", "astro frontend", "web",
+			[]Endpoint{
+				localEp(":8083", "http://localhost:8083", "local_web"),
+				cloudEp("nexus-web-dev", "https://nexus-web-dev-2tvic4xjjq-uc.a.run.app", "cloud-run_web (cloud)"),
+				domainEp("portal.jredh.com", "https://portal.jredh.com", "https://nexus-web-dev-2tvic4xjjq-uc.a.run.app", "domains_portal.jredh.com"),
+			},
+			append(dockerDeploy, ghRows(ghNexus, "deploy-web-dev.yml")...),
+		),
+		card("vn", "visual novel engine", "vn",
+			[]Endpoint{
+				localEp(":8082", "http://localhost:8082/health", "local_vn"),
+				cloudEp("nexus-vn-dev", "https://nexus-vn-dev-2tvic4xjjq-uc.a.run.app/health", "cloud-run_vn (cloud)"),
+			},
+			append(vnDeploy, ghRows(ghNexus, "deploy-vn-dev.yml")...),
+		),
+		card("deadman", "sms deadman switch", "deadman",
+			[]Endpoint{
+				localEp(":8095", "http://localhost:8095/health", "local_deadman"),
+				cloudEp("nexus-deadman-dev", "https://nexus-deadman-dev-2tvic4xjjq-uc.a.run.app", "cloud-run_deadman (cloud)"),
+				domainEp("deadman.jredh.com", "https://deadman.jredh.com", "https://nexus-deadman-dev-2tvic4xjjq-uc.a.run.app", "domains_deadman.jredh.com"),
+			},
+			append(dockerDeploy, ghRows(ghNexus, "deploy-deadman-dev.yml")...),
+		),
+		card("ref", "reference / docs", "ref",
+			[]Endpoint{localEp(":8086", "http://localhost:8086", "local_ref")},
+			dockerDeploy,
+		),
+		card("matrix", "this page", "matrix",
+			[]Endpoint{localEp(":8085", "http://localhost:8085", "local_matrix")},
+			dockerDeploy,
+		),
+		card("opencode", "ai coding agent", "opencode",
+			[]Endpoint{localEp(":4096", cfg.OpenCodeURL, "local_opencode")},
+			nil,
+		),
+	}
+
+	// ---- Cloud-only services ----
+	cloudServices := []ServiceCard{
+		card("cal", "calendar / ical", "cal",
+			[]Endpoint{
+				cloudEp("nexus-cal-dev", "https://nexus-cal-dev-2tvic4xjjq-uc.a.run.app/health", "cloud-run_cal (cloud)"),
+				domainEp("cal.jredh.com", "https://cal.jredh.com", "https://nexus-cal-dev-2tvic4xjjq-uc.a.run.app", "domains_cal.jredh.com"),
+			},
+			ghRows(ghNexus, "deploy-cal-dev.yml"),
+		),
+	}
+
+	// ---- Infra (local only) ----
+	infraServices := []ServiceCard{
+		card("postgres", "postgresql 16", "postgres",
+			[]Endpoint{localEp("/tmp/ctl-pg", "", "local_postgres")},
+			nil,
+		),
+		card("vault", "secret management", "vault",
+			[]Endpoint{localEp(":8200", "http://localhost:8200", "local_vault")},
+			nil,
+		),
+		card("gitea", "local git + ci", "gitea",
+			[]Endpoint{localEp(":3000", "http://localhost:3000", "local_gitea")},
+			nil,
+		),
+		card("openobserve", "log aggregation", "openobserve",
+			[]Endpoint{localEp(":5080", cfg.OpenObserveBrowserURL, "local_openobserve")},
+			nil,
+		),
+		card("vector", "log shipper", "vector",
+			[]Endpoint{localEp("docker", "", "local_vector")},
+			nil,
+		),
+		card("act_runner", "gitea ci runner", "act_runner",
+			[]Endpoint{localEp("docker", "", "local_act_runner")},
+			nil,
+		),
+		card("gatus", "health monitor", "gatus",
+			[]Endpoint{localEp(":8084", "http://localhost:8084", "local_gatus")},
+			nil,
+		),
+	}
+
 	repos := []RepoGroup{
 		{
 			Name:      "nexus",
 			GitHubURL: "https://github.com/jredh-dev/nexus",
-			GiteaURL:  "http://localhost:3000/jredhbot/nexus",
+			GiteaURL:  "http://localhost:3000/jredh-dev/nexus",
 			Pipelines: append(
-				ghRows(ghNexus,
-					"ci.yml",
-					"integration-tests-dev.yml",
-				),
-				giteaRows(giteaNexus, "docker-deploy.yml", "install.yml")...,
+				ghRows(ghNexus, "ci.yml", "integration-tests-dev.yml"),
+				giteaRows(giteaNexus, "ci.yml", "deploy-vn.yml", "docker-deploy.yml", "install.yml")...,
 			),
 		},
 		{
 			Name:      "ctl",
 			GitHubURL: "https://github.com/jredh-dev/ctl",
-			GiteaURL:  "http://localhost:3000/jredhbot/ctl",
-			// GitHub ci.yml + Gitea install.yml (auto-installs binary on merge)
+			GiteaURL:  "http://localhost:3000/jredh-dev/ctl",
 			Pipelines: append(
 				ghRows(ghCtl, "ci.yml"),
 				giteaRows(giteaCtl, "install.yml")...,
@@ -513,18 +529,19 @@ func buildPageData(
 		},
 	}
 
-	// Display the fetch time in Pacific time (PST/PDT) — where this server runs.
-	// time.LoadLocation uses the tzdata embedded in the Go binary (or the host's
-	// zoneinfo); "America/Los_Angeles" covers both PST (UTC-8) and PDT (UTC-7).
 	loc, err := time.LoadLocation("America/Los_Angeles")
 	if err != nil {
-		// Fallback: UTC with an explicit suffix so it's never silently wrong.
 		loc = time.UTC
 	}
 	return TemplateData{
-		Services:  services,
-		Repos:     repos,
-		Errors:    errors,
-		FetchedAt: time.Now().In(loc).Format("15:04:05 MST"),
+		GatusURL:       cfg.GatusURL,
+		OpenObserveURL: cfg.OpenObserveBrowserURL,
+		OpenCodeURL:    cfg.OpenCodeURL,
+		AppServices:    appServices,
+		CloudServices:  cloudServices,
+		InfraServices:  infraServices,
+		Repos:          repos,
+		Errors:         errors,
+		FetchedAt:      time.Now().In(loc).Format("15:04:05 MST"),
 	}
 }

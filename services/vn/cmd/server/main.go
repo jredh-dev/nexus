@@ -8,7 +8,7 @@
 //
 //	PORT           HTTP listen port (default: 8080)
 //	DATABASE_URL   PostgreSQL connection string
-//	               (default: "host=/tmp/ctl-pg dbname=vn user=jredh")
+//	               (default: "host=localhost port=5432 dbname=vn user=jredh")
 //	STORY_DIR      Path to directory containing YAML story files
 //	               (default: "./stories")
 //	HOT_RELOAD     Enable fsnotify hot-reload of story files ("true"/"false")
@@ -51,7 +51,7 @@ func main() {
 	flag.Parse()
 
 	port := envOr("PORT", "8080")
-	dbURL := envOr("DATABASE_URL", "host=/tmp/ctl-pg dbname=vn user=jredh")
+	dbURL := envOr("DATABASE_URL", "host=localhost port=5432 dbname=vn user=jredh")
 	storyDir := envOr("STORY_DIR", "./stories")
 	hotReload := envOr("HOT_RELOAD", "true")
 	adminEnabled := envOr("ADMIN_ENABLED", "false") == "true"

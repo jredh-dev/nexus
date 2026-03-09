@@ -65,6 +65,43 @@ func AdminMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// APIAuthMiddleware requires a valid session cookie, returning JSON 401 on
+// failure instead of an HTML redirect. Use this on /api/* routes that are
+// called by the Astro frontend via fetch(), not by browser navigation.
+func APIAuthMiddleware(authService *auth.Service) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			cookie, err := r.Cookie("session")
+			if err != nil || cookie.Value == "" {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte(`{"error":"authentication required"}`))
+				return
+			}
+
+			user, _, err := authService.ValidateSession(cookie.Value)
+			if err != nil {
+				log.Printf("API session validation error: %v", err)
+				clearSessionCookie(w)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte(`{"error":"authentication required"}`))
+				return
+			}
+			if user == nil {
+				clearSessionCookie(w)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte(`{"error":"authentication required"}`))
+				return
+			}
+
+			ctx := context.WithValue(r.Context(), UserContextKey, user)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
 // GetUserFromContext extracts the authenticated user from request context.
 func GetUserFromContext(ctx context.Context) (*models.User, bool) {
 	user, ok := ctx.Value(UserContextKey).(*models.User)

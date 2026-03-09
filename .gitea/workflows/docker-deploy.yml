@@ -18,6 +18,16 @@ jobs:
         with:
           fetch-depth: 2
 
+      - name: Sync source checkout
+        env:
+          INTERNAL_GIT_TOKEN: ${{ secrets.INTERNAL_GIT_TOKEN }}
+        run: |
+          # Pull latest main into work/source so docker compose build context is current.
+          # Use http://gitea:3000 (Docker internal hostname) — not localhost:3000,
+          # which is unreachable from inside the runner container.
+          git -C /Users/jredh/Development/agentic/work/source/jredh-dev/nexus \
+            pull "http://jredhbot:${INTERNAL_GIT_TOKEN}@gitea:3000/jredh-dev/nexus.git" main --ff-only
+
       - name: Detect changes and deploy
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
@@ -27,7 +37,14 @@ jobs:
 
           notify() {
             local service=$1 status=$2
-            ctl notify discord --event deploy --service "$service" --env local --status "$status" 2>/dev/null || true
+            # Post a Discord embed directly — no ctl dependency.
+            if [ -n "${DISCORD_WEBHOOK_URL}" ]; then
+              color=3066993   # green
+              [ "$status" = "failure" ] && color=15158332  # red
+              curl -s -X POST -H "Content-Type: application/json" \
+                -d "{\"embeds\":[{\"title\":\"deploy · ${service} · ${status}\",\"color\":${color},\"description\":\"env: local\"}]}" \
+                "${DISCORD_WEBHOOK_URL}" > /dev/null || true
+            fi
           }
 
           # hermit — Rust gRPC server

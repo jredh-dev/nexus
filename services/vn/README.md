@@ -27,11 +27,10 @@ services/vn/
 
 ## Database
 
-PostgreSQL 16 (native, Unix socket). Database: `vn`.
+PostgreSQL 16 (Docker, TCP). Database: `vn`.
 
 ```bash
-export PATH="/usr/local/Cellar/postgresql@16/16.13/bin:$PATH"
-psql -h /tmp/ctl-pg -d vn
+psql -h localhost -d vn
 ```
 
 **Tables:** `videos`, `significant_events`, `subtitles`, `readers`, `votes`, `schema_version`
@@ -42,8 +41,8 @@ psql -h /tmp/ctl-pg -d vn
 # Build server
 go build ./services/vn/cmd/server
 
-# Run locally (requires PostgreSQL at /tmp/ctl-pg with database 'vn')
-DATABASE_URL="host=/tmp/ctl-pg dbname=vn user=jredh" \
+# Run locally (requires PostgreSQL at localhost:5432 with database 'vn')
+DATABASE_URL="host=localhost port=5432 dbname=vn user=jredh" \
 STORY_DIR=services/vn/stories \
 HOT_RELOAD=true \
 go run ./services/vn/cmd/server

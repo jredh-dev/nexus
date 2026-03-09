@@ -18,6 +18,7 @@
       --green:   #3fb950;
       --red:     #f85149;
       --yellow:  #d29922;
+      --purple:  #bc8cff;
       --radius:  6px;
       --gap:     14px;
     }
@@ -32,15 +33,43 @@
       max-width: 1200px;
     }
 
-    /* ---- header ---- */
-    header {
+    /* ---- top nav ---- */
+    nav {
       display: flex;
-      align-items: baseline;
-      gap: 16px;
+      align-items: center;
+      gap: 10px;
       margin-bottom: 28px;
+      flex-wrap: wrap;
     }
-    h1 { font-size: 18px; font-weight: 600; color: var(--accent); letter-spacing: 0.05em; }
-    .fetched-at { color: var(--muted); font-size: 11px; }
+    .nav-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+      margin-right: 8px;
+    }
+    .fetched-at {
+      color: var(--muted);
+      font-size: 11px;
+      margin-left: auto;
+    }
+    /* big nav buttons linking to monitoring tools */
+    .nav-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 600;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .nav-btn .nav-icon { font-size: 14px; }
 
     /* ---- section ---- */
     section { margin-bottom: 28px; }
@@ -82,7 +111,24 @@
     .card-desc {
       color: var(--muted);
       font-size: 11px;
+      flex: 1;
     }
+    /* log count badge — shows recent log lines from OpenObserve */
+    .log-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 1px 6px;
+      background: rgba(188,140,255,0.12);
+      border: 1px solid rgba(188,140,255,0.25);
+      border-radius: 10px;
+      color: var(--purple);
+      font-size: 10px;
+      font-weight: 600;
+      text-decoration: none;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .log-badge:hover { border-color: var(--purple); }
 
     /* ---- env rows (local / cloud) ---- */
     .env-row {
@@ -114,14 +160,35 @@
       font-size: 11px;
     }
     .env-urls a:hover { color: var(--accent); }
-
-    /* ---- pipelines list (wraps naturally) ---- */
-    .pipelines {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-      align-items: center;
+    /* no-link URL (e.g. postgres socket path) */
+    .env-urls span {
+      color: var(--muted);
+      font-size: 11px;
     }
+
+    /* ---- pipelines table ---- */
+    .pipelines {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      border-top: 1px solid var(--border);
+      margin-top: 6px;
+      padding-top: 4px;
+    }
+    .pipelines td {
+      padding: 2px 4px;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    .pipelines td:first-child { padding-left: 0; width: 14px; }
+    .pipelines td:nth-child(2) { width: 100%; }  /* workflow name stretches */
+    .pipelines td:last-child   { padding-right: 0; color: var(--muted); font-size: 10px; text-align: right; }
+    .pipelines tr:hover td { background: rgba(255,255,255,0.03); }
+    /* job name: yellow, no underline */
+    .pipelines a { color: var(--yellow); text-decoration: none; }
+    .pipelines a:hover { color: var(--accent); }
+    .pipelines span.job-name { color: var(--yellow); }
+    .pipelines .run-num { color: var(--muted); font-size: 10px; }
 
     /* ---- status dot ---- */
     .dot {
@@ -134,45 +201,15 @@
     .dot-up      { background: var(--green); }
     .dot-down    { background: var(--red); box-shadow: 0 0 4px var(--red); }
     .dot-unknown { background: var(--border); }
+    /* CI status dots reuse the same dot element */
+    .dot.ci-success { background: var(--green); }
+    .dot.ci-failure { background: var(--red); box-shadow: 0 0 4px var(--red); }
+    .dot.ci-pending { background: var(--yellow); }
+    .dot.ci-unknown { background: var(--border); }
 
-    /* ---- ci pill ---- */
-    .ci-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      padding: 1px 6px;
-      border-radius: 10px;
-      font-size: 10px;
-      font-weight: 600;
-      text-decoration: none;
-      border: 1px solid transparent;
-      white-space: nowrap;
-    }
-    .ci-success { background: rgba(63,185,80,0.15); color: var(--green); border-color: rgba(63,185,80,0.3); }
-    .ci-failure { background: rgba(248,81,73,0.15); color: var(--red);   border-color: rgba(248,81,73,0.3); }
-    .ci-pending { background: rgba(210,153,34,0.15); color: var(--yellow); border-color: rgba(210,153,34,0.3); }
-    .ci-unknown { background: transparent; color: var(--muted); border-color: var(--border); }
-
-    /* pending pill pulses to signal an in-flight run */
-    @keyframes pulse-pending {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.45; }
-    }
-    .ci-pending { animation: pulse-pending 1.6s ease-in-out infinite; }
-
-    /* run number inside pill — slightly dimmer than the label */
-    .run-num {
-      opacity: 0.65;
-      font-weight: 400;
-    }
-
-    /* time-ago stamp after the pill — very quiet */
-    .run-age {
-      color: var(--muted);
-      font-size: 9px;
-      font-weight: 400;
-      white-space: nowrap;
-    }
+    /* pending CI dot pulses */
+    @keyframes pulse-pending { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .dot.ci-pending { animation: pulse-pending 1.6s ease-in-out infinite; }
 
     /* ---- repo grid ---- */
     .repo-grid {
@@ -213,58 +250,57 @@
 </head>
 <body>
 
-<header>
-  <h1>matrix</h1>
+<!-- ================================================================ -->
+<!-- TOP NAV: title + monitoring tool links + fetch timestamp          -->
+<!-- ================================================================ -->
+<nav>
+  <span class="nav-title">matrix</span>
+  <a class="nav-btn" href="{{.GatusURL}}" target="_blank">
+    <span class="nav-icon">◉</span> gatus
+  </a>
+  <a class="nav-btn" href="{{.OpenObserveURL}}" target="_blank">
+    <span class="nav-icon">◈</span> openobserve
+  </a>
+  <a class="nav-btn" href="{{.OpenCodeURL}}" target="_blank">
+    <span class="nav-icon">◆</span> opencode
+  </a>
   <span class="fetched-at">fetched {{.FetchedAt}}</span>
-</header>
+</nav>
 
 <!-- ================================================================ -->
-<!-- SERVICES                                                           -->
+<!-- APP SERVICES (local + cloud)                                       -->
 <!-- ================================================================ -->
 <section>
-  <h2>services</h2>
+  <h2>app services</h2>
   <div class="service-grid">
-    {{range .Services}}
-    <div class="card">
-      <div class="card-header">
-        <span class="card-name">{{.Name}}</span>
-        <span class="card-desc">{{.Description}}</span>
-      </div>
+    {{range .AppServices}}
+    {{template "serviceCard" .}}
+    {{end}}
+  </div>
+</section>
 
-      {{if .Local}}
-      <div class="env-row">
-        <span class="env-label">local</span>
-        <span class="dot {{statusClass .Local.GatusStatus}}" title="{{statusText .Local.GatusStatus}}"></span>
-        <div class="env-urls">
-          {{range .Local.URLs}}<a href="{{.Href}}" target="_blank">{{.Label}}</a>{{end}}
-        </div>
-        {{if .Local.Pipelines}}
-        <div class="pipelines">
-          {{range .Local.Pipelines}}
-            {{template "pill" .}}
-          {{end}}
-        </div>
-        {{end}}
-      </div>
-      {{end}}
+<!-- ================================================================ -->
+<!-- CLOUD RUN (cloud-only services)                                    -->
+<!-- ================================================================ -->
+{{if .CloudServices}}
+<section>
+  <h2>cloud run</h2>
+  <div class="service-grid">
+    {{range .CloudServices}}
+    {{template "serviceCard" .}}
+    {{end}}
+  </div>
+</section>
+{{end}}
 
-      {{if .Cloud}}
-      <div class="env-row">
-        <span class="env-label">cloud</span>
-        <span class="dot {{statusClass .Cloud.GatusStatus}}" title="{{statusText .Cloud.GatusStatus}}"></span>
-        <div class="env-urls">
-          {{range .Cloud.URLs}}<a href="{{.Href}}" target="_blank">{{.Label}}</a>{{end}}
-        </div>
-        {{if .Cloud.Pipelines}}
-        <div class="pipelines">
-          {{range .Cloud.Pipelines}}
-            {{template "pill" .}}
-          {{end}}
-        </div>
-        {{end}}
-      </div>
-      {{end}}
-    </div>
+<!-- ================================================================ -->
+<!-- INFRA                                                              -->
+<!-- ================================================================ -->
+<section>
+  <h2>infra</h2>
+  <div class="service-grid">
+    {{range .InfraServices}}
+    {{template "serviceCard" .}}
     {{end}}
   </div>
 </section>
@@ -283,11 +319,9 @@
         {{if .GiteaURL}}<a href="{{.GiteaURL}}" target="_blank">gitea</a>{{end}}
       </div>
       {{if .Pipelines}}
-      <div class="pipelines">
-        {{range .Pipelines}}
-          {{template "pill" .}}
-        {{end}}
-      </div>
+      <table class="pipelines">
+        {{range .Pipelines}}{{template "pipelineRow" .}}{{end}}
+      </table>
       {{end}}
     </div>
     {{end}}
@@ -311,20 +345,57 @@
 </body>
 </html>
 
-{{/* ---- pill sub-template: renders one WorkflowRow as a CI pill + age stamp ---- */}}
-{{define "pill"}}
+{{/* ---- serviceCard sub-template: renders one ServiceCard (flat Endpoint model) ---- */}}
+{{define "serviceCard"}}
+<div class="card">
+  <div class="card-header">
+    <span class="card-name">{{.Name}}</span>
+    <span class="card-desc">{{.Description}}</span>
+    {{if gt .LogCount 0}}
+    <a class="log-badge" href="{{.LogSearchURL}}" target="_blank" title="log lines in last 5 min">{{.LogCount}} logs</a>
+    {{end}}
+  </div>
+
+  {{/* one row per endpoint: dot + label/link, with optional faded sub-URL for domain entries */}}
+  {{range .Endpoints}}
+  <div class="env-row">
+    <span class="dot {{statusClass .GatusStatus}}" title="{{statusText .GatusStatus}}"></span>
+    <div class="env-urls">
+      {{if .URL}}
+        <a href="{{.URL}}" target="_blank">{{if .IsLocal}}localhost{{end}}{{.Label}}</a>
+      {{else}}
+        <span>{{if .IsLocal}}localhost{{end}}{{.Label}}</span>
+      {{end}}
+      {{if .SubURL}}
+      <br><a href="{{.SubURL}}" target="_blank" style="color:var(--muted);font-size:10px;">{{.SubLabel}}</a>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+
+  {{/* all pipelines for this service (gitea + github, all envs) */}}
+  {{if .Pipelines}}
+  <table class="pipelines">
+    {{range .Pipelines}}{{template "pipelineRow" .}}{{end}}
+  </table>
+  {{end}}
+</div>
+{{end}}
+
+{{/* ---- pipelineRow sub-template: one <tr> per workflow run ---- */}}
+{{define "pipelineRow"}}
   {{- $age := timeAgo .UpdatedAt -}}
   {{- $num := .RunNumber -}}
-  {{- if .URL}}
-  <a class="ci-pill {{ciClass .Status}}" href="{{.URL}}" target="_blank"
-     title="{{if $num}}#{{$num}} {{end}}{{if $age}}{{$age}}{{end}}">
-    {{ciText .Status}} {{.Label}}{{if $num}} <span class="run-num">#{{$num}}</span>{{end}}
-  </a>
-  {{- else}}
-  <span class="ci-pill {{ciClass .Status}}"
-        title="{{if $num}}#{{$num}} {{end}}{{if $age}}{{$age}}{{end}}">
-    {{ciText .Status}} {{.Label}}{{if $num}} <span class="run-num">#{{$num}}</span>{{end}}
-  </span>
-  {{- end}}
-  {{- if $age}}<span class="run-age">{{$age}}</span>{{end}}
+  <tr>
+    <td><span class="dot {{ciClass .Status}}" title="{{ciText .Status}}"></span></td>
+    <td>
+      {{- if .URL -}}
+      <a href="{{.URL}}" target="_blank">{{.Label}}</a>
+      {{- else -}}
+      <span class="job-name">{{.Label}}</span>
+      {{- end -}}
+    </td>
+    <td class="run-num">{{if $num}}#{{$num}}{{end}}</td>
+    <td>{{$age}}</td>
+  </tr>
 {{- end}}

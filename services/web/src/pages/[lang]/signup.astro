@@ -17,17 +17,23 @@ if (Astro.request.method === 'POST') {
   // Rewrite portal redirects to locale-prefixed paths.
   if (resp.status >= 300 && resp.status < 400) {
     const location = resp.headers.get('Location') || '';
+    // Build a clean redirect — never spread resp.headers, which can produce
+    // multi-value Location strings like "/dashboard, /en/dashboard".
+    const redirectHeaders: Record<string, string> = {};
+    const setCookie = resp.headers.get('set-cookie');
+    if (setCookie) redirectHeaders['set-cookie'] = setCookie;
+
     if (location === '/dashboard' || location.endsWith('/dashboard')) {
       return new Response(null, {
         status: resp.status,
-        headers: { ...Object.fromEntries(resp.headers), Location: localePath(locale, '/dashboard') },
+        headers: { ...redirectHeaders, Location: localePath(locale, '/dashboard') },
       });
     }
     if (location.startsWith('/signup')) {
       const search = location.includes('?') ? location.substring(location.indexOf('?')) : '';
       return new Response(null, {
         status: resp.status,
-        headers: { ...Object.fromEntries(resp.headers), Location: localePath(locale, '/signup') + search },
+        headers: { ...redirectHeaders, Location: localePath(locale, '/signup') + search },
       });
     }
   }
