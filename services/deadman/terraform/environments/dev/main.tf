@@ -31,8 +31,6 @@ provider "google-beta" {
 locals {
   environment  = "dev"
   service_name = "nexus-deadman-${local.environment}"
-  github_org   = "jredh-dev"
-  github_repo  = "nexus"
 
   common_labels = {
     app         = "nexus-deadman"
@@ -41,21 +39,12 @@ locals {
   }
 }
 
-# Module: GCP Project APIs — reuse portal's project module
-module "project" {
-  source     = "../../../../portal/terraform/modules/project"
-  project_id = var.project_id
-}
-
-# Module: IAM and Workload Identity Federation — reuse portal's IAM module
-module "iam" {
-  source      = "../../../../portal/terraform/modules/iam"
-  project_id  = var.project_id
-  environment = local.environment
-  github_org  = local.github_org
-  github_repo = local.github_repo
-
-  depends_on = [module.project]
+# Data source: reference the existing github-actions-ci service account.
+# The portal IAM module creates "github-actions-{env}" = "github-actions-dev", which does
+# NOT match the real SA name "github-actions-ci". Using a data source avoids any replacement.
+data "google_service_account" "github_actions" {
+  project    = var.project_id
+  account_id = "github-actions-ci"
 }
 
 # Module: Cloud SQL (PostgreSQL 16, us-west1, shared instance nexus-dev-west1)
@@ -66,9 +55,7 @@ module "cloud_sql" {
   instance_name         = "nexus-dev-west1"
   database_name         = "deadman"
   db_user               = "deadman"
-  service_account_email = module.iam.service_account_email
-
-  depends_on = [module.project, module.iam]
+  service_account_email = data.google_service_account.github_actions.email
 }
 
 # Module: Secret Manager
@@ -76,14 +63,12 @@ module "secrets" {
   source                = "../../modules/secrets"
   project_id            = var.project_id
   environment           = local.environment
-  service_account_email = module.iam.service_account_email
+  service_account_email = data.google_service_account.github_actions.email
   twilio_account_sid    = var.twilio_account_sid
   twilio_auth_token     = var.twilio_auth_token
   twilio_from           = var.twilio_from
   deadman_phone         = var.deadman_phone
   deadman_db_password   = var.deadman_db_password
-
-  depends_on = [module.project, module.iam]
 }
 
 # Module: Cloud DNS — CNAME for deadman.jredh.com
@@ -101,7 +86,7 @@ module "cloud_run" {
   region                = var.region
   service_name          = local.service_name
   image                 = var.cloud_run_image
-  service_account_email = module.iam.service_account_email
+  service_account_email = data.google_service_account.github_actions.email
 
   # Non-secret config.
   # NOTE: do NOT include PORT here — Cloud Run reserves it.
@@ -132,5 +117,5 @@ module "cloud_run" {
 
   labels = local.common_labels
 
-  depends_on = [module.project, module.iam, module.secrets, module.cloud_sql]
+  depends_on = [module.secrets, module.cloud_sql]
 }

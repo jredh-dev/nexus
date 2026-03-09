@@ -1,8 +1,9 @@
 name: CI
 
 # Runs on workstream_* branches — the Gitea quality gate.
-# On pass, pushes directly to the current rc/vX.Y.Z branch on GitHub.
-# No feat/* branches. No GitHub PRs from CI. Human reviews rc/* → main on GitHub.
+# Workstream CI is lint + build + test only. Propagation to GitHub rc/* happens
+# exclusively via propagate-main.yml when the workstream merges to Gitea main.
+# This avoids race conditions where multiple workstreams fight over rc/*.
 on:
   push:
     branches-ignore:
@@ -53,45 +54,6 @@ jobs:
           export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
           go test ./...
 
-  propagate:
-    name: Propagate to GitHub rc/vX.Y.Z
-    runs-on: local
-    needs: [lint, build, test]
-    if: success()
-    env:
-      GITHUB_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Determine current RC branch
-        id: rc
-        run: |
-          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
-          rc=$(curl -s \
-            -H "Authorization: token ${GITHUB_TOKEN}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/jredh-dev/nexus/branches?per_page=100" \
-            | grep '"name"' \
-            | grep '"rc/v' \
-            | sed 's/.*"name": "\(.*\)".*/\1/' \
-            | sort -rV \
-            | head -1)
-          if [ -z "$rc" ]; then
-            echo "No rc/vX.Y.Z branch found on GitHub — cannot propagate"
-            exit 1
-          fi
-          echo "rc_branch=${rc}" >> $GITHUB_OUTPUT
-          echo "Pushing to: ${rc}"
-
-      - name: Push to GitHub rc/vX.Y.Z
-        run: |
-          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
-          git push \
-            "https://${GITHUB_TOKEN}@github.com/jredh-dev/nexus.git" \
-            "HEAD:refs/heads/${{ steps.rc.outputs.rc_branch }}"
-
   notify-failure:
     name: Notify Discord on Failure
     runs-on: local
@@ -115,3 +77,4 @@ jobs:
               -d '{"embeds":[{"title":"build nexus","description":"env: local | status: failure","color":15158332}]}' \
               2>/dev/null || true
           fi
+

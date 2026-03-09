@@ -75,6 +75,12 @@ resource "google_secret_manager_secret" "twilio_account_sid" {
 resource "google_secret_manager_secret_version" "twilio_account_sid" {
   secret      = google_secret_manager_secret.twilio_account_sid.id
   secret_data = var.twilio_account_sid
+
+  # Terraform cannot read back secret values to compare — always shows a diff.
+  # Ignore secret_data to prevent forced replacement on every plan.
+  lifecycle {
+    ignore_changes = [secret_data]
+  }
 }
 
 resource "google_secret_manager_secret_iam_member" "twilio_account_sid_access" {
@@ -106,6 +112,10 @@ resource "google_secret_manager_secret" "twilio_auth_token" {
 resource "google_secret_manager_secret_version" "twilio_auth_token" {
   secret      = google_secret_manager_secret.twilio_auth_token.id
   secret_data = var.twilio_auth_token
+
+  lifecycle {
+    ignore_changes = [secret_data]
+  }
 }
 
 resource "google_secret_manager_secret_iam_member" "twilio_auth_token_access" {
@@ -138,6 +148,10 @@ resource "google_secret_manager_secret" "twilio_from" {
 resource "google_secret_manager_secret_version" "twilio_from" {
   secret      = google_secret_manager_secret.twilio_from.id
   secret_data = var.twilio_from
+
+  lifecycle {
+    ignore_changes = [secret_data]
+  }
 }
 
 resource "google_secret_manager_secret_iam_member" "twilio_from_access" {
@@ -169,6 +183,10 @@ resource "google_secret_manager_secret" "deadman_phone" {
 resource "google_secret_manager_secret_version" "deadman_phone" {
   secret      = google_secret_manager_secret.deadman_phone.id
   secret_data = var.deadman_phone
+
+  lifecycle {
+    ignore_changes = [secret_data]
+  }
 }
 
 resource "google_secret_manager_secret_iam_member" "deadman_phone_access" {
@@ -200,6 +218,10 @@ resource "google_secret_manager_secret" "deadman_db_password" {
 resource "google_secret_manager_secret_version" "deadman_db_password" {
   secret      = google_secret_manager_secret.deadman_db_password.id
   secret_data = var.deadman_db_password
+
+  lifecycle {
+    ignore_changes = [secret_data]
+  }
 }
 
 resource "google_secret_manager_secret_iam_member" "deadman_db_password_access" {
