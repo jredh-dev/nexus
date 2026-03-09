@@ -8,7 +8,7 @@ on:
     branches: [main]
 
 env:
-  AGENTIC_ROOT: /Users/jredh/Development/agentic
+  AGENTIC_ROOT: /agentic
 
 jobs:
   deploy:
@@ -25,7 +25,7 @@ jobs:
           # Pull latest main into work/source so docker compose build context is current.
           # Use http://gitea:3000 (Docker internal hostname) — not localhost:3000,
           # which is unreachable from inside the runner container.
-          git -C /Users/jredh/Development/agentic/work/source/jredh-dev/nexus \
+          git -C /agentic/work/source/jredh-dev/nexus \
             pull "http://jredhbot:${INTERNAL_GIT_TOKEN}@gitea:3000/jredh-dev/nexus.git" main --ff-only
 
       - name: Detect changes and deploy
