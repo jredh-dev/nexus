@@ -33,5 +33,11 @@ jobs:
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
-          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
-          ctl notify discord --event deploy --service vn --env local --status "${{ job.status }}" 2>/dev/null || true
+          status="${{ job.status }}"
+          if [ -n "${DISCORD_WEBHOOK_URL}" ]; then
+            color=3066993   # green
+            [ "$status" = "failure" ] && color=15158332  # red
+            curl -s -X POST -H "Content-Type: application/json" \
+              -d "{\"embeds\":[{\"title\":\"deploy · vn · ${status}\",\"color\":${color},\"description\":\"env: local\"}]}" \
+              "${DISCORD_WEBHOOK_URL}" > /dev/null || true
+          fi
