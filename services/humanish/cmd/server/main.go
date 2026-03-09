@@ -166,28 +166,25 @@ func run(cfg config) error {
 	}
 }
 
-// sendInit reads the AGENTS.md hierarchy and sends a startup message to
-// OpenCode so it ingests instructions before any diffs arrive.
+// sendInit sends a lean startup message to OpenCode.
+//
+// We do NOT embed the full AGENTS.md hierarchy in the message body — the
+// OpenCode server already injects the project AGENTS.md automatically, and
+// adding another large context blob risks exceeding the provider's context
+// window (which triggers a runaway compaction loop).  Instead we tell
+// OpenCode where the humanish files live and ask it to read them directly.
 func sendInit(cfg config, oc *opencode.Client) error {
-	agentFiles, err := agents.Collect(cfg.dir)
-	if err != nil {
-		return err
-	}
+	initMsg := fmt.Sprintf(`humanish watcher started in "%s" mode.
 
-	ctx := agents.MergedContext(agentFiles)
+Humanish directory: %s
 
-	initMsg := fmt.Sprintf(`You are the humanish agent. Your role is defined in the AGENTS.md files below.
-
-Please read all AGENTS.md instructions carefully. You are now running in "%s" mode.
-
-Your working directory is: %s
-
-After reading the instructions, confirm you understand your role in one short paragraph.
-If any instructions are unclear or missing, note what you need. Do NOT make changes yet.
-Wait for the first diff to arrive.`, cfg.branch, cfg.dir)
+Please read %s/AGENTS.md and any *.AGENTS.md files in that directory.
+Confirm you understand your role in one short paragraph.
+Do NOT make any changes yet — wait for the first file-change diff.`,
+		cfg.branch, cfg.dir, cfg.dir)
 
 	slog.Info("sending initialization message to OpenCode")
-	reply, err := oc.Send(ctx, initMsg)
+	reply, err := oc.Send("", initMsg)
 	if err != nil {
 		return fmt.Errorf("init send: %w", err)
 	}
