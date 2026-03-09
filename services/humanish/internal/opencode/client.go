@@ -20,19 +20,25 @@ import (
 
 // Client talks to the OpenCode headless server.
 type Client struct {
-	url      string
-	username string
-	password string
-	http     *http.Client
+	url        string
+	username   string
+	password   string
+	providerID string // e.g. "github-copilot"
+	modelID    string // e.g. "claude-sonnet-4.6"
+	http       *http.Client
 }
 
 // New creates a Client. url should be e.g. "http://opencode:4096".
 // password is OPENCODE_SERVER_PASSWORD on the server.
-func New(url, password string) *Client {
+// providerID and modelID control which model is used for each session.
+// If empty, the OpenCode server's default model is used.
+func New(url, password, providerID, modelID string) *Client {
 	return &Client{
-		url:      strings.TrimRight(url, "/"),
-		username: "opencode",
-		password: password,
+		url:        strings.TrimRight(url, "/"),
+		username:   "opencode",
+		password:   password,
+		providerID: providerID,
+		modelID:    modelID,
 		http: &http.Client{
 			Timeout: 10 * time.Minute, // model responses can be slow
 		},
@@ -42,6 +48,12 @@ func New(url, password string) *Client {
 // sessionResp is the minimal shape returned by POST /session.
 type sessionResp struct {
 	ID string `json:"id"`
+}
+
+// sessionReq is the optional body for POST /session.
+type sessionReq struct {
+	ProviderID string `json:"providerID,omitempty"`
+	ModelID    string `json:"modelID,omitempty"`
 }
 
 // messageReq is the body for POST /session/:id/message.
@@ -107,7 +119,16 @@ func (c *Client) Health() error {
 }
 
 func (c *Client) createSession() (string, error) {
-	req, err := http.NewRequest("POST", c.url+"/session", bytes.NewBufferString("{}"))
+	body := sessionReq{
+		ProviderID: c.providerID,
+		ModelID:    c.modelID,
+	}
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequest("POST", c.url+"/session", bytes.NewReader(encoded))
 	if err != nil {
 		return "", err
 	}

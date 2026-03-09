@@ -10,6 +10,8 @@
 //	HUMANISH_DIR             path to the humanish volume (required)
 //	OPENCODE_URL             OpenCode server URL (default: http://opencode:4096)
 //	OPENCODE_PASSWORD        OpenCode server password (required)
+//	OPENCODE_PROVIDER_ID     OpenCode provider ID (default: github-copilot)
+//	OPENCODE_MODEL_ID        OpenCode model ID (default: claude-sonnet-4.6)
 //	HUMANISH_QUIET_SECONDS   seconds of file silence before committing (default: 5)
 //	HUMANISH_MAX_QUIET_SEC   hard max wait per file in seconds (default: 300)
 //	HUMANISH_AUDIT_LOG       path to audit log file (default: <HUMANISH_DIR>/work/humanish-audit.log)
@@ -53,21 +55,25 @@ func main() {
 
 // config holds all runtime configuration.
 type config struct {
-	dir          string
-	opencodeURL  string
-	opencodePass string
-	quietSeconds int
-	maxQuietSec  int
-	auditLog     string
-	branch       string
+	dir              string
+	opencodeURL      string
+	opencodePass     string
+	opencodeProvider string
+	opencodeModel    string
+	quietSeconds     int
+	maxQuietSec      int
+	auditLog         string
+	branch           string
 }
 
 func loadConfig() (config, error) {
 	c := config{
-		dir:          os.Getenv("HUMANISH_DIR"),
-		opencodeURL:  envOr("OPENCODE_URL", "http://opencode:4096"),
-		opencodePass: os.Getenv("OPENCODE_PASSWORD"),
-		branch:       envOr("HUMANISH_BRANCH", "on-demand"),
+		dir:              os.Getenv("HUMANISH_DIR"),
+		opencodeURL:      envOr("OPENCODE_URL", "http://opencode:4096"),
+		opencodePass:     os.Getenv("OPENCODE_PASSWORD"),
+		opencodeProvider: envOr("OPENCODE_PROVIDER_ID", "github-copilot"),
+		opencodeModel:    envOr("OPENCODE_MODEL_ID", "claude-sonnet-4.6"),
+		branch:           envOr("HUMANISH_BRANCH", "on-demand"),
 	}
 
 	if c.dir == "" {
@@ -91,6 +97,8 @@ func run(cfg config) error {
 	slog.Info("humanish starting",
 		"dir", cfg.dir,
 		"opencode_url", cfg.opencodeURL,
+		"provider", cfg.opencodeProvider,
+		"model", cfg.opencodeModel,
 		"quiet_seconds", cfg.quietSeconds,
 		"max_quiet_sec", cfg.maxQuietSec,
 		"branch", cfg.branch,
@@ -113,7 +121,7 @@ func run(cfg config) error {
 	}
 
 	// Build OpenCode client.
-	oc := opencode.New(cfg.opencodeURL, cfg.opencodePass)
+	oc := opencode.New(cfg.opencodeURL, cfg.opencodePass, cfg.opencodeProvider, cfg.opencodeModel)
 
 	// Wait for OpenCode server to be healthy (retry up to 60s).
 	slog.Info("waiting for OpenCode server", "url", cfg.opencodeURL)
