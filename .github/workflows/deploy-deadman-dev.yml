@@ -14,12 +14,12 @@ on:
 
 env:
   GCP_PROJECT_ID: dea-noctua
-  GCP_REGION: us-central1
+  GCP_REGION: us-west1
   SERVICE_NAME: nexus-deadman-dev
   IMAGE_NAME: gcr.io/dea-noctua/nexus-deadman-dev
   CUSTOM_DOMAIN: deadman.jredh.com
   # Cloud SQL instance connection name for Cloud Run Auth Proxy socket.
-  CLOUD_SQL_CONNECTION_NAME: dea-noctua:us-central1:nexus-dev
+  CLOUD_SQL_CONNECTION_NAME: dea-noctua:us-west1:nexus-dev-west1
 
 jobs:
   deploy:
