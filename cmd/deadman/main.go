@@ -31,6 +31,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -41,6 +42,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jredh-dev/nexus/internal/deadman"
 )
+
+//go:embed PRIVACY.txt
+var privacyPolicy string
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
@@ -126,6 +130,12 @@ func cmdServe(ctx context.Context, pool *pgxpool.Pool, twilio deadman.TwilioConf
 	mux.HandleFunc("GET /status", deadman.MakeStatusHandler(pool))
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintln(w, "ok")
+	})
+	// /privacy serves the plain-text privacy policy.
+	// Required for Twilio A2P 10DLC campaign registration.
+	mux.HandleFunc("GET /privacy", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		fmt.Fprint(w, privacyPolicy)
 	})
 
 	// Test endpoints — only mounted when TEST_ENDPOINTS_ENABLED=true.
@@ -481,13 +491,14 @@ HTTP endpoints (when serving):
   POST /sms              Twilio inbound SMS webhook
   GET  /status           JSON owner status
   GET  /health           200 OK
+  GET  /privacy          Plain-text privacy policy
   POST /test/trigger     Send trigger SMS to ?to=<phone> (TEST_ENDPOINTS_ENABLED only)
   POST /test/warn        Send warn SMS to ?to=<phone>    (TEST_ENDPOINTS_ENABLED only)
   POST /test/checkin     Reset owner timer for ?phone=<phone> (TEST_ENDPOINTS_ENABLED only)
 
 SMS protocol:
   Owner texts:      any message → check-in, timer reset
-  Subscriber texts: R=status, W=ask why, H=ask how, U=unsubscribe all
+  Subscriber texts: R=resubscribe, W=ask why, H=ask how, U=unsubscribe all
   Consent texts:    Y=subscribe, N=decline, Q=block (never contact again)
 `)
 }
