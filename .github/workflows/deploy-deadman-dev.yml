@@ -96,13 +96,20 @@ jobs:
       - name: Create domain mapping (idempotent)
         # Maps deadman.jredh.com → nexus-deadman-dev.
         # jredh.com is already a verified domain in this GCP project.
-        # Safe to run on every deploy — gcloud exits 0 if the mapping already exists.
+        # Checks for existing mapping first to avoid swallowing real errors.
         run: |
-          gcloud beta run domain-mappings create \
-            --service ${{ env.SERVICE_NAME }} \
-            --domain ${{ env.CUSTOM_DOMAIN }} \
-            --region ${{ env.GCP_REGION }} \
-            --project ${{ env.GCP_PROJECT_ID }} 2>&1 | grep -v "already exists" || true
+          if gcloud beta run domain-mappings describe \
+              --domain ${{ env.CUSTOM_DOMAIN }} \
+              --region ${{ env.GCP_REGION }} \
+              --project ${{ env.GCP_PROJECT_ID }} >/dev/null 2>&1; then
+            echo "Domain mapping for ${{ env.CUSTOM_DOMAIN }} already exists, skipping."
+          else
+            gcloud beta run domain-mappings create \
+              --service ${{ env.SERVICE_NAME }} \
+              --domain ${{ env.CUSTOM_DOMAIN }} \
+              --region ${{ env.GCP_REGION }} \
+              --project ${{ env.GCP_PROJECT_ID }}
+          fi
 
       - name: Get service URL
         id: service-url
