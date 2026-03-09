@@ -145,12 +145,13 @@ jobs:
     runs-on: local
     needs: [propagate, comment-rc-pr, update-source-clone]
     if: failure()
+    env:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
     steps:
       - name: Discord notification
         run: |
-          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
-          ctl notify discord \
-            --event build \
-            --service nexus \
-            --status failure \
-            --message "Gitea main failed to propagate to GitHub RC branch"
+          if [ -n "${DISCORD_WEBHOOK_URL}" ]; then
+            curl -s -X POST -H "Content-Type: application/json" \
+              -d '{"embeds":[{"title":"build \u00b7 nexus \u00b7 failure","color":15158332,"description":"Gitea main failed to propagate to GitHub RC branch"}]}' \
+              "${DISCORD_WEBHOOK_URL}" > /dev/null || true
+          fi
