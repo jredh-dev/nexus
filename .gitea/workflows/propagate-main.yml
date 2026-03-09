@@ -125,14 +125,18 @@ jobs:
     runs-on: local
     needs: [propagate]
     if: success()
+    env:
+      INTERNAL_GIT_TOKEN: ${{ secrets.INTERNAL_GIT_TOKEN }}
     steps:
       - name: Pull work/source/jredh-dev/nexus
         # Keeps the source clone current so ctl workstream create branches
         # from the latest main, preventing rebase conflicts on new workstreams.
         # /agentic is the host workspace bind-mounted into the runner container.
+        # Use http://gitea:3000 (Docker internal hostname) — not localhost:3000,
+        # which is unreachable from inside the runner container.
         run: |
           cd /agentic/work/source/jredh-dev/nexus
-          git fetch gitea main
+          git fetch "http://jredhbot:${INTERNAL_GIT_TOKEN}@gitea:3000/jredh-dev/nexus.git" main:refs/remotes/gitea/main
           git checkout main
           git merge --ff-only gitea/main
 
