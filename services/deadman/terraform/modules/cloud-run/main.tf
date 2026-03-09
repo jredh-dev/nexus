@@ -228,8 +228,13 @@ resource "google_cloud_run_domain_mapping" "mapping" {
   }
 
   # Domain mapping status changes are driven externally (DNS propagation).
+  # certificate_mode defaults to AUTOMATIC but is not returned by the API after creation,
+  # causing Terraform to want to replace the resource. Ignore it.
   lifecycle {
-    ignore_changes = [metadata[0].annotations]
+    ignore_changes = [
+      metadata[0].annotations,
+      spec[0].certificate_mode,
+    ]
   }
 }
 
