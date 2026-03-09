@@ -171,6 +171,9 @@
       width: 100%;
       border-collapse: collapse;
       font-size: 11px;
+      border-top: 1px solid var(--border);
+      margin-top: 6px;
+      padding-top: 4px;
     }
     .pipelines td {
       padding: 2px 4px;
@@ -181,8 +184,10 @@
     .pipelines td:nth-child(2) { width: 100%; }  /* workflow name stretches */
     .pipelines td:last-child   { padding-right: 0; color: var(--muted); font-size: 10px; text-align: right; }
     .pipelines tr:hover td { background: rgba(255,255,255,0.03); }
-    .pipelines a { color: var(--text); text-decoration: none; }
+    /* job name: yellow, no underline */
+    .pipelines a { color: var(--yellow); text-decoration: none; }
     .pipelines a:hover { color: var(--accent); }
+    .pipelines span.job-name { color: var(--yellow); }
     .pipelines .run-num { color: var(--muted); font-size: 10px; }
 
     /* ---- status dot ---- */
@@ -387,7 +392,7 @@
       {{- if .URL -}}
       <a href="{{.URL}}" target="_blank">{{.Label}}</a>
       {{- else -}}
-      <span style="color:var(--muted)">{{.Label}}</span>
+      <span class="job-name">{{.Label}}</span>
       {{- end -}}
     </td>
     <td class="run-num">{{if $num}}#{{$num}}{{end}}</td>
