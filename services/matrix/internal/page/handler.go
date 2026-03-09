@@ -100,35 +100,37 @@ var tmpl = template.Must(template.New("matrix").Funcs(template.FuncMap{
 
 // Config holds runtime configuration for the page handler.
 type Config struct {
-	GatusURL        string // e.g. "http://host.docker.internal:8084"
-	GiteaURL        string // e.g. "http://host.docker.internal:3000"
-	GiteaToken      string
-	GitHubToken     string
-	GitHubOwner     string
-	GitHubRepo      string
-	GiteaOwner      string
-	GiteaRepo       string
-	OpenObserveURL  string // e.g. "http://host.docker.internal:5080" — used for API + nav link
-	OpenObserveUser string // e.g. "admin@local.dev"
-	OpenObservePass string // e.g. "changeme"
-	OpenCodeURL     string // e.g. "http://localhost:4096" — browser-facing nav link
+	GatusURL              string // e.g. "http://host.docker.internal:8084"
+	GiteaURL              string // e.g. "http://host.docker.internal:3000"
+	GiteaToken            string
+	GitHubToken           string
+	GitHubOwner           string
+	GitHubRepo            string
+	GiteaOwner            string
+	GiteaRepo             string
+	OpenObserveURL        string // internal API URL e.g. "http://host.docker.internal:5080"
+	OpenObserveBrowserURL string // browser-facing nav link e.g. "http://localhost:5080"
+	OpenObserveUser       string // e.g. "admin@local.dev"
+	OpenObservePass       string // e.g. "changeme"
+	OpenCodeURL           string // e.g. "http://localhost:4096" — browser-facing nav link
 }
 
 // ConfigFromEnv reads handler config from environment variables with defaults.
 func ConfigFromEnv() Config {
 	return Config{
-		GatusURL:        envOr("GATUS_URL", "http://host.docker.internal:8084"),
-		GiteaURL:        envOr("GITEA_URL", "http://host.docker.internal:3000"),
-		GiteaToken:      os.Getenv("GITEA_TOKEN"),
-		GitHubToken:     os.Getenv("GITHUB_TOKEN"),
-		GitHubOwner:     envOr("GITHUB_OWNER", "jredh-dev"),
-		GitHubRepo:      envOr("GITHUB_REPO", "nexus"),
-		GiteaOwner:      envOr("GITEA_OWNER", "jredhbot"),
-		GiteaRepo:       envOr("GITEA_REPO", "nexus"),
-		OpenObserveURL:  envOr("OPENOBSERVE_URL", "http://host.docker.internal:5080"),
-		OpenObserveUser: envOr("OPENOBSERVE_USER", "admin@local.dev"),
-		OpenObservePass: envOr("OPENOBSERVE_PASS", "changeme"),
-		OpenCodeURL:     envOr("OPENCODE_URL", "http://localhost:4096"),
+		GatusURL:              envOr("GATUS_URL", "http://host.docker.internal:8084"),
+		GiteaURL:              envOr("GITEA_URL", "http://host.docker.internal:3000"),
+		GiteaToken:            os.Getenv("GITEA_TOKEN"),
+		GitHubToken:           os.Getenv("GITHUB_TOKEN"),
+		GitHubOwner:           envOr("GITHUB_OWNER", "jredh-dev"),
+		GitHubRepo:            envOr("GITHUB_REPO", "nexus"),
+		GiteaOwner:            envOr("GITEA_OWNER", "jredh-dev"),
+		GiteaRepo:             envOr("GITEA_REPO", "nexus"),
+		OpenObserveURL:        envOr("OPENOBSERVE_URL", "http://host.docker.internal:5080"),
+		OpenObserveBrowserURL: envOr("OPENOBSERVE_BROWSER_URL", "http://localhost:5080"),
+		OpenObserveUser:       envOr("OPENOBSERVE_USER", "admin@local.dev"),
+		OpenObservePass:       envOr("OPENOBSERVE_PASS", "changeme"),
+		OpenCodeURL:           envOr("OPENCODE_URL", "http://localhost:4096"),
 	}
 }
 
@@ -392,7 +394,7 @@ func buildPageData(
 			Endpoints:    eps,
 			Pipelines:    pipelines,
 			LogCount:     logCounts[svcName],
-			LogSearchURL: ooLogsURL(cfg.OpenObserveURL, svcName),
+			LogSearchURL: ooLogsURL(cfg.OpenObserveBrowserURL, svcName),
 		}
 	}
 
@@ -489,7 +491,7 @@ func buildPageData(
 			nil,
 		),
 		card("openobserve", "log aggregation", "openobserve",
-			[]Endpoint{localEp(":5080", cfg.OpenObserveURL, "local_openobserve")},
+			[]Endpoint{localEp(":5080", cfg.OpenObserveBrowserURL, "local_openobserve")},
 			nil,
 		),
 		card("vector", "log shipper", "vector",
@@ -533,7 +535,7 @@ func buildPageData(
 	}
 	return TemplateData{
 		GatusURL:       cfg.GatusURL,
-		OpenObserveURL: cfg.OpenObserveURL,
+		OpenObserveURL: cfg.OpenObserveBrowserURL,
 		OpenCodeURL:    cfg.OpenCodeURL,
 		AppServices:    appServices,
 		CloudServices:  cloudServices,
