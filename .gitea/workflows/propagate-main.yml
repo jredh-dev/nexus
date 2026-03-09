@@ -1,13 +1,11 @@
-# Propagate Gitea main to GitHub.
+# Propagate Gitea main to GitHub rc/vX.Y.Z.
 #
 # Flow:
-#   1. Push to GitHub `rc` branch (not main — protected by status checks).
-#   2. GitHub Actions picks up `rc`, runs CI, then fast-forward merges to
-#      `main` and opens a PR against the current versioned RC branch
-#      (.github/workflows/promote-rc.yml).
+#   Gitea main → push to current rc/vX.Y.Z on GitHub → human reviews RC → main PR.
 #
-# Runs on every push to Gitea main (squash-merges from workstream branches).
-name: Propagate Main to GitHub
+# Gitea CI is the quality gate. Code reaching Gitea main is already vetted.
+# No additional CI needed on GitHub before RC — that runs on rc/* → main PRs.
+name: Propagate Main to GitHub RC
 
 on:
   push:
@@ -15,7 +13,7 @@ on:
 
 jobs:
   propagate:
-    name: Push to GitHub rc
+    name: Push to GitHub rc/vX.Y.Z
     runs-on: local
     env:
       GITHUB_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
@@ -24,12 +22,48 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Push to GitHub rc
+      - name: Determine current RC branch
+        id: rc
+        run: |
+          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
+          rc=$(curl -s \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/jredh-dev/nexus/branches?per_page=100" \
+            | grep '"name"' \
+            | grep '"rc/v' \
+            | sed 's/.*"name": "\(.*\)".*/\1/' \
+            | sort -rV \
+            | head -1)
+          if [ -z "$rc" ]; then
+            echo "No rc/vX.Y.Z branch found on GitHub — cannot propagate"
+            exit 1
+          fi
+          echo "rc_branch=${rc}" >> $GITHUB_OUTPUT
+          echo "Pushing to: ${rc}"
+
+      - name: Push to GitHub rc/vX.Y.Z
         run: |
           export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
           git push --force \
             "https://${GITHUB_TOKEN}@github.com/jredh-dev/nexus.git" \
-            "HEAD:refs/heads/rc"
+            "HEAD:refs/heads/${{ steps.rc.outputs.rc_branch }}"
+
+  notify-failure:
+    name: Notify Discord on Failure
+    runs-on: local
+    needs: [propagate]
+    if: failure()
+    steps:
+      - name: Discord notification
+        run: |
+          export PATH="/usr/local/bin:$HOME/go/bin:$PATH"
+          ctl notify discord \
+            --event build \
+            --service nexus \
+            --status failure \
+            --message "Gitea main failed to propagate to GitHub RC branch"
+
 
   notify-failure:
     name: Notify Discord on Failure
