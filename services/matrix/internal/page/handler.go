@@ -519,7 +519,7 @@ func buildPageData(
 		{
 			Name:      "ctl",
 			GitHubURL: "https://github.com/jredh-dev/ctl",
-			GiteaURL:  "http://localhost:3000/jredhbot/ctl",
+			GiteaURL:  "http://localhost:3000/jredh-dev/ctl",
 			Pipelines: append(
 				ghRows(ghCtl, "ci.yml"),
 				giteaRows(giteaCtl, "install.yml")...,
