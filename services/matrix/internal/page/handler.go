@@ -102,29 +102,37 @@ var tmpl = template.Must(template.New("matrix").Funcs(template.FuncMap{
 
 // Config holds runtime configuration for the page handler.
 type Config struct {
-	GatusURL       string // e.g. "http://host.docker.internal:8084"
-	GiteaURL       string // e.g. "http://host.docker.internal:3000"
-	GiteaToken     string
-	GitHubToken    string
-	GitHubOwner    string
-	GitHubRepo     string
-	GiteaOwner     string
-	GiteaRepo      string
-	OpenObserveURL string // e.g. "http://localhost:5080"
+	GatusURL    string // e.g. "http://host.docker.internal:8084"
+	GiteaURL    string // e.g. "http://host.docker.internal:3000"
+	GiteaToken  string
+	GitHubToken string
+	GitHubOwner string
+	GitHubRepo  string
+	GiteaOwner  string
+	GiteaRepo   string
+	// OpenObserve connection — for log count badges.
+	OpenObserveURL  string // e.g. "http://host.docker.internal:5080"
+	OpenObserveUser string // e.g. "admin@local.dev"
+	OpenObservePass string // e.g. "changeme"
+	// OpenCode web UI URL — shown in the top nav.
+	OpenCodeURL string // e.g. "http://localhost:4096"
 }
 
 // ConfigFromEnv reads handler config from environment variables with defaults.
 func ConfigFromEnv() Config {
 	return Config{
-		GatusURL:       envOr("GATUS_URL", "http://host.docker.internal:8084"),
-		GiteaURL:       envOr("GITEA_URL", "http://host.docker.internal:3000"),
-		GiteaToken:     os.Getenv("GITEA_TOKEN"),
-		GitHubToken:    os.Getenv("GITHUB_TOKEN"),
-		GitHubOwner:    envOr("GITHUB_OWNER", "jredh-dev"),
-		GitHubRepo:     envOr("GITHUB_REPO", "nexus"),
-		GiteaOwner:     envOr("GITEA_OWNER", "jredhbot"),
-		GiteaRepo:      envOr("GITEA_REPO", "nexus"),
-		OpenObserveURL: envOr("OPENOBSERVE_URL", "http://localhost:5080"),
+		GatusURL:        envOr("GATUS_URL", "http://host.docker.internal:8084"),
+		GiteaURL:        envOr("GITEA_URL", "http://host.docker.internal:3000"),
+		GiteaToken:      os.Getenv("GITEA_TOKEN"),
+		GitHubToken:     os.Getenv("GITHUB_TOKEN"),
+		GitHubOwner:     envOr("GITHUB_OWNER", "jredh-dev"),
+		GitHubRepo:      envOr("GITHUB_REPO", "nexus"),
+		GiteaOwner:      envOr("GITEA_OWNER", "jredhbot"),
+		GiteaRepo:       envOr("GITEA_REPO", "nexus"),
+		OpenObserveURL:  envOr("OPENOBSERVE_URL", "http://host.docker.internal:5080"),
+		OpenObserveUser: envOr("OPENOBSERVE_USER", "admin@local.dev"),
+		OpenObservePass: envOr("OPENOBSERVE_PASS", "changeme"),
+		OpenCodeURL:     envOr("OPENCODE_URL", "http://localhost:4096"),
 	}
 }
 
@@ -180,10 +188,11 @@ func Handler(cfg Config) http.HandlerFunc {
 			ghCtl      map[string]data.WorkflowRun
 			giteaNexus map[string]data.WorkflowRun
 			giteaCtl   map[string]data.WorkflowRun
+			logCounts  map[string]int
 		)
 
 		var wg sync.WaitGroup
-		wg.Add(5)
+		wg.Add(6)
 
 		go func() {
 			defer wg.Done()
@@ -216,10 +225,16 @@ func Handler(cfg Config) http.HandlerFunc {
 			giteaCtl = data.FetchGiteaWorkflows(ctx, cfg.GiteaURL, cfg.GiteaOwner, "ctl", cfg.GiteaToken, ctlGiteaWorkflows)
 		}()
 
+		go func() {
+			defer wg.Done()
+			// Log counts from OpenObserve — best-effort, silently empty on error.
+			logCounts = data.FetchLogCounts(ctx, cfg.OpenObserveURL, cfg.OpenObserveUser, cfg.OpenObservePass)
+		}()
+
 		wg.Wait()
 		log.Printf("matrix: data fetched in %s", time.Since(start).Round(time.Millisecond))
 
-		pd := buildPageData(gatusData, ghNexus, ghCtl, giteaNexus, giteaCtl, cfg.OpenObserveURL, errors)
+		pd := buildPageData(cfg, gatusData, ghNexus, ghCtl, giteaNexus, giteaCtl, logCounts, errors)
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		// Short cache — stale for 10s is fine, data changes slowly.
@@ -232,7 +247,23 @@ func Handler(cfg Config) http.HandlerFunc {
 
 // TemplateData is the full view model passed to template.html.
 type TemplateData struct {
-	Services  []ServiceGroup
+	// Top-nav URLs — rendered as big buttons.
+	GatusURL       string
+	OpenObserveURL string
+	OpenCodeURL    string
+
+	// AppServices: hermit, secrets, portal, web, vn, deadman, ref, matrix.
+	// Each has a local env and optional cloud env.
+	AppServices []ServiceGroup
+
+	// CloudServices: services that only exist in cloud (cal, and cloud-only views).
+	// Rendered in a separate "cloud run" section.
+	CloudServices []ServiceGroup
+
+	// InfraServices: postgres, vault, gitea, openobserve, vector, act_runner.
+	// Local-only; no cloud env.
+	InfraServices []ServiceGroup
+
 	Repos     []RepoGroup
 	Errors    []string
 	FetchedAt string
@@ -241,15 +272,15 @@ type TemplateData struct {
 // ServiceGroup is one named service (hermit, secrets, portal, etc.)
 // with its local and cloud environments.
 type ServiceGroup struct {
-	Name        string
-	Description string
-	Local       *ServiceEnv // nil if no local deployment
-	Cloud       *ServiceEnv // nil if no cloud deployment
+	Name         string
+	Description  string
+	Local        *ServiceEnv // nil if no local deployment
+	Cloud        *ServiceEnv // nil if no cloud deployment
+	LogCount     int         // recent log lines (last 5 min) from OpenObserve; 0 = no data
+	LogSearchURL string      // link to OpenObserve filtered to this service
 }
 
 // ServiceURL is a labelled link to a running instance of a service.
-// Multiple URLs per env allow showing both the cloud run URL and any
-// custom domain mappings side by side.
 type ServiceURL struct {
 	Label string // short display text, e.g. ":8081", "cloud run", "secrets.jredh.com"
 	Href  string // full URL
@@ -261,7 +292,6 @@ type ServiceEnv struct {
 	GatusKey    string
 	GatusStatus data.Status
 	// Pipelines is the ordered list of CI/deploy workflows for this env.
-	// Each entry is displayed as an individual named pill.
 	Pipelines []WorkflowRow
 }
 
@@ -290,13 +320,22 @@ func trimYML(s string) string {
 // u is a convenience constructor for ServiceURL.
 func u(label, href string) ServiceURL { return ServiceURL{Label: label, Href: href} }
 
+// ooLogsURL builds an OpenObserve search URL pre-filtered to a given service name.
+// The URL format opens the OpenObserve Logs UI with a SQL filter pre-populated.
+func ooLogsURL(baseURL, service string) string {
+	// OpenObserve doesn't support deep-link query params in the open-source build,
+	// so we just link to the logs page for the org. The badge still shows the count.
+	return fmt.Sprintf("%s/web/logs?org_identifier=default", baseURL)
+}
+
 func buildPageData(
+	cfg Config,
 	gatus map[string]data.GatusResult,
 	ghNexus map[string]data.WorkflowRun,
 	ghCtl map[string]data.WorkflowRun,
 	giteaNexus map[string]data.WorkflowRun,
 	giteaCtl map[string]data.WorkflowRun,
-	openObserveURL string,
+	logCounts map[string]int,
 	errors []string,
 ) TemplateData {
 	// gs looks up a Gatus health status by endpoint key.
@@ -354,17 +393,29 @@ func buildPageData(
 		return rows
 	}
 
-	services := []ServiceGroup{
-		{
-			Name:        "hermit",
-			Description: "rust grpc server",
-			Local: &ServiceEnv{
+	// svc builds a ServiceGroup with log count from OpenObserve.
+	// svcName must match the `service` field Vector emits (container name minus "agentic-").
+	svc := func(name, desc, svcName string, local *ServiceEnv, cloud *ServiceEnv) ServiceGroup {
+		return ServiceGroup{
+			Name:         name,
+			Description:  desc,
+			Local:        local,
+			Cloud:        cloud,
+			LogCount:     logCounts[svcName],
+			LogSearchURL: ooLogsURL(cfg.OpenObserveURL, svcName),
+		}
+	}
+
+	// ---- App services (local + optional cloud) ----
+	appServices := []ServiceGroup{
+		svc("hermit", "rust grpc server", "hermit",
+			&ServiceEnv{
 				URLs:        []ServiceURL{u(":9090", "http://localhost:9090")},
 				GatusKey:    "local_hermit",
 				GatusStatus: gs("local_hermit"),
 				Pipelines:   giteaRows(giteaNexus, "docker-deploy.yml", "install.yml"),
 			},
-			Cloud: &ServiceEnv{
+			&ServiceEnv{
 				URLs: []ServiceURL{
 					u("cloud run", "https://nexus-hermit-dev-2tvic4xjjq-uc.a.run.app"),
 				},
@@ -372,17 +423,15 @@ func buildPageData(
 				GatusStatus: gs("cloud-run_hermit-(cloud)"),
 				Pipelines:   ghRows(ghNexus, "deploy-hermit-dev.yml"),
 			},
-		},
-		{
-			Name:        "secrets",
-			Description: "confessions api",
-			Local: &ServiceEnv{
+		),
+		svc("secrets", "confessions api", "secrets",
+			&ServiceEnv{
 				URLs:        []ServiceURL{u(":8081", "http://localhost:8081")},
 				GatusKey:    "local_secrets",
 				GatusStatus: gs("local_secrets"),
 				Pipelines:   giteaRows(giteaNexus, "docker-deploy.yml"),
 			},
-			Cloud: &ServiceEnv{
+			&ServiceEnv{
 				URLs: []ServiceURL{
 					u("cloud run", "https://nexus-secrets-dev-2tvic4xjjq-uc.a.run.app/health"),
 					u("secrets.jredh.com", "https://secrets.jredh.com"),
@@ -391,17 +440,15 @@ func buildPageData(
 				GatusStatus: gs("cloud-run_secrets-(cloud)"),
 				Pipelines:   ghRows(ghNexus, "deploy-go-http-dev.yml"),
 			},
-		},
-		{
-			Name:        "portal",
-			Description: "web portal / admin",
-			Local: &ServiceEnv{
+		),
+		svc("portal", "web portal / admin", "portal",
+			&ServiceEnv{
 				URLs:        []ServiceURL{u(":8090", "http://localhost:8090/login")},
 				GatusKey:    "local_portal",
 				GatusStatus: gs("local_portal"),
 				Pipelines:   giteaRows(giteaNexus, "docker-deploy.yml"),
 			},
-			Cloud: &ServiceEnv{
+			&ServiceEnv{
 				URLs: []ServiceURL{
 					u("cloud run", "https://nexus-portal-dev-2tvic4xjjq-uc.a.run.app"),
 				},
@@ -409,17 +456,15 @@ func buildPageData(
 				GatusStatus: gs("cloud-run_portal-(cloud)"),
 				Pipelines:   ghRows(ghNexus, "deploy-portal-dev.yml"),
 			},
-		},
-		{
-			Name:        "web",
-			Description: "astro frontend",
-			Local: &ServiceEnv{
+		),
+		svc("web", "astro frontend", "web",
+			&ServiceEnv{
 				URLs:        []ServiceURL{u(":8083", "http://localhost:8083")},
 				GatusKey:    "local_web",
 				GatusStatus: gs("local_web"),
 				Pipelines:   giteaRows(giteaNexus, "docker-deploy.yml"),
 			},
-			Cloud: &ServiceEnv{
+			&ServiceEnv{
 				URLs: []ServiceURL{
 					u("cloud run", "https://nexus-web-dev-2tvic4xjjq-uc.a.run.app"),
 					u("portal.jredh.com", "https://portal.jredh.com"),
@@ -428,17 +473,15 @@ func buildPageData(
 				GatusStatus: gs("cloud-run_web-(cloud)"),
 				Pipelines:   ghRows(ghNexus, "deploy-web-dev.yml"),
 			},
-		},
-		{
-			Name:        "vn",
-			Description: "visual novel engine",
-			Local: &ServiceEnv{
+		),
+		svc("vn", "visual novel engine", "vn",
+			&ServiceEnv{
 				URLs:        []ServiceURL{u(":8082", "http://localhost:8082/health")},
 				GatusKey:    "local_vn",
 				GatusStatus: gs("local_vn"),
 				Pipelines:   giteaRows(giteaNexus, "docker-deploy.yml"),
 			},
-			Cloud: &ServiceEnv{
+			&ServiceEnv{
 				URLs: []ServiceURL{
 					u("cloud run", "https://nexus-vn-dev-2tvic4xjjq-uc.a.run.app/health"),
 				},
@@ -446,11 +489,57 @@ func buildPageData(
 				GatusStatus: gs("cloud-run_vn-(cloud)"),
 				Pipelines:   ghRows(ghNexus, "deploy-vn-dev.yml"),
 			},
-		},
-		{
-			Name:        "cal",
-			Description: "calendar / ical service",
-			Cloud: &ServiceEnv{
+		),
+		svc("deadman", "sms deadman switch", "deadman",
+			&ServiceEnv{
+				URLs:        []ServiceURL{u(":8095", "http://localhost:8095/health")},
+				GatusKey:    "local_deadman",
+				GatusStatus: gs("local_deadman"),
+				Pipelines:   giteaRows(giteaNexus, "docker-deploy.yml"),
+			},
+			&ServiceEnv{
+				URLs: []ServiceURL{
+					u("cloud run", "https://nexus-deadman-dev-2tvic4xjjq-uc.a.run.app"),
+					u("deadman.jredh.com", "https://deadman.jredh.com"),
+				},
+				GatusKey:    "cloud-run_deadman-(cloud)",
+				GatusStatus: gs("cloud-run_deadman-(cloud)"),
+				Pipelines:   ghRows(ghNexus, "deploy-deadman-dev.yml"),
+			},
+		),
+		svc("ref", "reference / docs", "ref",
+			&ServiceEnv{
+				URLs:        []ServiceURL{u(":8086", "http://localhost:8086")},
+				GatusKey:    "local_ref",
+				GatusStatus: gs("local_ref"),
+				Pipelines:   giteaRows(giteaNexus, "docker-deploy.yml"),
+			},
+			nil,
+		),
+		svc("matrix", "this page", "matrix",
+			&ServiceEnv{
+				URLs:        []ServiceURL{u(":8085", "http://localhost:8085")},
+				GatusKey:    "local_matrix",
+				GatusStatus: gs("local_matrix"),
+				Pipelines:   giteaRows(giteaNexus, "docker-deploy.yml"),
+			},
+			nil,
+		),
+		svc("opencode", "ai coding agent", "opencode",
+			&ServiceEnv{
+				URLs:        []ServiceURL{u(":4096", cfg.OpenCodeURL)},
+				GatusKey:    "local_opencode",
+				GatusStatus: gs("local_opencode"),
+			},
+			nil,
+		),
+	}
+
+	// ---- Cloud-only services ----
+	cloudServices := []ServiceGroup{
+		svc("cal", "calendar / ical", "cal",
+			nil,
+			&ServiceEnv{
 				URLs: []ServiceURL{
 					u("cloud run", "https://nexus-cal-dev-2tvic4xjjq-uc.a.run.app/health"),
 					u("cal.jredh.com", "https://cal.jredh.com"),
@@ -459,77 +548,67 @@ func buildPageData(
 				GatusStatus: gs("cloud-run_cal-(cloud)"),
 				Pipelines:   ghRows(ghNexus, "deploy-cal-dev.yml"),
 			},
-		},
-		{
-			Name:        "ref",
-			Description: "async prompt queue",
-			Local: &ServiceEnv{
-				URLs:        []ServiceURL{u(":8086", "http://localhost:8086")},
-				GatusKey:    "local_ref",
-				GatusStatus: gs("local_ref"),
-				Pipelines:   giteaRows(giteaNexus, "docker-deploy.yml"),
+		),
+	}
+
+	// ---- Infra services (local only, no log badges needed) ----
+	infraServices := []ServiceGroup{
+		svc("postgres", "postgresql 16", "postgres",
+			&ServiceEnv{
+				URLs:        []ServiceURL{u("/tmp/ctl-pg", "")},
+				GatusKey:    "local_postgres",
+				GatusStatus: gs("local_postgres"),
 			},
-		},
-		{
-			Name:        "deadman",
-			Description: "sms deadman switch",
-			Local: &ServiceEnv{
-				URLs:        []ServiceURL{u(":8095", "http://localhost:8095/health")},
-				GatusKey:    "local_deadman",
-				GatusStatus: gs("local_deadman"),
-				Pipelines:   giteaRows(giteaNexus, "docker-deploy.yml"),
+			nil,
+		),
+		svc("vault", "secret management", "vault",
+			&ServiceEnv{
+				URLs:        []ServiceURL{u(":8200", "http://localhost:8200")},
+				GatusKey:    "local_vault",
+				GatusStatus: gs("local_vault"),
 			},
-		},
-		{
-			Name:        "matrix",
-			Description: "this page",
-			Local: &ServiceEnv{
-				URLs:        []ServiceURL{u(":8085", "http://localhost:8085")},
-				GatusKey:    "local_matrix",
-				GatusStatus: gs("local_matrix"),
-				Pipelines:   giteaRows(giteaNexus, "docker-deploy.yml"),
-			},
-		},
-		{
-			Name:        "gatus",
-			Description: "health monitor",
-			Local: &ServiceEnv{
-				URLs: []ServiceURL{u(":8084", "http://localhost:8084")},
-			},
-		},
-		{
-			Name:        "gitea",
-			Description: "local git + ci",
-			Local: &ServiceEnv{
+			nil,
+		),
+		svc("gitea", "local git + ci", "gitea",
+			&ServiceEnv{
 				URLs:        []ServiceURL{u(":3000", "http://localhost:3000")},
 				GatusKey:    "local_gitea",
 				GatusStatus: gs("local_gitea"),
 			},
-		},
-		{
-			Name:        "opencode",
-			Description: "llm agent server",
-			Local: &ServiceEnv{
-				URLs:        []ServiceURL{u(":4096", "http://localhost:4096")},
-				GatusKey:    "local_opencode",
-				GatusStatus: gs("local_opencode"),
+			nil,
+		),
+		svc("openobserve", "log aggregation", "openobserve",
+			&ServiceEnv{
+				URLs:        []ServiceURL{u(":5080", cfg.OpenObserveURL)},
+				GatusKey:    "local_openobserve",
+				GatusStatus: gs("local_openobserve"),
 			},
-		},
-		{
-			Name:        "oracle",
-			Description: "hourly prompt executor",
-			Local: &ServiceEnv{
-				// No HTTP port — cron only. No gatus entry.
-				URLs: []ServiceURL{},
+			nil,
+		),
+		svc("vector", "log shipper", "vector",
+			&ServiceEnv{
+				URLs:        []ServiceURL{u("docker", "")},
+				GatusKey:    "local_vector",
+				GatusStatus: gs("local_vector"),
 			},
-		},
-		{
-			Name:        "logs",
-			Description: "centralized log search",
-			Local: &ServiceEnv{
-				URLs: []ServiceURL{u(":5080", openObserveURL)},
+			nil,
+		),
+		svc("act_runner", "gitea ci runner", "act_runner",
+			&ServiceEnv{
+				URLs:        []ServiceURL{u("docker", "")},
+				GatusKey:    "local_act_runner",
+				GatusStatus: gs("local_act_runner"),
 			},
-		},
+			nil,
+		),
+		svc("gatus", "health monitor", "gatus",
+			&ServiceEnv{
+				URLs:        []ServiceURL{u(":8084", "http://localhost:8084")},
+				GatusKey:    "local_gatus",
+				GatusStatus: gs("local_gatus"),
+			},
+			nil,
+		),
 	}
 
 	// Repos section: each repo shows all its named pipelines.
@@ -550,7 +629,6 @@ func buildPageData(
 			Name:      "ctl",
 			GitHubURL: "https://github.com/jredh-dev/ctl",
 			GiteaURL:  "http://localhost:3000/jredhbot/ctl",
-			// GitHub ci.yml + Gitea install.yml (auto-installs binary on merge)
 			Pipelines: append(
 				ghRows(ghCtl, "ci.yml"),
 				giteaRows(giteaCtl, "install.yml")...,
@@ -558,18 +636,20 @@ func buildPageData(
 		},
 	}
 
-	// Display the fetch time in Pacific time (PST/PDT) — where this server runs.
-	// time.LoadLocation uses the tzdata embedded in the Go binary (or the host's
-	// zoneinfo); "America/Los_Angeles" covers both PST (UTC-8) and PDT (UTC-7).
+	// Display the fetch time in Pacific time (PST/PDT).
 	loc, err := time.LoadLocation("America/Los_Angeles")
 	if err != nil {
-		// Fallback: UTC with an explicit suffix so it's never silently wrong.
 		loc = time.UTC
 	}
 	return TemplateData{
-		Services:  services,
-		Repos:     repos,
-		Errors:    errors,
-		FetchedAt: time.Now().In(loc).Format("15:04:05 MST"),
+		GatusURL:       cfg.GatusURL,
+		OpenObserveURL: cfg.OpenObserveURL,
+		OpenCodeURL:    cfg.OpenCodeURL,
+		AppServices:    appServices,
+		CloudServices:  cloudServices,
+		InfraServices:  infraServices,
+		Repos:          repos,
+		Errors:         errors,
+		FetchedAt:      time.Now().In(loc).Format("15:04:05 MST"),
 	}
 }
