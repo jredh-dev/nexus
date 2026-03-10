@@ -90,19 +90,3 @@ jobs:
           else
             echo "--- servicectl: no changes"
           fi
-
-          # wstr — workstream lifecycle CLI
-          # Cross-compile for darwin/amd64 (host OS). The runner is linux/amd64 inside
-          # Docker, but /root/go is bind-mounted to /Users/jredh/go on the macOS host.
-          # Plain `go install` would write a Linux binary there, which is unusable on
-          # macOS. GOOS=darwin GOARCH=amd64 produces a native macOS binary instead.
-          if echo "$CHANGED" | grep -qE '^(cmd/wstr/|go\.(mod|sum)$)'; then
-            echo "==> Installing wstr (darwin/amd64 cross-compile)"
-            if GOOS=darwin GOARCH=amd64 go build -o /root/go/bin/wstr ./cmd/wstr; then
-              notify wstr success
-            else
-              notify wstr failure
-            fi
-          else
-            echo "--- wstr: no changes"
-          fi
