@@ -1,3 +1,6 @@
+// Deprecated: wstr is superseded by ctl (github.com/jredh-dev/ctl).
+// Use "ctl workstream start/commit/end" instead. wstr will not receive further updates.
+//
 // Command wstr manages git workstream worktrees.
 // Three subcommands: start, commit, end.
 //
