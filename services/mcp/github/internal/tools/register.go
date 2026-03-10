@@ -3,9 +3,8 @@ package tools
 
 import (
 	"encoding/json"
-	"fmt"
 
-	"github.com/jredh-dev/nexus/services/mcp/github/internal/mcp"
+	"github.com/jredh-dev/nexus/internal/mcp"
 )
 
 // RegisterAll registers all GitHub MCP tools with the server.
@@ -16,33 +15,22 @@ func RegisterAll(s *mcp.Server) {
 	registerRCTools(s)
 }
 
-// jsonResult marshals v as indented JSON and wraps it in a successful ToolCallResult.
+// jsonResult delegates to the shared mcp.JSONResult helper.
 func jsonResult(v any) (*mcp.ToolCallResult, error) {
-	data, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("marshal result: %w", err)
-	}
-	return &mcp.ToolCallResult{
-		Content: []mcp.ContentBlock{mcp.TextContent(string(data))},
-	}, nil
+	return mcp.JSONResult(v)
 }
 
-// textResult wraps a plain text string in a ToolCallResult.
+// textResult delegates to the shared mcp.TextResult helper.
 func textResult(text string) *mcp.ToolCallResult {
-	return &mcp.ToolCallResult{
-		Content: []mcp.ContentBlock{mcp.TextContent(text)},
-	}
+	return mcp.TextResult(text)
 }
 
-// parseArgs unmarshals raw JSON arguments into dst.
+// parseArgs delegates to the shared mcp.ParseArgs helper.
 func parseArgs(raw json.RawMessage, dst any) error {
-	if len(raw) == 0 || string(raw) == "null" {
-		return nil
-	}
-	return json.Unmarshal(raw, dst)
+	return mcp.ParseArgs(raw, dst)
 }
 
-// errMissing returns a standard missing-parameter error.
+// errMissing delegates to the shared mcp.ErrMissing helper.
 func errMissing(param string) error {
-	return fmt.Errorf("missing required parameter: %s", param)
+	return mcp.ErrMissing(param)
 }

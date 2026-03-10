@@ -1,5 +1,4 @@
-// Package mcp implements the Model Context Protocol server for the GitHub MCP service.
-// It exposes GitHub API operations (PR, checks, RC branches, issues) as MCP tools.
+// Package mcp implements the Model Context Protocol shared types and server.
 //
 // Protocol reference: https://spec.modelcontextprotocol.io/specification/2025-03-26/
 package mcp

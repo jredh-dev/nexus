@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"strconv"
 
+	"github.com/jredh-dev/nexus/internal/mcp"
 	gh "github.com/jredh-dev/nexus/services/mcp/github/internal/github"
-	"github.com/jredh-dev/nexus/services/mcp/github/internal/mcp"
 )
 
 func registerPRTools(s *mcp.Server) {

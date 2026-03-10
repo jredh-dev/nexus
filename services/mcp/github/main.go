@@ -13,7 +13,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/jredh-dev/nexus/services/mcp/github/internal/mcp"
+	"github.com/jredh-dev/nexus/internal/mcp"
 	"github.com/jredh-dev/nexus/services/mcp/github/internal/tools"
 )
 
@@ -66,7 +66,7 @@ func run() int {
 	}
 
 	mcp.Version = version
-	srv := mcp.NewServer(logger, instructions)
+	srv := mcp.NewServer(logger, "github-mcp", instructions)
 	tools.RegisterAll(srv)
 
 	logger.Printf("[github-mcp] version=%s addr=%s", version, *addr)

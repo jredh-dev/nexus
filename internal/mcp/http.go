@@ -137,5 +137,5 @@ func (h *httpHandler) handleSessionEnd(w http.ResponseWriter, r *http.Request) {
 
 func (h *httpHandler) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"status":"ok","server":"%s","version":"%s"}`, ServerName, Version)
+	fmt.Fprintf(w, `{"status":"ok","server":"%s","version":"%s"}`, h.server.ServerName(), Version)
 }

@@ -10,7 +10,6 @@ import (
 const (
 	// ProtocolVersion is the MCP protocol version this server supports.
 	ProtocolVersion = "2025-03-26"
-	ServerName      = "discord-mcp"
 )
 
 // Version is set via ldflags at build time.
@@ -27,10 +26,11 @@ type Server struct {
 	initialized  bool
 	instructions string
 	logger       *log.Logger
+	serverName   string
 }
 
-// NewServer creates a new MCP server with the given logger and system instructions.
-func NewServer(logger *log.Logger, instructions string) *Server {
+// NewServer creates a new MCP server with the given logger, server name, and system instructions.
+func NewServer(logger *log.Logger, serverName, instructions string) *Server {
 	if logger == nil {
 		logger = log.Default()
 	}
@@ -39,7 +39,13 @@ func NewServer(logger *log.Logger, instructions string) *Server {
 		handlers:     make(map[string]ToolHandler),
 		instructions: instructions,
 		logger:       logger,
+		serverName:   serverName,
 	}
+}
+
+// ServerName returns the server's name as provided to NewServer.
+func (s *Server) ServerName() string {
+	return s.serverName
 }
 
 // RegisterTool adds a tool and its handler to the server.
@@ -111,7 +117,7 @@ func (s *Server) handleInitialize(params json.RawMessage) (any, *RPCError) {
 	return InitializeResult{
 		ProtocolVersion: ProtocolVersion,
 		Capabilities:    ServerCapabilities{Tools: &ToolsCapability{}},
-		ServerInfo:      Implementation{Name: ServerName, Version: Version},
+		ServerInfo:      Implementation{Name: s.serverName, Version: Version},
 		Instructions:    s.instructions,
 	}, nil
 }

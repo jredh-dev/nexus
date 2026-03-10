@@ -3,10 +3,9 @@ package tools
 
 import (
 	"encoding/json"
-	"fmt"
 
+	"github.com/jredh-dev/nexus/internal/mcp"
 	"github.com/jredh-dev/nexus/services/mcp/discord/internal/discord"
-	"github.com/jredh-dev/nexus/services/mcp/discord/internal/mcp"
 )
 
 // RegisterAll registers all Discord MCP tools with the server.
@@ -38,14 +37,14 @@ func handleNotify(args json.RawMessage) (*mcp.ToolCallResult, error) {
 		Env     string `json:"env"`
 		Message string `json:"message"`
 	}
-	if err := parseArgs(args, &p); err != nil {
+	if err := mcp.ParseArgs(args, &p); err != nil {
 		return nil, err
 	}
 	if p.Event == "" {
-		return nil, errMissing("event")
+		return nil, mcp.ErrMissing("event")
 	}
 	if p.Service == "" {
-		return nil, errMissing("service")
+		return nil, mcp.ErrMissing("service")
 	}
 	if p.Status == "" {
 		p.Status = discord.StatusSuccess
@@ -63,36 +62,5 @@ func handleNotify(args json.RawMessage) (*mcp.ToolCallResult, error) {
 	if err := discord.SendFromEnv(n); err != nil {
 		return nil, err
 	}
-	return textResult("Notification sent"), nil
-}
-
-// jsonResult marshals v as indented JSON and wraps it in a ToolCallResult.
-func jsonResult(v any) (*mcp.ToolCallResult, error) {
-	data, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("marshal result: %w", err)
-	}
-	return &mcp.ToolCallResult{
-		Content: []mcp.ContentBlock{mcp.TextContent(string(data))},
-	}, nil
-}
-
-// textResult wraps a plain text string in a ToolCallResult.
-func textResult(text string) *mcp.ToolCallResult {
-	return &mcp.ToolCallResult{
-		Content: []mcp.ContentBlock{mcp.TextContent(text)},
-	}
-}
-
-// parseArgs unmarshals raw JSON arguments into dst.
-func parseArgs(raw json.RawMessage, dst any) error {
-	if len(raw) == 0 || string(raw) == "null" {
-		return nil
-	}
-	return json.Unmarshal(raw, dst)
-}
-
-// errMissing returns a standard missing-parameter error.
-func errMissing(param string) error {
-	return fmt.Errorf("missing required parameter: %s", param)
+	return mcp.TextResult("Notification sent"), nil
 }
