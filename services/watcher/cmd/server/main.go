@@ -218,13 +218,16 @@ func run(cfg config) error {
 // triggerFullDiff diffs all visible files in cfg.dir against HEAD and sends
 // the result to OpenCode. Used for manual /trigger requests.
 func triggerFullDiff(cfg config, oc *opencode.Client) error {
-	// Walk the directory and collect all visible files.
+	// Walk the directory and collect all visible files. Skip .git/ entirely.
 	var visible []string
 	err := filepath.WalkDir(cfg.dir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
 		if d.IsDir() {
+			if d.Name() == ".git" {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		rel, _ := filepath.Rel(cfg.dir, path)
@@ -257,11 +260,9 @@ func sendInit(cfg config, oc *opencode.Client) error {
 
 Please read all FORM.md instructions carefully. You are now running in "%s" mode.
 
-Your working directory is: %s
-
 After reading the instructions, confirm you understand your role in one short paragraph.
 If any instructions are unclear or missing, note what you need. Do NOT make changes yet.
-Wait for the first diff to arrive.`, cfg.branch, cfg.dir)
+Wait for the first diff to arrive.`, cfg.branch)
 
 	slog.Info("sending initialization message to OpenCode")
 	reply, err := oc.Send(ctx, initMsg)
@@ -326,7 +327,7 @@ func processBatch(cfg config, oc *opencode.Client, paths []string) error {
 	if formUpdated {
 		sb.WriteString("Note: FORM.md was updated in this batch. Please re-read your instructions above.\n\n")
 	}
-	sb.WriteString(fmt.Sprintf("New changes detected in the watched volume (%d files):\n\n", len(visible)))
+	sb.WriteString(fmt.Sprintf("New changes detected (%d files):\n\n", len(visible)))
 	sb.WriteString("```diff\n")
 	sb.WriteString(diff)
 	sb.WriteString("\n```\n\n")
@@ -344,9 +345,14 @@ func processBatch(cfg config, oc *opencode.Client, paths []string) error {
 
 	slog.Info("opencode response received", "length", len(reply))
 
-	// Append to audit log.
+	// Append to audit log — use relative paths for readability.
+	var relPaths []string
+	for _, p := range visible {
+		rel, _ := filepath.Rel(cfg.dir, p)
+		relPaths = append(relPaths, rel)
+	}
 	appendAudit(cfg.auditLog, "BATCH", map[string]string{
-		"files": strings.Join(visible, ", "),
+		"files": strings.Join(relPaths, ", "),
 		"reply": truncate(reply, 500),
 	})
 
