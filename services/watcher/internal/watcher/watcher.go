@@ -105,6 +105,38 @@ func (w *Watcher) Stop() {
 	_ = w.fw.Close()
 }
 
+// Interrupt signals the batch loop to flush all pending files immediately,
+// bypassing the quiet-period wait. Used by the HTTP control server's
+// /interrupt endpoint.
+func (w *Watcher) Interrupt() {
+	// Force checkSettled to treat all pending files as settled now by
+	// directly draining and emitting them.
+	w.mu.Lock()
+	var paths []string
+	for path := range w.pending {
+		paths = append(paths, path)
+		delete(w.pending, path)
+		delete(w.firstSeen, path)
+	}
+	w.mu.Unlock()
+
+	if len(paths) > 0 {
+		select {
+		case w.Batches <- Batch{Paths: paths}:
+		default:
+			slog.Warn("watcher: interrupt — batch channel full, dropping", "count", len(paths))
+		}
+	}
+}
+
+// PendingCount returns the number of files currently waiting for their
+// quiet period to expire.
+func (w *Watcher) PendingCount() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return len(w.pending)
+}
+
 // addDirRecursive adds a directory and all its subdirectories to fsnotify.
 func (w *Watcher) addDirRecursive(root string) error {
 	return filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {

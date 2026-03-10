@@ -10,18 +10,21 @@
 // Environment variables:
 //
 //	WATCHER_DIR             path to the watched volume (required)
-//	OPENCODE_URL             OpenCode server URL (default: http://opencode:4096)
-//	OPENCODE_PASSWORD        OpenCode server password (required)
+//	OPENCODE_URL            OpenCode server URL (default: http://opencode:4096)
+//	OPENCODE_PASSWORD       OpenCode server password (required)
 //	WATCHER_QUIET_SECONDS   seconds of file silence before committing (default: 5)
 //	WATCHER_MAX_QUIET_SEC   hard max wait per file in seconds (default: 300)
 //	WATCHER_AUDIT_LOG       path to audit log file (default: <WATCHER_DIR>/work/watcher-audit.log)
 //	WATCHER_BRANCH          branch mode: on-demand | on-schedule (default: on-demand)
+//	WATCHER_CTL_PORT        port for the HTTP control server (default: 4097)
 package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -32,6 +35,7 @@ import (
 	"time"
 
 	"github.com/jredh-dev/nexus/services/watcher/internal/agents"
+	"github.com/jredh-dev/nexus/services/watcher/internal/ctl"
 	"github.com/jredh-dev/nexus/services/watcher/internal/filter"
 	"github.com/jredh-dev/nexus/services/watcher/internal/opencode"
 	"github.com/jredh-dev/nexus/services/watcher/internal/watcher"
@@ -63,6 +67,7 @@ type config struct {
 	maxQuietSec  int
 	auditLog     string
 	branch       string
+	ctlPort      string
 }
 
 func loadConfig() (config, error) {
@@ -71,6 +76,7 @@ func loadConfig() (config, error) {
 		opencodeURL:  envOr("OPENCODE_URL", "http://opencode:4096"),
 		opencodePass: os.Getenv("OPENCODE_PASSWORD"),
 		branch:       envOr("WATCHER_BRANCH", "on-demand"),
+		ctlPort:      envOr("WATCHER_CTL_PORT", "4097"),
 	}
 
 	if c.dir == "" {
@@ -91,12 +97,13 @@ func loadConfig() (config, error) {
 }
 
 func run(cfg config) error {
-	slog.Info("humanish starting",
+	slog.Info("watcher starting",
 		"dir", cfg.dir,
 		"opencode_url", cfg.opencodeURL,
 		"quiet_seconds", cfg.quietSeconds,
 		"max_quiet_sec", cfg.maxQuietSec,
 		"branch", cfg.branch,
+		"ctl_port", cfg.ctlPort,
 	)
 
 	// Ensure audit log directory exists.
@@ -127,6 +134,19 @@ func run(cfg config) error {
 		slog.Warn("init message failed", "err", err)
 	}
 
+	// Start HTTP control server.
+	ctlHandler := ctl.New()
+	ctlSrv := &http.Server{
+		Addr:    ":" + cfg.ctlPort,
+		Handler: ctlHandler,
+	}
+	go func() {
+		slog.Info("ctl server listening", "port", cfg.ctlPort)
+		if err := ctlSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("ctl server error", "err", err)
+		}
+	}()
+
 	// Start file watcher.
 	w, err := watcher.New(cfg.dir, watcher.Config{
 		QuietSeconds:    cfg.quietSeconds,
@@ -150,18 +170,77 @@ func run(cfg config) error {
 		select {
 		case <-sigCh:
 			slog.Info("shutdown signal received")
+			_ = ctlSrv.Shutdown(context.Background())
 			return nil
+
+		case <-ctlHandler.TriggerCh():
+			// Manual trigger: diff all visible files against HEAD.
+			if ctlHandler.IsPaused() {
+				slog.Info("ctl: trigger received but watcher is paused — skipping")
+				continue
+			}
+			slog.Info("ctl: trigger — running full diff")
+			if err := triggerFullDiff(cfg, oc); err != nil {
+				slog.Error("ctl: trigger error", "err", err)
+			}
+			ctlHandler.SetLastBatch(time.Now())
+
+		case <-ctlHandler.InterruptCh():
+			// Interrupt: flush any pending files from the watcher immediately.
+			if ctlHandler.IsPaused() {
+				slog.Info("ctl: interrupt received but watcher is paused — skipping")
+				continue
+			}
+			slog.Info("ctl: interrupt — flushing pending batch")
+			w.Interrupt()
 
 		case batch, ok := <-w.Batches:
 			if !ok {
 				return nil
 			}
+			// Respect pause state.
+			if ctlHandler.IsPaused() {
+				slog.Info("ctl: watcher paused — dropping batch", "files", len(batch.Paths))
+				continue
+			}
 			if err := processBatch(cfg, oc, batch.Paths); err != nil {
 				slog.Error("batch processing error", "err", err)
 				// Continue — don't crash on a single bad batch.
 			}
+			ctlHandler.SetLastBatch(time.Now())
 		}
+
+		// Keep pending count fresh for /status.
+		ctlHandler.SetPending(w.PendingCount())
 	}
+}
+
+// triggerFullDiff diffs all visible files in cfg.dir against HEAD and sends
+// the result to OpenCode. Used for manual /trigger requests.
+func triggerFullDiff(cfg config, oc *opencode.Client) error {
+	// Walk the directory and collect all visible files.
+	var visible []string
+	err := filepath.WalkDir(cfg.dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel, _ := filepath.Rel(cfg.dir, path)
+		if filter.IsVisible(rel) {
+			visible = append(visible, path)
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("walk: %w", err)
+	}
+	if len(visible) == 0 {
+		slog.Info("ctl: trigger — no visible files found")
+		return nil
+	}
+	return processBatch(cfg, oc, visible)
 }
 
 // sendInit reads the FORM.md hierarchy and sends a startup message to
