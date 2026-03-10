@@ -17,6 +17,8 @@
 //	WATCHER_AUDIT_LOG       path to audit log file (default: <WATCHER_DIR>/work/watcher-audit.log)
 //	WATCHER_BRANCH          branch mode: on-demand | on-schedule (default: on-demand)
 //	WATCHER_CTL_PORT        port for the HTTP control server (default: 4097)
+//	WATCHER_GIT_NAME        git user.name for auto-commits (default: watcher)
+//	WATCHER_GIT_EMAIL       git user.email for auto-commits (default: watcher@local)
 package main
 
 import (
@@ -337,22 +339,32 @@ func processBatch(cfg config, oc *opencode.Client, paths []string) error {
 	sb.WriteString("3. Respond with a brief assessment of what changed and any actions taken.\n")
 	sb.WriteString("4. If you detect a conflict or ambiguity that requires human input, say so clearly.\n")
 
-	slog.Info("sending diff to OpenCode", "files", len(visible))
-	reply, err := oc.Send(formCtx, sb.String())
-	if err != nil {
-		return fmt.Errorf("opencode send: %w", err)
-	}
-
-	slog.Info("opencode response received", "length", len(reply))
-
 	// Append to audit log — use relative paths for readability.
 	var relPaths []string
 	for _, p := range visible {
 		rel, _ := filepath.Rel(cfg.dir, p)
 		relPaths = append(relPaths, rel)
 	}
-	appendAudit(cfg.auditLog, "BATCH", map[string]string{
-		"files": strings.Join(relPaths, ", "),
+	fileList := strings.Join(relPaths, ", ")
+
+	appendAudit(cfg.auditLog, "BATCH_START", map[string]string{
+		"files": fileList,
+	})
+
+	slog.Info("sending diff to OpenCode", "files", len(visible))
+	reply, err := oc.Send(formCtx, sb.String())
+	if err != nil {
+		appendAudit(cfg.auditLog, "BATCH_ERROR", map[string]string{
+			"files": fileList,
+			"err":   err.Error(),
+		})
+		return fmt.Errorf("opencode send: %w", err)
+	}
+
+	slog.Info("opencode response received", "length", len(reply))
+
+	appendAudit(cfg.auditLog, "BATCH_COMPLETE", map[string]string{
+		"files": fileList,
 		"reply": truncate(reply, 500),
 	})
 
