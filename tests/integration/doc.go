@@ -13,4 +13,10 @@
 //	HERMIT_BEARER_TOKEN OAuth2/IAM bearer token for Cloud Run auth (optional)
 //	SECRETS_URL         HTTP base URL (default: http://localhost:8082)
 //	VN_URL              HTTP base URL for vn service (default: http://localhost:8082)
+//
+// MCP services:
+//
+//	GITHUB_MCP_URL      github-mcp base URL (default: http://localhost:8091)
+//	DISCORD_MCP_URL     discord-mcp base URL (default: http://localhost:8092)
+//	GCLOUD_MCP_URL      gcloud-mcp base URL (default: http://localhost:8093)
 package integration
