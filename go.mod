@@ -3,17 +3,18 @@ module github.com/jredh-dev/nexus
 go 1.24.2
 
 require (
+	charm.land/bubbletea/v2 v2.0.0
+	charm.land/lipgloss/v2 v2.0.0
 	connectrpc.com/connect v1.19.1
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/google/uuid v1.6.0
+	github.com/segmentio/kafka-go v0.4.50
 	golang.org/x/crypto v0.48.0
 	google.golang.org/protobuf v1.36.11
 	modernc.org/sqlite v1.37.1
 )
 
 require (
-	charm.land/bubbletea/v2 v2.0.0 // indirect
-	charm.land/lipgloss/v2 v2.0.0 // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/charmbracelet/colorprofile v0.4.2 // indirect
 	github.com/charmbracelet/ultraviolet v0.0.0-20260205113103-524a6607adb8 // indirect
@@ -34,12 +35,14 @@ require (
 	github.com/jackc/pgx/v5 v5.8.0 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
+	github.com/klauspost/compress v1.15.9 // indirect
 	github.com/lucasb-eyer/go-colorful v1.3.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.19 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
+	github.com/pierrec/lz4/v4 v4.1.15 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sv-tools/openapi v0.4.0 // indirect

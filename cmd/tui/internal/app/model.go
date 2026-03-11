@@ -4,6 +4,8 @@
 package app
 
 import (
+	tuitypes "github.com/jredh-dev/nexus/internal/tui"
+
 	pb "github.com/jredh-dev/nexus/cmd/tui/proto"
 )
 
@@ -29,12 +31,11 @@ type dbHistoryEntry struct {
 // Model is the root bubbletea model for fool.
 // Exported so tests can construct and drive it directly.
 type Model struct {
+	tuitypes.WindowSize // embeds Width, Height
+
 	state  appState
 	addr   string
 	secret string
-
-	width  int
-	height int
 
 	hermit  HermitClient
 	secrets SecretsClient

@@ -11,46 +11,26 @@ import (
 	"charm.land/lipgloss/v2"
 
 	pb "github.com/jredh-dev/nexus/cmd/tui/proto"
+	tuitypes "github.com/jredh-dev/nexus/internal/tui"
 )
 
-// --- Styles ---
+// --- App-specific styles (not shared) ---
 
 var (
-	titleStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#00FF88"))
-
 	selectedStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#000000")).
 			Background(lipgloss.Color("#00FF88"))
 
-	dimStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#666666"))
-
-	errStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FF4444")).
-			Bold(true)
-
-	valueStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFAA00"))
-
 	promptStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#00FF88")).
 			Bold(true)
-
-	panelStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#444466")).
-			Padding(0, 1)
 )
 
 // View renders the full-screen TUI.
 func (m Model) View() tea.View {
-	if m.width == 0 {
-		v := tea.NewView("loading...")
-		v.AltScreen = true
-		return v
+	if m.Width == 0 {
+		return tuitypes.AltView("loading...")
 	}
 
 	var s string
@@ -71,41 +51,39 @@ func (m Model) View() tea.View {
 		s = m.viewError()
 	}
 
-	v := tea.NewView(s)
-	v.AltScreen = true
-	return v
+	return tuitypes.AltView(s)
 }
 
 // --- Full-screen views ---
 
 func (m Model) viewLogin() string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("  FOOL"))
+	b.WriteString(tuitypes.TitleStyle.Render("  FOOL"))
 	b.WriteString("\n\n")
 	b.WriteString("  Connect to: ")
-	b.WriteString(dimStyle.Render(m.addr))
+	b.WriteString(tuitypes.DimStyle.Render(m.addr))
 	b.WriteString("\n\n")
 	b.WriteString("  Username: ")
 	b.WriteString(m.username)
 	b.WriteString("█")
 	b.WriteString("\n\n")
-	b.WriteString(dimStyle.Render("  [enter] login  [esc] quit"))
+	b.WriteString(tuitypes.DimStyle.Render("  [enter] login  [esc] quit"))
 	return b.String()
 }
 
 func (m Model) viewConnecting() string {
-	return titleStyle.Render("  FOOL") + "\n\n  Connecting to " + m.addr + "..."
+	return tuitypes.TitleStyle.Render("  FOOL") + "\n\n  Connecting to " + m.addr + "..."
 }
 
 func (m Model) viewError() string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("  FOOL"))
+	b.WriteString(tuitypes.TitleStyle.Render("  FOOL"))
 	b.WriteString("\n\n")
 	if m.err != nil {
-		b.WriteString(errStyle.Render("  ERROR: " + m.err.Error()))
+		b.WriteString(tuitypes.ErrStyle.Render("  ERROR: " + m.err.Error()))
 	}
 	b.WriteString("\n\n")
-	b.WriteString(dimStyle.Render("  [q/esc] quit"))
+	b.WriteString(tuitypes.DimStyle.Render("  [q/esc] quit"))
 	return b.String()
 }
 
@@ -133,17 +111,17 @@ func (m Model) splitView(
 ) string {
 	// Border overhead: 2 vertical borders (top+bottom) + 2 padding lines each side
 	borderH := 2
-	topHeight := m.height/2 - borderH
+	topHeight := m.Height/2 - borderH
 	if topHeight < 4 {
 		topHeight = 4
 	}
-	botHeight := m.height - (topHeight + borderH*2) - borderH
+	botHeight := m.Height - (topHeight + borderH*2) - borderH
 	if botHeight < 3 {
 		botHeight = 3
 	}
 
 	// Inner width: border (1 each side) + padding (1 each side) = 4 chars
-	innerW := m.width - 4
+	innerW := m.Width - 4
 	if innerW < 20 {
 		innerW = 20
 	}
@@ -151,8 +129,8 @@ func (m Model) splitView(
 	topContent := topFn(innerW, topHeight)
 	botContent := botFn(innerW, botHeight)
 
-	topBox := panelStyle.Width(innerW).Render(topContent)
-	botBox := panelStyle.Width(innerW).Render(botContent)
+	topBox := tuitypes.BoxStyle.Width(innerW).Render(topContent)
+	botBox := tuitypes.BoxStyle.Width(innerW).Render(botContent)
 
 	return topBox + "\n" + botBox
 }
@@ -161,14 +139,14 @@ func (m Model) splitView(
 
 func (m Model) renderInfoPanel(innerW, maxLines int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Server Information"))
+	b.WriteString(tuitypes.TitleStyle.Render("Server Information"))
 	b.WriteString("\n")
 
 	if m.serverInfo == nil {
-		b.WriteString(dimStyle.Render("No server info yet. Select 'Hermit DB' or 'Benchmark' to connect."))
+		b.WriteString(tuitypes.DimStyle.Render("No server info yet. Select 'Hermit DB' or 'Benchmark' to connect."))
 		if m.err != nil {
 			b.WriteString("\n")
-			b.WriteString(errStyle.Render(m.err.Error()))
+			b.WriteString(tuitypes.ErrStyle.Render(m.err.Error()))
 		}
 		return b.String()
 	}
@@ -185,14 +163,14 @@ func (m Model) renderInfoPanel(innerW, maxLines int) string {
 
 	if len(m.viewHistory) > 0 {
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render("Log:"))
+		b.WriteString(tuitypes.DimStyle.Render("Log:"))
 		b.WriteString("\n")
 		start := 0
 		if len(m.viewHistory) > 3 {
 			start = len(m.viewHistory) - 3
 		}
 		for _, h := range m.viewHistory[start:] {
-			b.WriteString(dimStyle.Render("  " + h))
+			b.WriteString(tuitypes.DimStyle.Render("  " + h))
 			b.WriteString("\n")
 		}
 	}
@@ -202,17 +180,17 @@ func (m Model) renderInfoPanel(innerW, maxLines int) string {
 
 func serverInfoLines(si *pb.ServerInfoResponse) []string {
 	return []string{
-		fmt.Sprintf("Version:   %s", valueStyle.Render(si.Version)),
-		fmt.Sprintf("Region:    %s", valueStyle.Render(si.Region)),
-		fmt.Sprintf("Uptime:    %s", valueStyle.Render(fmt.Sprintf("%ds", si.UptimeSeconds))),
-		fmt.Sprintf("TLS:       %s", valueStyle.Render(fmt.Sprintf("%v", si.TlsEnabled))),
-		fmt.Sprintf("gRPC Port: %s", valueStyle.Render(fmt.Sprintf("%d", si.GrpcPort))),
+		fmt.Sprintf("Version:   %s", tuitypes.ValueStyle.Render(si.Version)),
+		fmt.Sprintf("Region:    %s", tuitypes.ValueStyle.Render(si.Region)),
+		fmt.Sprintf("Uptime:    %s", tuitypes.ValueStyle.Render(fmt.Sprintf("%ds", si.UptimeSeconds))),
+		fmt.Sprintf("TLS:       %s", tuitypes.ValueStyle.Render(fmt.Sprintf("%v", si.TlsEnabled))),
+		fmt.Sprintf("gRPC Port: %s", tuitypes.ValueStyle.Render(fmt.Sprintf("%d", si.GrpcPort))),
 	}
 }
 
 func (m Model) renderControlPanel(innerW, _ int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Menu"))
+	b.WriteString(tuitypes.TitleStyle.Render("Menu"))
 	b.WriteString("\n\n")
 
 	for i, item := range m.menuItems {
@@ -225,13 +203,13 @@ func (m Model) renderControlPanel(innerW, _ int) string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("[↑/↓ or k/j] navigate  [enter] select  [q] quit"))
+	b.WriteString(tuitypes.DimStyle.Render("[↑/↓ or k/j] navigate  [enter] select  [q] quit"))
 	return b.String()
 }
 
 func (m Model) renderBenchPanel(innerW, _ int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Benchmark Results"))
+	b.WriteString(tuitypes.TitleStyle.Render("Benchmark Results"))
 	b.WriteString("\n")
 
 	if m.benchRunning {
@@ -241,19 +219,19 @@ func (m Model) renderBenchPanel(innerW, _ int) string {
 
 	if m.grpcBench != nil {
 		b.WriteString("\n")
-		b.WriteString(titleStyle.Render("gRPC (TLS 1.3)"))
+		b.WriteString(tuitypes.TitleStyle.Render("gRPC (TLS 1.3)"))
 		b.WriteString("\n")
 		gb := m.grpcBench
 		b.WriteString(fmt.Sprintf("  min: %s  p50: %s  p99: %s  max: %s\n",
-			valueStyle.Render(fmtNs(gb.MinNs)),
-			valueStyle.Render(fmtNs(gb.P50Ns)),
-			valueStyle.Render(fmtNs(gb.P99Ns)),
-			valueStyle.Render(fmtNs(gb.MaxNs)),
+			tuitypes.ValueStyle.Render(tuitypes.FmtNs(gb.MinNs)),
+			tuitypes.ValueStyle.Render(tuitypes.FmtNs(gb.P50Ns)),
+			tuitypes.ValueStyle.Render(tuitypes.FmtNs(gb.P99Ns)),
+			tuitypes.ValueStyle.Render(tuitypes.FmtNs(gb.MaxNs)),
 		))
 		b.WriteString(fmt.Sprintf("  mean: %s  overhead: %s  tls: %s\n",
-			valueStyle.Render(fmtNs(gb.MeanNs)),
-			valueStyle.Render(fmtNs(gb.ProcessingOverheadNs)),
-			valueStyle.Render(gb.TlsVersion),
+			tuitypes.ValueStyle.Render(tuitypes.FmtNs(gb.MeanNs)),
+			tuitypes.ValueStyle.Render(tuitypes.FmtNs(gb.ProcessingOverheadNs)),
+			tuitypes.ValueStyle.Render(gb.TlsVersion),
 		))
 	}
 
@@ -262,36 +240,36 @@ func (m Model) renderBenchPanel(innerW, _ int) string {
 
 func (m Model) renderDBStatsPanel(innerW, maxLines int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("In-Memory Database — Stats"))
+	b.WriteString(tuitypes.TitleStyle.Render("In-Memory Database — Stats"))
 	b.WriteString("\n")
 
 	b.WriteString("\n")
-	b.WriteString(titleStyle.Render("Document Store") + dimStyle.Render(" (zstd KVP, fast reads)"))
+	b.WriteString(tuitypes.TitleStyle.Render("Document Store") + tuitypes.DimStyle.Render(" (zstd KVP, fast reads)"))
 	b.WriteString("\n")
 	if m.dbStats != nil {
 		b.WriteString(fmt.Sprintf("  keys: %s   compressed: %s\n",
-			valueStyle.Render(fmt.Sprintf("%d", m.dbStats.DocKeyCount)),
-			valueStyle.Render(fmtBytes(m.dbStats.DocCompressedBytes)),
+			tuitypes.ValueStyle.Render(fmt.Sprintf("%d", m.dbStats.DocKeyCount)),
+			tuitypes.ValueStyle.Render(tuitypes.FmtBytes(m.dbStats.DocCompressedBytes)),
 		))
 	} else {
-		b.WriteString(dimStyle.Render("  loading...\n"))
+		b.WriteString(tuitypes.DimStyle.Render("  loading...\n"))
 	}
 
 	b.WriteString("\n")
-	b.WriteString(titleStyle.Render("Relational Store") + dimStyle.Render(" (MPSC queue, eventual reads)"))
+	b.WriteString(tuitypes.TitleStyle.Render("Relational Store") + tuitypes.DimStyle.Render(" (MPSC queue, eventual reads)"))
 	b.WriteString("\n")
 	if m.dbStats != nil {
 		b.WriteString(fmt.Sprintf("  committed rows: %s   pending writes: %s\n",
-			valueStyle.Render(fmt.Sprintf("%d", m.dbStats.RelRowCount)),
-			valueStyle.Render(fmt.Sprintf("%d", m.dbStats.RelPendingWrites)),
+			tuitypes.ValueStyle.Render(fmt.Sprintf("%d", m.dbStats.RelRowCount)),
+			tuitypes.ValueStyle.Render(fmt.Sprintf("%d", m.dbStats.RelPendingWrites)),
 		))
 	} else {
-		b.WriteString(dimStyle.Render("  loading...\n"))
+		b.WriteString(tuitypes.DimStyle.Render("  loading...\n"))
 	}
 
 	if len(m.dbHistory) > 0 {
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render("Recent:"))
+		b.WriteString(tuitypes.DimStyle.Render("Recent:"))
 		b.WriteString("\n")
 		linesUsed := 7
 		avail := maxLines - linesUsed - 2
@@ -303,9 +281,9 @@ func (m Model) renderDBStatsPanel(innerW, maxLines int) string {
 			start = len(m.dbHistory) - avail
 		}
 		for _, h := range m.dbHistory[start:] {
-			style := dimStyle
+			style := tuitypes.DimStyle
 			if h.isErr {
-				style = errStyle
+				style = tuitypes.ErrStyle
 			}
 			line := fmt.Sprintf("[%s] %s → %s", h.ts, h.cmd, h.output)
 			if len(line) > innerW-2 {
@@ -321,7 +299,7 @@ func (m Model) renderDBStatsPanel(innerW, maxLines int) string {
 
 func (m Model) renderDBInputPanel(innerW, _ int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("DB Console"))
+	b.WriteString(tuitypes.TitleStyle.Render("DB Console"))
 	b.WriteString("\n\n")
 
 	b.WriteString(promptStyle.Render("> "))
@@ -329,24 +307,24 @@ func (m Model) renderDBInputPanel(innerW, _ int) string {
 	b.WriteString("█")
 	b.WriteString("\n\n")
 
-	b.WriteString(dimStyle.Render("kv:set <k> <v>  kv:get <k>  kv:list"))
+	b.WriteString(tuitypes.DimStyle.Render("kv:set <k> <v>  kv:get <k>  kv:list"))
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("sql:insert <k> <v>  sql:query [k]  stats  help"))
+	b.WriteString(tuitypes.DimStyle.Render("sql:insert <k> <v>  sql:query [k]  stats  help"))
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("[enter] execute  [esc] back"))
+	b.WriteString(tuitypes.DimStyle.Render("[enter] execute  [esc] back"))
 	return b.String()
 }
 
 func (m Model) renderSecretsListPanel(innerW, maxLines int) string {
 	var b strings.Builder
 	stats := m.secretsStats
-	b.WriteString(titleStyle.Render("Secrets") +
-		dimStyle.Render(fmt.Sprintf("  total:%d  secrets:%d  exposed:%d  lenses:%d",
+	b.WriteString(tuitypes.TitleStyle.Render("Secrets") +
+		tuitypes.DimStyle.Render(fmt.Sprintf("  total:%d  secrets:%d  exposed:%d  lenses:%d",
 			stats.Total, stats.Secrets, stats.NotSecrets, stats.Lenses)))
 	b.WriteString("\n\n")
 
 	if len(m.secretsList) == 0 {
-		b.WriteString(dimStyle.Render("No secrets yet."))
+		b.WriteString(tuitypes.DimStyle.Render("No secrets yet."))
 	} else {
 		// Show most recent first, capped to fit maxLines
 		avail := maxLines - 4
@@ -365,12 +343,12 @@ func (m Model) renderSecretsListPanel(innerW, maxLines int) string {
 				stateLabel = "exposed"
 			}
 			stateTag := lipgloss.NewStyle().Foreground(stateColor).Render(stateLabel)
-			countInfo := dimStyle.Render(fmt.Sprintf("x%d", s.Count))
+			countInfo := tuitypes.DimStyle.Render(fmt.Sprintf("x%d", s.Count))
 			line := fmt.Sprintf("[%s] %s  %s  %s",
 				stateTag,
-				valueStyle.Render(s.Value),
+				tuitypes.ValueStyle.Render(s.Value),
 				countInfo,
-				dimStyle.Render("by "+s.SubmittedBy),
+				tuitypes.DimStyle.Render("by "+s.SubmittedBy),
 			)
 			if len(line) > innerW {
 				line = line[:innerW-3] + "..."
@@ -382,16 +360,16 @@ func (m Model) renderSecretsListPanel(innerW, maxLines int) string {
 
 	if len(m.secretsLog) > 0 {
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render("Log:"))
+		b.WriteString(tuitypes.DimStyle.Render("Log:"))
 		b.WriteString("\n")
 		start := 0
 		if len(m.secretsLog) > 3 {
 			start = len(m.secretsLog) - 3
 		}
 		for _, e := range m.secretsLog[start:] {
-			style := dimStyle
+			style := tuitypes.DimStyle
 			if e.isErr {
-				style = errStyle
+				style = tuitypes.ErrStyle
 			}
 			b.WriteString(style.Render(fmt.Sprintf("  [%s] %s", e.ts, e.text)))
 			b.WriteString("\n")
@@ -403,7 +381,7 @@ func (m Model) renderSecretsListPanel(innerW, maxLines int) string {
 
 func (m Model) renderSecretsInputPanel(innerW, _ int) string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Submit a Secret"))
+	b.WriteString(tuitypes.TitleStyle.Render("Submit a Secret"))
 	b.WriteString("\n\n")
 
 	b.WriteString(promptStyle.Render("> "))
@@ -411,32 +389,6 @@ func (m Model) renderSecretsInputPanel(innerW, _ int) string {
 	b.WriteString("█")
 	b.WriteString("\n\n")
 
-	b.WriteString(dimStyle.Render("[enter] submit  [enter on empty] refresh  [esc] back"))
+	b.WriteString(tuitypes.DimStyle.Render("[enter] submit  [enter on empty] refresh  [esc] back"))
 	return b.String()
-}
-
-// --- Formatting helpers ---
-
-func fmtNs(ns int64) string {
-	switch {
-	case ns >= 1_000_000_000:
-		return fmt.Sprintf("%.2fs", float64(ns)/1e9)
-	case ns >= 1_000_000:
-		return fmt.Sprintf("%.2fms", float64(ns)/1e6)
-	case ns >= 1_000:
-		return fmt.Sprintf("%.2fμs", float64(ns)/1e3)
-	default:
-		return fmt.Sprintf("%dns", ns)
-	}
-}
-
-func fmtBytes(b uint64) string {
-	switch {
-	case b >= 1<<20:
-		return fmt.Sprintf("%.1fMB", float64(b)/float64(1<<20))
-	case b >= 1<<10:
-		return fmt.Sprintf("%.1fKB", float64(b)/float64(1<<10))
-	default:
-		return fmt.Sprintf("%dB", b)
-	}
 }

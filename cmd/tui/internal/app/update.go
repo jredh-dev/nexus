@@ -9,6 +9,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	tuitypes "github.com/jredh-dev/nexus/internal/tui"
 )
 
 // Init satisfies tea.Model. Returns nil (no initial commands).
@@ -18,12 +19,12 @@ func (m Model) Init() tea.Cmd {
 
 // Update is the bubbletea update function.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
+	// WindowSizeMsg handled via embedded WindowSize.
+	if m.WindowSize.Handle(msg) {
 		return m, nil
+	}
 
+	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 
@@ -77,7 +78,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case stateSecrets:
 		return m.handleSecretsKey(k)
 	case stateError:
-		if k.Code == 'q' || k.Code == tea.KeyEscape {
+		if tuitypes.IsQuit(k) {
 			return m, tea.Quit
 		}
 	}
